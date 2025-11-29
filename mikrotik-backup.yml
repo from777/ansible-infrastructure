@@ -19,3 +19,18 @@
       copy:
         content: "{{ config_output.stdout[0] }}"
         dest: "{{ backup_dir }}/{{ inventory_hostname }}.rsc"
+
+    - name: Git add backup file
+      delegate_to: localhost
+      shell: |
+        cd {{ playbook_dir }}
+        git config user.email "semaphore@local"
+        git config user.name "Semaphore"
+        git add backups/
+        git commit -m "Backup {{ inventory_hostname }} - {{ ansible_date_time.date | default('manual') }}" || true
+      
+    - name: Git push
+      delegate_to: localhost
+      shell: |
+        cd {{ playbook_dir }}
+        git push
