@@ -6,6 +6,7 @@
     ansible_connection: ansible.netcommon.network_cli
     ansible_network_os: community.routeros.routeros
     ansible_become: no
+    backup_dir: "{{ playbook_dir }}/backups"
   tasks:
     - name: Get export configuration
       community.routeros.command:
@@ -17,4 +18,4 @@
       delegate_to: localhost
       copy:
         content: "{{ config_output.stdout[0] }}"
-        dest: "/tmp/mikrotik-backup-{{ inventory_hostname }}.rsc"
+        dest: "{{ backup_dir }}/{{ inventory_hostname }}.rsc"
