@@ -1,0 +1,16 @@
+---
+- name: Backup MikroTik configuration
+  hosts: mikrotik
+  gather_facts: no
+  tasks:
+    - name: Get export configuration
+      community.routeros.command:
+        commands:
+          - /export
+      register: config_output
+
+    - name: Save config to file
+      local_action:
+        module: copy
+        content: "{{ config_output.stdout[0] }}"
+        dest: "/tmp/mikrotik-backup-{{ inventory_hostname }}.rsc"
