@@ -1,4 +1,4 @@
-# 2025-11-30 03:47:21 by RouterOS 7.20.2
+# 2025-11-30 03:56:55 by RouterOS 7.20.2
 # software id = E05L-801M
 #
 # model = RB5009UPr+S+
@@ -222,7 +222,8 @@ add allowed-address=10.101.101.0/24,10.200.200.0/24 comment="Mama router" \
     preshared-key="UPCYUl+kt/sH/rMlt36JEKXgiCLb9S8FipuZrSMgIVQ=" public-key=\
     "VCqD4aQWT7v1p/AhTR8KzyN/SIY0/QsySqAZkfBePBE="
 /ip address
-add address=192.168.0.1/24 comment=Main interface=bridge1 network=192.168.0.0
+add address=192.168.0.1/24 comment=Main1 interface=bridge1 network=\
+    192.168.0.0
 add address=10.101.101.1/24 interface=WG_Home network=10.101.101.0
 add address=192.168.254.1/24 interface=Bridge-Docker network=192.168.254.0
 add address=192.168.100.1/24 interface=vlan100-guest network=192.168.100.0
