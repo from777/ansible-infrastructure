@@ -2,6 +2,10 @@
 - name: Backup MikroTik configuration
   hosts: mikrotik
   gather_facts: no
+  vars:
+    ansible_connection: ansible.netcommon.network_cli
+    ansible_network_os: community.routeros.routeros
+    ansible_become: no
   tasks:
     - name: Get export configuration
       community.routeros.command:
@@ -10,7 +14,7 @@
       register: config_output
 
     - name: Save config to file
-      local_action:
-        module: copy
+      delegate_to: localhost
+      copy:
         content: "{{ config_output.stdout[0] }}"
         dest: "/tmp/mikrotik-backup-{{ inventory_hostname }}.rsc"
