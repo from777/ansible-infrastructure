@@ -15,28 +15,19 @@
           - ca-certificates
           - curl
           - gnupg
+          - default-jdk
         state: present
         update_cache: yes
 
-    - name: Add Elasticsearch GPG key
-      shell: |
-        curl -fsSL https://artifacts.elastic.co/GPG-KEY-elasticsearch | gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg
-      args:
-        creates: /usr/share/keyrings/elasticsearch-keyring.gpg
-
-    - name: Add Elasticsearch repository
-      copy:
-        content: "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main"
-        dest: /etc/apt/sources.list.d/elastic-8.x.list
-
-    - name: Update apt cache
-      apt:
-        update_cache: yes
+    - name: Download Elasticsearch
+      get_url:
+        url: "https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-{{ elk_version }}-amd64.deb"
+        dest: "/tmp/elasticsearch-{{ elk_version }}-amd64.deb"
+        timeout: 300
 
     - name: Install Elasticsearch
       apt:
-        name: elasticsearch={{ elk_version }}
-        state: present
+        deb: "/tmp/elasticsearch-{{ elk_version }}-amd64.deb"
 
     - name: Configure Elasticsearch
       copy:
@@ -73,10 +64,15 @@
         delay: 10
         timeout: 120
 
+    - name: Download Kibana
+      get_url:
+        url: "https://artifacts.elastic.co/downloads/kibana/kibana-{{ elk_version }}-amd64.deb"
+        dest: "/tmp/kibana-{{ elk_version }}-amd64.deb"
+        timeout: 300
+
     - name: Install Kibana
       apt:
-        name: kibana={{ elk_version }}
-        state: present
+        deb: "/tmp/kibana-{{ elk_version }}-amd64.deb"
 
     - name: Configure Kibana
       copy:
@@ -93,10 +89,15 @@
         state: started
         enabled: yes
 
+    - name: Download Logstash
+      get_url:
+        url: "https://artifacts.elastic.co/downloads/logstash/logstash-{{ elk_version }}-amd64.deb"
+        dest: "/tmp/logstash-{{ elk_version }}-amd64.deb"
+        timeout: 300
+
     - name: Install Logstash
       apt:
-        name: logstash=1:{{ elk_version }}-1
-        state: present
+        deb: "/tmp/logstash-{{ elk_version }}-amd64.deb"
 
     - name: Configure Logstash pipeline
       copy:
