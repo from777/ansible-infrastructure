@@ -29,6 +29,13 @@
       apt:
         deb: "/tmp/elasticsearch-{{ elk_version }}-amd64.deb"
 
+    - name: Clear Elasticsearch keystore
+      shell: |
+        /usr/share/elasticsearch/bin/elasticsearch-keystore remove xpack.security.transport.ssl.keystore.secure_password || true
+        /usr/share/elasticsearch/bin/elasticsearch-keystore remove xpack.security.transport.ssl.truststore.secure_password || true
+        /usr/share/elasticsearch/bin/elasticsearch-keystore remove xpack.security.http.ssl.keystore.secure_password || true
+      ignore_errors: yes
+
     - name: Configure Elasticsearch
       copy:
         content: |
@@ -40,6 +47,9 @@
           http.port: 9200
           discovery.type: single-node
           xpack.security.enabled: false
+          xpack.security.enrollment.enabled: false
+          xpack.security.http.ssl.enabled: false
+          xpack.security.transport.ssl.enabled: false
         dest: /etc/elasticsearch/elasticsearch.yml
       notify: Restart Elasticsearch
 
