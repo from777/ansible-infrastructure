@@ -1,0 +1,151 @@
+# elk.yml
+---
+- name: Install ELK Stack
+  hosts: elk
+  become: yes
+  vars:
+    elk_version: "8.17.0"
+    es_heap_size: "2g"
+
+  tasks:
+    - name: Install dependencies
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+        state: present
+        update_cache: yes
+
+    - name: Add Elasticsearch GPG key
+      shell: |
+        curl -fsSL https://artifacts.elastic.co/GPG-KEY-elasticsearch | gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/elasticsearch-keyring.gpg
+
+    - name: Add Elasticsearch repository
+      copy:
+        content: "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main"
+        dest: /etc/apt/sources.list.d/elastic-8.x.list
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install Elasticsearch
+      apt:
+        name: elasticsearch={{ elk_version }}
+        state: present
+
+    - name: Configure Elasticsearch
+      copy:
+        content: |
+          cluster.name: elk-cluster
+          node.name: elk-node-1
+          path.data: /var/lib/elasticsearch
+          path.logs: /var/log/elasticsearch
+          network.host: 0.0.0.0
+          http.port: 9200
+          discovery.type: single-node
+          xpack.security.enabled: false
+        dest: /etc/elasticsearch/elasticsearch.yml
+      notify: Restart Elasticsearch
+
+    - name: Configure Elasticsearch heap size
+      copy:
+        content: |
+          -Xms{{ es_heap_size }}
+          -Xmx{{ es_heap_size }}
+        dest: /etc/elasticsearch/jvm.options.d/heap.options
+      notify: Restart Elasticsearch
+
+    - name: Start and enable Elasticsearch
+      systemd:
+        name: elasticsearch
+        state: started
+        enabled: yes
+
+    - name: Wait for Elasticsearch
+      wait_for:
+        host: localhost
+        port: 9200
+        delay: 10
+        timeout: 120
+
+    - name: Install Kibana
+      apt:
+        name: kibana={{ elk_version }}
+        state: present
+
+    - name: Configure Kibana
+      copy:
+        content: |
+          server.port: 5601
+          server.host: "0.0.0.0"
+          elasticsearch.hosts: ["http://localhost:9200"]
+        dest: /etc/kibana/kibana.yml
+      notify: Restart Kibana
+
+    - name: Start and enable Kibana
+      systemd:
+        name: kibana
+        state: started
+        enabled: yes
+
+    - name: Install Logstash
+      apt:
+        name: logstash=1:{{ elk_version }}-1
+        state: present
+
+    - name: Configure Logstash pipeline
+      copy:
+        content: |
+          input {
+            syslog {
+              port => 5514
+              type => "syslog"
+            }
+            beats {
+              port => 5044
+            }
+          }
+          
+          filter {
+            if [type] == "syslog" {
+              grok {
+                match => { "message" => "%{SYSLOGTIMESTAMP:syslog_timestamp} %{SYSLOGHOST:syslog_hostname} %{DATA:syslog_program}(?:\[%{POSINT:syslog_pid}\])?: %{GREEDYDATA:syslog_message}" }
+              }
+            }
+          }
+          
+          output {
+            elasticsearch {
+              hosts => ["localhost:9200"]
+              index => "logs-%{+YYYY.MM.dd}"
+            }
+          }
+        dest: /etc/logstash/conf.d/main.conf
+      notify: Restart Logstash
+
+    - name: Start and enable Logstash
+      systemd:
+        name: logstash
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: Restart Elasticsearch
+      systemd:
+        name: elasticsearch
+        state: restarted
+
+    - name: Restart Kibana
+      systemd:
+        name: kibana
+        state: restarted
+
+    - name: Restart Logstash
+      systemd:
+        name: logstash
+        state: restarted
