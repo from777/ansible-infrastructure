@@ -1,0 +1,56 @@
+# mikrotik-logging.yml
+---
+- name: Configure MikroTik logging to ELK
+  hosts: mikrotik
+  gather_facts: no
+  vars:
+    elk_server: "192.168.0.82"
+    elk_port: "5514"
+    ntp_server: "pool.ntp.org"
+    timezone: "Europe/Moscow"
+
+  tasks:
+    - name: Set NTP client
+      community.routeros.command:
+        commands:
+          - /system/ntp/client/set enabled=yes
+
+    - name: Add NTP server
+      community.routeros.command:
+        commands:
+          - /system/ntp/client/servers/add address={{ ntp_server }}
+      ignore_errors: yes
+
+    - name: Set timezone
+      community.routeros.command:
+        commands:
+          - /system/clock/set time-zone-name={{ timezone }}
+
+    - name: Configure remote logging action
+      community.routeros.command:
+        commands:
+          - /system/logging/action/set [find name="remote"] remote={{ elk_server }} remote-port={{ elk_port }} remote-log-format=bsd-syslog
+
+    - name: Add logging rule for info
+      community.routeros.command:
+        commands:
+          - /system/logging/add action=remote topics=info
+      ignore_errors: yes
+
+    - name: Add logging rule for warning
+      community.routeros.command:
+        commands:
+          - /system/logging/add action=remote topics=warning
+      ignore_errors: yes
+
+    - name: Add logging rule for error
+      community.routeros.command:
+        commands:
+          - /system/logging/add action=remote topics=error
+      ignore_errors: yes
+
+    - name: Add logging rule for critical
+      community.routeros.command:
+        commands:
+          - /system/logging/add action=remote topics=critical
+      ignore_errors: yes
