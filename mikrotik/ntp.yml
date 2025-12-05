@@ -1,0 +1,60 @@
+# ntp.yml
+---
+- name: Configure MikroTik NTP
+  hosts: mikrotik
+  gather_facts: no
+  vars:
+    timezone: "Asia/Novosibirsk"
+    router_ip: "192.168.0.1"
+
+  tasks:
+    - name: Set NTP client enabled
+      community.routeros.command:
+        commands:
+          - /system/ntp/client/set enabled=yes
+
+    - name: Add NTP server 0.ru.pool.ntp.org
+      community.routeros.command:
+        commands:
+          - /system/ntp/client/servers/add address=0.ru.pool.ntp.org
+      ignore_errors: yes
+
+    - name: Add NTP server 1.ru.pool.ntp.org
+      community.routeros.command:
+        commands:
+          - /system/ntp/client/servers/add address=1.ru.pool.ntp.org
+      ignore_errors: yes
+
+    - name: Add NTP server 2.ru.pool.ntp.org
+      community.routeros.command:
+        commands:
+          - /system/ntp/client/servers/add address=2.ru.pool.ntp.org
+      ignore_errors: yes
+
+    - name: Add NTP server 3.ru.pool.ntp.org
+      community.routeros.command:
+        commands:
+          - /system/ntp/client/servers/add address=3.ru.pool.ntp.org
+      ignore_errors: yes
+
+    - name: Set timezone
+      community.routeros.command:
+        commands:
+          - /system/clock/set time-zone-name={{ timezone }}
+
+    - name: Enable NTP server
+      community.routeros.command:
+        commands:
+          - /system/ntp/server/set enabled=yes
+
+    - name: Set NTP server in DHCP network 192.168.0.0/24
+      community.routeros.command:
+        commands:
+          - /ip/dhcp-server/network/set [find address="192.168.0.0/24"] ntp-server={{ router_ip }}
+      ignore_errors: yes
+
+    - name: Set NTP server in DHCP network 192.168.100.0/24
+      community.routeros.command:
+        commands:
+          - /ip/dhcp-server/network/set [find address="192.168.100.0/24"] ntp-server={{ router_ip }}
+      ignore_errors: yes

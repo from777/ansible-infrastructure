@@ -1,4 +1,4 @@
-# mikrotik-logging.yml
+# logging.yml
 ---
 - name: Configure MikroTik logging to ELK
   hosts: mikrotik
@@ -6,26 +6,8 @@
   vars:
     elk_server: "192.168.0.82"
     elk_port: "5514"
-    ntp_server: "pool.ntp.org"
-    timezone: "Europe/Moscow"
 
   tasks:
-    - name: Set NTP client
-      community.routeros.command:
-        commands:
-          - /system/ntp/client/set enabled=yes
-
-    - name: Add NTP server
-      community.routeros.command:
-        commands:
-          - /system/ntp/client/servers/add address={{ ntp_server }}
-      ignore_errors: yes
-
-    - name: Set timezone
-      community.routeros.command:
-        commands:
-          - /system/clock/set time-zone-name={{ timezone }}
-
     - name: Configure remote logging action
       community.routeros.command:
         commands:
