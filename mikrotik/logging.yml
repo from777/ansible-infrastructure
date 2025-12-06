@@ -3,7 +3,10 @@
 - name: Configure MikroTik logging to ELK
   hosts: mikrotik
   gather_facts: no
+  connection: ansible.netcommon.network_cli
   vars:
+    ansible_network_os: community.routeros.routeros
+    ansible_connection: ansible.netcommon.network_cli
     elk_server: "192.168.0.82"
     elk_port: "5514"
 
