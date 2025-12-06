@@ -3,7 +3,10 @@
 - name: Configure MikroTik NTP
   hosts: mikrotik
   gather_facts: no
+  connection: ansible.netcommon.network_cli
   vars:
+    ansible_network_os: community.routeros.routeros
+    ansible_connection: ansible.netcommon.network_cli
     timezone: "Asia/Novosibirsk"
     router_ip: "192.168.0.1"
 
