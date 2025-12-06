@@ -13,7 +13,7 @@
     - name: Configure remote logging action
       community.routeros.command:
         commands:
-          - /system/logging/action/set remote remote={{ elk_server }} remote-port={{ elk_port }} remote-log-format=syslog
+          - /system/logging/action/set remote remote={{ elk_server }} remote-port={{ elk_port }} remote-log-format=syslog syslog-time-format=iso8601
 
     - name: Add logging rule for info
       community.routeros.command:
