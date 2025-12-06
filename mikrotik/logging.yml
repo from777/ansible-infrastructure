@@ -7,7 +7,7 @@
   vars:
     ansible_network_os: community.routeros.routeros
     ansible_connection: ansible.netcommon.network_cli
-    elk_server: "192.168.0.82"
+    elk_server: "{{ elk_server_override | default('192.168.0.82') }}"
     elk_port: "5514"
 
   tasks:
