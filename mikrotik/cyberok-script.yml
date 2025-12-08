@@ -9,26 +9,29 @@
     ansible_network_os: community.routeros.routeros
     script_url: "https://raw.githubusercontent.com/from777/mikrotik-scripts/main/cyberok-script.rsc"
     script_file: "cyberok-script.rsc"
+    script_name: "update-cyberok-list"
+    # Только нужные policy: ftp, read, write, test
+    script_policy: "ftp,read,write,test"
 
   tasks:
     # Проверяем существует ли скрипт
     - name: Check if script exists
       community.routeros.command:
         commands:
-          - /system/script/print count-only where name="update-cyberok-list"
+          - /system/script/print count-only where name="{{ script_name }}"
       register: script_count
 
-    # Извлекаем число из вывода (последняя непустая строка)
+    # Извлекаем число из вывода
     - name: Set script exists flag
       set_fact:
         script_exists: "{{ script_count.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 0 }}"
 
-    # Debug - показать результат
+    # Debug
     - name: Debug script exists
       debug:
         msg: "Script exists: {{ script_exists }}"
 
-    # Скачиваем и импортируем только если скрипта нет
+    # Скачиваем только если скрипта нет
     - name: Download script from GitHub
       community.routeros.command:
         commands:
@@ -41,12 +44,21 @@
           - /delay 2s
       when: not script_exists
 
+    # Импортируем скрипт
     - name: Import script
       community.routeros.command:
         commands:
           - /import file="{{ script_file }}"
       when: not script_exists
 
+    # Устанавливаем правильные policy после импорта
+    - name: Set script policy
+      community.routeros.command:
+        commands:
+          - /system/script/set [find name="{{ script_name }}"] policy="{{ script_policy }}"
+      when: not script_exists
+
+    # Удаляем временный файл
     - name: Remove temp file
       community.routeros.command:
         commands:
