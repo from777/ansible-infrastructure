@@ -7,7 +7,7 @@
   vars:
     ansible_network_os: community.routeros.routeros
     elk_port: "5514"
-    # Список topics для цикла — каждый элемент будет подставлен в {{ item }}
+    # Список topics для цикла — каждый элемент будет подставлен в {{ item } }
     logging_topics:
       - info
       - warning
