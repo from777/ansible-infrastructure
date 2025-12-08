@@ -7,17 +7,15 @@
   vars:
     ansible_network_os: community.routeros.routeros
     elk_port: "5514"
-    # Список topics для цикла — каждый элемент будет подставлен в {{ item } }
+    # Список topics для цикла — каждый элемент будет подставлен в {{ item }}
     logging_topics:
       - info
       - warning
       - error
       - critical
 
-  # {{ elk_server }} — берётся из inventory (инвентаря)
-  # В Ansible Semaphore: inventory задаётся в Environment или в Host Variables
-  # Каждый хост (роутер) может иметь свою переменную elk_server
-  # Или она может быть общей для группы [mikrotik:vars]
+  # {{ elk_server }} — берётся из inventory файла mikrotik/inventory.ini
+  # Для каждого хоста своё значение, указанное в той же строке что и хост
 
   tasks:
     - name: Configure remote logging action
