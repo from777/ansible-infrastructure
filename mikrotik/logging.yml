@@ -1,7 +1,7 @@
 # logging.yml
 ---
 - name: Configure MikroTik logging to ELK
-  hosts: mikrotik
+  hosts: "{{ target_hosts }}"
   gather_facts: no
   connection: ansible.netcommon.network_cli
   vars:
