@@ -1,0 +1,52 @@
+# firewall-raw.yml
+# Настройка RAW правил фаервола MikroTik
+# RAW таблица обрабатывает пакеты ДО connection tracking - меньше нагрузки на CPU
+---
+- name: Configure MikroTik firewall RAW rules
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+
+  tasks:
+    # Проверяем существующие правила перед добавлением
+    - name: Get existing RAW rules
+      community.routeros.command:
+        commands:
+          - /ip/firewall/raw/print without-paging
+      register: raw_rules
+
+    # ===== ПРАВИЛА ДЛЯ ОБОИХ РОУТЕРОВ =====
+
+    # Правило: Drop трафик из списка cyberok-ban
+    - name: Add cyberok-ban drop rule
+      community.routeros.command:
+        commands:
+          - /ip/firewall/raw/add chain=prerouting action=drop src-address-list=cyberok-ban log=no log-prefix="RAW-CYBEROK-DROP"
+      when: raw_rules.stdout[0] | regex_search('cyberok-ban') is none
+
+    # Правило: Drop трафик от RDP bruteforcers
+    - name: Add RDP bruteforce drop rule
+      community.routeros.command:
+        commands:
+          - /ip/firewall/raw/add chain=prerouting action=drop src-address-list=rdp-bruteforce comment="Drop all traffic from RDP bruteforcers"
+      when: raw_rules.stdout[0] | regex_search('rdp-bruteforce.*drop') is none
+
+    # Правило: Honeypot для RDP сканеров
+    - name: Add RDP honeypot rule
+      community.routeros.command:
+        commands:
+          - /ip/firewall/raw/add chain=prerouting action=add-src-to-address-list protocol=tcp dst-port=3389 in-interface-list=!LAN address-list=rdp-bruteforce address-list-timeout=1w log=no log-prefix="RDP-HONEYPOT" comment="Honeypot: catch RDP scanners"
+      when: raw_rules.stdout[0] | regex_search('RDP.*HONEYPOT|3389.*add-src-to-address-list') is none
+
+    # ===== ПРАВИЛА ТОЛЬКО ДЛЯ Mik_mom =====
+
+    # Правило: Accept RDP через WireGuard туннель (только Mik_mom)
+    - name: Add RDP accept via WireGuard rule (Mik_mom only)
+      community.routeros.command:
+        commands:
+          - /ip/firewall/raw/add chain=prerouting action=accept protocol=tcp dst-port=3389 in-interface=wg-to-home dst-address=10.101.101.242 log=no log-prefix="RAW-RDP:"
+      when:
+        - inventory_hostname == "Mik_mom"
+        - raw_rules.stdout[0] | regex_search('wg-to-home.*3389') is none
