@@ -6,35 +6,46 @@
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
-    ansible_connection: ansible.netcommon.network_cli
     elk_port: "5514"
+    # Список topics для цикла — каждый элемент будет подставлен в {{ item }}
+    logging_topics:
+      - info
+      - warning
+      - error
+      - critical
+
+  # {{ elk_server }} — берётся из inventory (инвентаря)
+  # В Ansible Semaphore: inventory задаётся в Environment или в Host Variables
+  # Каждый хост (роутер) может иметь свою переменную elk_server
+  # Или она может быть общей для группы [mikrotik:vars]
 
   tasks:
     - name: Configure remote logging action
       community.routeros.command:
         commands:
+          # {{ elk_server }} — подставляется значение из inventory для текущего хоста
           - /system/logging/action/set remote remote={{ elk_server }} remote-port={{ elk_port }} remote-log-format=syslog syslog-time-format=iso8601
 
-    - name: Add logging rule for info
+    - name: Get existing logging rules
       community.routeros.command:
         commands:
-          - /system/logging/add action=remote topics=info
-      ignore_errors: yes
+          - /system/logging/print without-paging
+      # register — сохраняет результат команды в переменную logging_rules
+      register: logging_rules
 
-    - name: Add logging rule for warning
+    # ===== НАЧАЛО ЦИКЛА =====
+    # loop: перебирает список logging_topics
+    # {{ item }} — текущий элемент (info, потом warning, потом error, потом critical)
+    # when: — условие, выполнять ли задачу
+    # regex_search() — ищет паттерн "info      remote" в выводе
+    # is none — если не найдено, выполнить задачу
+    - name: Add logging rules if not exist
       community.routeros.command:
         commands:
-          - /system/logging/add action=remote topics=warning
+          - /system/logging/add action=remote topics={{ item }}
+      loop: "{{ logging_topics }}"
+      when: logging_rules.stdout[0] | regex_search(item ~ '\\s+remote') is none
       ignore_errors: yes
-
-    - name: Add logging rule for error
-      community.routeros.command:
-        commands:
-          - /system/logging/add action=remote topics=error
-      ignore_errors: yes
-
-    - name: Add logging rule for critical
-      community.routeros.command:
-        commands:
-          - /system/logging/add action=remote topics=critical
-      ignore_errors: yes
+    # ===== КОНЕЦ ЦИКЛА =====
+    # Цикл — это одна задача (task), которая выполняется 4 раза
+    # Границы цикла = границы этой задачи (от "- name:" до следующего "- name:" или конца файла)
