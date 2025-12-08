@@ -34,11 +34,12 @@
       when: raw_rules.stdout[0] | regex_search('rdp-bruteforce.*drop') is none
 
     # Правило: Honeypot для RDP сканеров
+    # Кавычки вокруг всей команды чтобы ! не интерпретировался
     - name: Add RDP honeypot rule
       community.routeros.command:
         commands:
-          - /ip/firewall/raw/add chain=prerouting action=add-src-to-address-list protocol=tcp dst-port=3389 in-interface-list=!LAN address-list=rdp-bruteforce address-list-timeout=1w log=no log-prefix="RDP-HONEYPOT" comment="Honeypot: catch RDP scanners"
-      when: raw_rules.stdout[0] | regex_search('RDP.*HONEYPOT|3389.*add-src-to-address-list') is none
+          - '/ip/firewall/raw/add chain=prerouting action=add-src-to-address-list protocol=tcp dst-port=3389 in-interface-list=!LAN address-list=rdp-bruteforce address-list-timeout=1w log=no log-prefix="RDP-HONEYPOT" comment="Honeypot: catch RDP scanners"'
+      when: raw_rules.stdout[0] | regex_search('address-list=rdp-bruteforce.*address-list-timeout') is none
 
     # ===== ПРАВИЛА ТОЛЬКО ДЛЯ Mik_mom =====
 
