@@ -14,7 +14,7 @@
     - name: Get existing RAW rules
       community.routeros.command:
         commands:
-          - /ip/firewall/raw/print without-paging
+          - /ip/firewall/raw/print detail without-paging
       register: raw_rules
 
     # ===== ПРАВИЛА ДЛЯ ОБОИХ РОУТЕРОВ =====
@@ -24,22 +24,21 @@
       community.routeros.command:
         commands:
           - /ip/firewall/raw/add chain=prerouting action=drop src-address-list=cyberok-ban log=no log-prefix="RAW-CYBEROK-DROP"
-      when: raw_rules.stdout[0] | regex_search('cyberok-ban') is none
+      when: "'src-address-list=cyberok-ban' not in raw_rules.stdout[0]"
 
     # Правило: Drop трафик от RDP bruteforcers
     - name: Add RDP bruteforce drop rule
       community.routeros.command:
         commands:
           - /ip/firewall/raw/add chain=prerouting action=drop src-address-list=rdp-bruteforce comment="Drop all traffic from RDP bruteforcers"
-      when: raw_rules.stdout[0] | regex_search('rdp-bruteforce.*drop') is none
+      when: "'Drop all traffic from RDP bruteforcers' not in raw_rules.stdout[0]"
 
     # Правило: Honeypot для RDP сканеров
-    # Кавычки вокруг всей команды чтобы ! не интерпретировался
     - name: Add RDP honeypot rule
       community.routeros.command:
         commands:
           - '/ip/firewall/raw/add chain=prerouting action=add-src-to-address-list protocol=tcp dst-port=3389 in-interface-list=!LAN address-list=rdp-bruteforce address-list-timeout=1w log=no log-prefix="RDP-HONEYPOT" comment="Honeypot: catch RDP scanners"'
-      when: raw_rules.stdout[0] | regex_search('address-list=rdp-bruteforce.*address-list-timeout') is none
+      when: "'Honeypot: catch RDP scanners' not in raw_rules.stdout[0]"
 
     # ===== ПРАВИЛА ТОЛЬКО ДЛЯ Mik_mom =====
 
@@ -50,4 +49,4 @@
           - /ip/firewall/raw/add chain=prerouting action=accept protocol=tcp dst-port=3389 in-interface=wg-to-home dst-address=10.101.101.242 log=no log-prefix="RAW-RDP:"
       when:
         - inventory_hostname == "Mik_mom"
-        - raw_rules.stdout[0] | regex_search('wg-to-home.*3389') is none
+        - "'in-interface=wg-to-home' not in raw_rules.stdout[0]"
