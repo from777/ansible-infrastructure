@@ -7,7 +7,7 @@
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
-    script_url: "https://raw.githubusercontent.com/from777/ansible-infrastructure/main/mikrotik/scripts/cyberok-script.rsc"
+    script_url: "https://raw.githubusercontent.com/from777/mikrotik-scripts/main/cyberok-script.rsc"
     script_file: "cyberok-script.rsc"
 
   tasks:
@@ -21,10 +21,9 @@
     # Debug - показать что вернулось
     - name: Debug script count
       debug:
-        msg: "Script count: '{{ script_count.stdout[0] }}' Length: {{ script_count.stdout[0] | length }}"
+        msg: "Script count: '{{ script_count.stdout[0] }}'"
 
     # Скачиваем и импортируем только если скрипта нет
-    # Используем int() для сравнения чисел
     - name: Download script from GitHub
       community.routeros.command:
         commands:
