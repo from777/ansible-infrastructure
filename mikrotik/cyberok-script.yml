@@ -1,5 +1,6 @@
 # cyberok-script.yml
 # Загружает скрипт update-cyberok-list с GitHub и импортирует на роутер
+# При каждом запуске обновляет скрипт до актуальной версии
 ---
 - name: Install CyberOK update script
   hosts: mikrotik
@@ -14,54 +15,39 @@
     script_policy: "ftp,read,write,test"
 
   tasks:
-    # Проверяем существует ли скрипт
-    - name: Check if script exists
-      community.routeros.command:
-        commands:
-          - /system/script/print count-only where name="{{ script_name }}"
-      register: script_count
-
-    # Извлекаем число из вывода
-    - name: Set script exists flag
-      set_fact:
-        script_exists: "{{ script_count.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 0 }}"
-
-    # Debug
-    - name: Debug script exists
-      debug:
-        msg: "Script exists: {{ script_exists }}"
-
-    # Скачиваем только если скрипта нет
+    # Скачиваем скрипт с GitHub
     - name: Download script from GitHub
       community.routeros.command:
         commands:
           - /tool/fetch url="{{ script_url }}" dst-path="{{ script_file }}"
-      when: not script_exists
 
     - name: Wait for download
       community.routeros.command:
         commands:
           - /delay 2s
-      when: not script_exists
 
-    # Импортируем скрипт
+    # Удаляем старый скрипт если есть
+    - name: Remove old script if exists
+      community.routeros.command:
+        commands:
+          - /system/script/remove [find name="{{ script_name }}"]
+      ignore_errors: yes
+
+    # Импортируем новый скрипт
     - name: Import script
       community.routeros.command:
         commands:
           - /import file="{{ script_file }}"
-      when: not script_exists
 
-    # Устанавливаем правильные policy после импорта
+    # Устанавливаем правильные policy
     - name: Set script policy
       community.routeros.command:
         commands:
           - /system/script/set [find name="{{ script_name }}"] policy="{{ script_policy }}"
-      when: not script_exists
 
     # Удаляем временный файл
     - name: Remove temp file
       community.routeros.command:
         commands:
           - /file/remove {{ script_file }}
-      when: not script_exists
       ignore_errors: yes
