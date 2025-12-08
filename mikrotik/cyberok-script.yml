@@ -1,0 +1,45 @@
+# cyberok-script.yml
+# Загружает скрипт update-cyberok-list с GitHub и импортирует на роутер
+---
+- name: Install CyberOK update script
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    script_url: "https://raw.githubusercontent.com/from777/ansible-infrastructure/main/mikrotik/scripts/cyberok-script.rsc"
+    script_file: "cyberok-script.rsc"
+
+  tasks:
+    # Проверяем существует ли скрипт
+    - name: Check if script exists
+      community.routeros.command:
+        commands:
+          - /system/script/print count-only where name="update-cyberok-list"
+      register: script_count
+
+    # Скачиваем и импортируем только если скрипта нет
+    - name: Download script from GitHub
+      community.routeros.command:
+        commands:
+          - /tool/fetch url="{{ script_url }}" dst-path="{{ script_file }}"
+      when: script_count.stdout[0] | trim == "0"
+
+    - name: Wait for download
+      community.routeros.command:
+        commands:
+          - /delay 2s
+      when: script_count.stdout[0] | trim == "0"
+
+    - name: Import script
+      community.routeros.command:
+        commands:
+          - /import file="{{ script_file }}"
+      when: script_count.stdout[0] | trim == "0"
+
+    - name: Remove temp file
+      community.routeros.command:
+        commands:
+          - /file/remove {{ script_file }}
+      when: script_count.stdout[0] | trim == "0"
+      ignore_errors: yes
