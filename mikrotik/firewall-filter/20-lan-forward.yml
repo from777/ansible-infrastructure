@@ -1,0 +1,49 @@
+# 20-lan-forward.yml
+# Правила для chain=LAN-Forward
+# Трафик из LAN наружу (в интернет или другие сети)
+#
+# LAN - доверенная сеть, разрешаем весь исходящий трафик
+# Но сначала проверяем connection-state для оптимизации
+---
+- name: Configure LAN-Forward chain
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+
+  tasks:
+    # Разрешаем established соединения (быстрый путь для существующих)
+    - name: Add LAN-Forward accept established
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=LAN-Forward action=accept connection-state=established comment="LAN-FWD: Accept established"
+
+    # Разрешаем related соединения
+    - name: Add LAN-Forward accept related
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=LAN-Forward action=accept connection-state=related comment="LAN-FWD: Accept related"
+
+    # Разрешаем untracked соединения
+    - name: Add LAN-Forward accept untracked
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=LAN-Forward action=accept connection-state=untracked comment="LAN-FWD: Accept untracked"
+
+    # Блокируем invalid соединения (битые пакеты)
+    - name: Add LAN-Forward drop invalid
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=LAN-Forward action=drop connection-state=invalid comment="LAN-FWD: Drop invalid"
+
+    # Разрешаем новые соединения из LAN (доверенная сеть)
+    - name: Add LAN-Forward accept new
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=LAN-Forward action=accept comment="LAN-FWD: Accept new from LAN"
+
+    # Итоговое сообщение
+    - name: Show result
+      debug:
+        msg: "LAN-Forward chain added - all traffic from LAN accepted"

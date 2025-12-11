@@ -1,0 +1,26 @@
+# 11-lan-input.yml
+# Правила для chain=LAN-Input
+# Трафик от LAN к роутеру
+#
+# LAN - доверенная сеть, разрешаем всё
+# Сюда попадает трафик от устройств из локальной сети к самому роутеру
+# (например обращение к веб-интерфейсу, DNS запросы к роутеру и т.д.)
+---
+- name: Configure LAN-Input chain
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+
+  tasks:
+    # LAN - доверенная сеть, разрешаем весь трафик к роутеру
+    - name: Add LAN-Input accept all
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=LAN-Input action=accept comment="Accept all from LAN"
+
+    # Итоговое сообщение
+    - name: Show result
+      debug:
+        msg: "LAN-Input chain added - all traffic from LAN accepted"

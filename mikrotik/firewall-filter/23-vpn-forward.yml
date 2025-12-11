@@ -1,0 +1,90 @@
+# 23-vpn-forward.yml
+# Правила для chain=VPN-Forward
+# Трафик из VPN наружу
+#
+# VPN клиентам разрешаем выход в интернет
+#
+# Автоматически пропускается если нет interface-list VPN-OUT
+---
+- name: Configure VPN-Forward chain
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+
+  tasks:
+    # ===== ПРОВЕРКА INTERFACE-LIST =====
+    # Проверяем есть ли VPN-OUT interface list
+
+    - name: Check VPN-OUT interface list exists
+      community.routeros.command:
+        commands:
+          - /interface/list/print count-only where name="VPN-OUT"
+      register: vpn_list_check
+
+    # Сохраняем результат в переменную
+    - name: Set VPN-OUT list exists flag
+      set_fact:
+        has_vpn: "{{ vpn_list_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 0 }}"
+
+    # Debug - показать результат проверки
+    - name: Debug VPN-OUT list check
+      debug:
+        msg: "VPN-OUT interface list exists: {{ has_vpn }}"
+
+    # Пропускаем если нет VPN-OUT interface list
+    - name: Skip if no VPN-OUT interface list
+      debug:
+        msg: "VPN-OUT interface list not found - skipping VPN-Forward rules"
+      when: not has_vpn
+
+    # ===== VPN-Forward ПРАВИЛА =====
+    # Выполняются только если есть VPN-OUT interface list
+
+    # Разрешаем established соединения
+    - name: Add VPN-Forward accept established
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=VPN-Forward action=accept connection-state=established comment="VPN-FWD: Accept established"
+      when: has_vpn
+
+    # Разрешаем related соединения
+    - name: Add VPN-Forward accept related
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=VPN-Forward action=accept connection-state=related comment="VPN-FWD: Accept related"
+      when: has_vpn
+
+    # Разрешаем untracked соединения
+    - name: Add VPN-Forward accept untracked
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=VPN-Forward action=accept connection-state=untracked comment="VPN-FWD: Accept untracked"
+      when: has_vpn
+
+    # Блокируем invalid соединения
+    - name: Add VPN-Forward drop invalid
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=VPN-Forward action=drop connection-state=invalid comment="VPN-FWD: Drop invalid"
+      when: has_vpn
+
+    # Разрешаем новые соединения в WAN (интернет)
+    - name: Add VPN-Forward allow new to WAN
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=VPN-Forward action=accept connection-state=new out-interface-list=WAN comment="VPN-FWD: Allow new to WAN"
+      when: has_vpn
+
+    # Правило для блокировки остального (отключено по умолчанию)
+    - name: Add VPN-Forward drop new disabled
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=VPN-Forward action=drop disabled=yes comment="VPN-FWD: Drop new (disabled)"
+      when: has_vpn
+
+    # Итоговое сообщение
+    - name: Show result
+      debug:
+        msg: "VPN-Forward chain - {{ 'added' if has_vpn else 'skipped (no VPN-OUT list)' }}"

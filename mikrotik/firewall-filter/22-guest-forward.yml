@@ -1,0 +1,118 @@
+# 22-guest-forward.yml
+# Правила для chain=GUEST-Forward
+# Трафик из гостевой сети наружу
+#
+# Гостям разрешаем только выход в интернет (WAN)
+# Блокируем доступ к локальным сетям (RFC1918)
+# Это изолирует гостей от основной сети
+#
+# Автоматически пропускается если нет interface-list GUEST
+---
+- name: Configure GUEST-Forward chain
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+
+  tasks:
+    # ===== ПРОВЕРКА INTERFACE-LIST =====
+    # Проверяем есть ли GUEST interface list
+
+    - name: Check GUEST interface list exists
+      community.routeros.command:
+        commands:
+          - /interface/list/print count-only where name="GUEST"
+      register: guest_list_check
+
+    # Сохраняем результат в переменную
+    - name: Set GUEST list exists flag
+      set_fact:
+        has_guest: "{{ guest_list_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 0 }}"
+
+    # Debug - показать результат проверки
+    - name: Debug GUEST list check
+      debug:
+        msg: "GUEST interface list exists: {{ has_guest }}"
+
+    # Пропускаем если нет GUEST interface list
+    - name: Skip if no GUEST interface list
+      debug:
+        msg: "GUEST interface list not found - skipping GUEST-Forward rules"
+      when: not has_guest
+
+    # ===== GUEST-Forward ПРАВИЛА =====
+    # Выполняются только если есть GUEST interface list
+
+    # Разрешаем established соединения
+    - name: Add GUEST-Forward accept established
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=GUEST-Forward action=accept connection-state=established comment="GUEST-FWD: Accept established"
+      when: has_guest
+
+    # Разрешаем related соединения
+    - name: Add GUEST-Forward accept related
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=GUEST-Forward action=accept connection-state=related comment="GUEST-FWD: Accept related"
+      when: has_guest
+
+    # Разрешаем untracked соединения
+    - name: Add GUEST-Forward accept untracked
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=GUEST-Forward action=accept connection-state=untracked comment="GUEST-FWD: Accept untracked"
+      when: has_guest
+
+    # Блокируем invalid соединения
+    - name: Add GUEST-Forward drop invalid
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=GUEST-Forward action=drop connection-state=invalid comment="GUEST-FWD: Drop invalid"
+      when: has_guest
+
+    # ===== БЛОКИРОВКА ЛОКАЛЬНЫХ СЕТЕЙ (RFC1918) =====
+    # Гости не должны иметь доступ к локальным устройствам
+
+    # Блокируем 10.0.0.0/8
+    - name: Add GUEST-Forward block RFC1918 10.x
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=GUEST-Forward action=drop dst-address=10.0.0.0/8 comment="GUEST-FWD: Block RFC1918 10.x"
+      when: has_guest
+
+    # Блокируем 172.16.0.0/12
+    - name: Add GUEST-Forward block RFC1918 172.x
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=GUEST-Forward action=drop dst-address=172.16.0.0/12 comment="GUEST-FWD: Block RFC1918 172.x"
+      when: has_guest
+
+    # Блокируем 192.168.0.0/16
+    - name: Add GUEST-Forward block RFC1918 192.x
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=GUEST-Forward action=drop dst-address=192.168.0.0/16 comment="GUEST-FWD: Block RFC1918 192.x"
+      when: has_guest
+
+    # ===== РАЗРЕШАЕМ ВЫХОД В ИНТЕРНЕТ =====
+
+    # Разрешаем трафик в WAN (интернет)
+    - name: Add GUEST-Forward allow to WAN
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=GUEST-Forward action=accept out-interface-list=WAN comment="GUEST-FWD: Allow to WAN"
+      when: has_guest
+
+    # Всё остальное блокируем
+    - name: Add GUEST-Forward drop all
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=GUEST-Forward action=drop comment="GUEST-FWD: Drop all other"
+      when: has_guest
+
+    # Итоговое сообщение
+    - name: Show result
+      debug:
+        msg: "GUEST-Forward chain - {{ 'added (guests isolated from LAN)' if has_guest else 'skipped (no GUEST list)' }}"
