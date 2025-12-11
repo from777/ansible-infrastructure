@@ -1,0 +1,69 @@
+# 10-brute-force.yml
+# Защита от перебора паролей (brute-force)
+#
+# Как работает:
+# 1. При первом подключении IP добавляется в список Brute-force-1 на 30 сек
+# 2. При втором подключении (в течение 30 сек) - в список Brute-force-2
+# 3. При третьем - в Brute-force-3
+# 4. При четвёртом - в Brute-force-4
+# 5. При пятом - в Brute-force-block на 8 часов
+#
+# После блокировки IP не сможет подключиться 8 часов
+---
+- name: Configure Brute-force protection
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+
+  tasks:
+    # Добавляем правила Brute-force chain
+    # Порядок правил важен!
+
+    # 1. Сначала блокируем уже заблокированных
+    - name: Add Brute-force drop blocked
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=Brute-force action=drop src-address-list=Brute-force-block comment="BF: Drop blocked"
+
+    # 2. Если IP уже в списке 4 - блокируем на 8 часов
+    - name: Add Brute-force block after 4th
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=Brute-force action=add-src-to-address-list src-address-list=Brute-force-4 address-list=Brute-force-block address-list-timeout=8h comment="BF: Block after 4th"
+
+    # 3. Если IP в списке 3 - переводим в список 4
+    - name: Add Brute-force 4th attempt
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=Brute-force action=add-src-to-address-list src-address-list=Brute-force-3 address-list=Brute-force-4 address-list-timeout=30s comment="BF: 4th attempt"
+
+    # 4. Если IP в списке 2 - переводим в список 3
+    - name: Add Brute-force 3rd attempt
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=Brute-force action=add-src-to-address-list src-address-list=Brute-force-2 address-list=Brute-force-3 address-list-timeout=30s comment="BF: 3rd attempt"
+
+    # 5. Если IP в списке 1 - переводим в список 2
+    - name: Add Brute-force 2nd attempt
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=Brute-force action=add-src-to-address-list src-address-list=Brute-force-1 address-list=Brute-force-2 address-list-timeout=30s comment="BF: 2nd attempt"
+
+    # 6. Первое подключение - добавляем в список 1
+    - name: Add Brute-force 1st attempt
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=Brute-force action=add-src-to-address-list address-list=Brute-force-1 address-list-timeout=30s comment="BF: 1st attempt"
+
+    # 7. Если не заблокирован - разрешаем
+    - name: Add Brute-force accept
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=Brute-force action=accept comment="BF: Accept if not blocked"
+
+    # Итоговое сообщение
+    - name: Show result
+      debug:
+        msg: "Brute-force protection chain added"

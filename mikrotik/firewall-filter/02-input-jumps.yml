@@ -1,0 +1,85 @@
+# 02-input-jumps.yml
+# Jump правила для chain=input
+# Определяют порядок обработки трафика К роутеру
+#
+# Порядок важен! Правила добавляются в таком порядке:
+# 1. jump → LAN-Input (трафик из LAN)
+# 2. jump → ISP-Input (трафик из WAN)
+# 3. jump → VPN-Input (трафик из VPN, если есть)
+# 4. jump → GUEST-Input (трафик из гостевой сети, если есть)
+# 5. drop all (всё остальное блокируем)
+---
+- name: Add input jump rules
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+
+  tasks:
+    # ===== ПРОВЕРКА INTERFACE-LISTS =====
+    # Проверяем какие interface-lists есть на роутере
+    # чтобы не создавать jump к несуществующим chains
+
+    - name: Check GUEST interface list exists
+      community.routeros.command:
+        commands:
+          - /interface/list/print count-only where name="GUEST"
+      register: guest_list_check
+
+    - name: Check VPN-OUT interface list exists
+      community.routeros.command:
+        commands:
+          - /interface/list/print count-only where name="VPN-OUT"
+      register: vpn_list_check
+
+    # Сохраняем результаты в переменные
+    - name: Set interface list flags
+      set_fact:
+        has_guest: "{{ guest_list_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 0 }}"
+        has_vpn: "{{ vpn_list_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 0 }}"
+
+    # Debug - показать какие interface-lists найдены
+    - name: Show detected interface lists
+      debug:
+        msg: "GUEST: {{ has_guest }}, VPN-OUT: {{ has_vpn }}"
+
+    # ===== JUMP ПРАВИЛА =====
+    # Добавляем в порядке обработки трафика
+
+    - name: Add jump to LAN-Input
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=input action=jump jump-target=LAN-Input in-interface-list=LAN comment="Jump to LAN-Input"
+
+    - name: Add jump to ISP-Input
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=input action=jump jump-target=ISP-Input in-interface-list=WAN comment="Jump to ISP-Input"
+
+    # VPN-Input jump - только если есть VPN-OUT interface list
+    - name: Add jump to VPN-Input
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=input action=jump jump-target=VPN-Input in-interface-list=VPN-OUT comment="Jump to VPN-Input"
+      when: has_vpn
+
+    # GUEST-Input jump - только если есть GUEST interface list
+    - name: Add jump to GUEST-Input
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=input action=jump jump-target=GUEST-Input in-interface-list=GUEST comment="Jump to GUEST-Input"
+      when: has_guest
+
+    # ===== DROP ALL =====
+    # Всё что не попало в jump - блокируем
+
+    - name: Add input drop all
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=input action=drop log=yes log-prefix="INPUT-DROP:" comment="Drop all other to router"
+
+    # Итоговое сообщение
+    - name: Show result
+      debug:
+        msg: "Input jumps added (GUEST: {{ has_guest }}, VPN: {{ has_vpn }})"

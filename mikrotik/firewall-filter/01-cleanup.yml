@@ -1,0 +1,56 @@
+# 01-cleanup.yml
+# Удаляет ВСЕ старые правила кроме SAFE-ACCESS
+# После этого можно добавлять новые правила в правильном порядке
+#
+# !!! ВНИМАНИЕ !!!
+# Этот плейбук удалит все правила firewall кроме SAFE-ACCESS!
+# Убедись что SAFE-ACCESS правило на месте перед запуском!
+---
+- name: Remove old firewall rules
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+
+  tasks:
+    # Проверяем что SAFE-ACCESS правило существует
+    - name: Check SAFE-ACCESS exists before cleanup
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="SAFE-ACCESS"
+      register: safe_check
+
+    # Извлекаем число из вывода
+    - name: Set safe exists flag
+      set_fact:
+        safe_exists: "{{ safe_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 0 }}"
+
+    # Прерываем если нет SAFE-ACCESS
+    - name: Fail if no SAFE-ACCESS
+      fail:
+        msg: "SAFE-ACCESS rule not found! Run 00-safe-access.yml first!"
+      when: not safe_exists
+
+    # Показываем сколько правил будет удалено
+    - name: Count rules to remove
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment!="SAFE-ACCESS"
+      register: rules_count
+
+    - name: Show rules count
+      debug:
+        msg: "Rules to remove: {{ rules_count.stdout[0] }}"
+
+    # Удаляем ВСЕ правила кроме SAFE-ACCESS
+    - name: Remove all rules except SAFE-ACCESS
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/remove [find comment!="SAFE-ACCESS"]
+      ignore_errors: yes
+
+    # Итоговое сообщение
+    - name: Show result
+      debug:
+        msg: "Old rules removed. Only SAFE-ACCESS remains."

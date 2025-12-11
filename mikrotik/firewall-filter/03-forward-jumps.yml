@@ -1,0 +1,84 @@
+# 03-forward-jumps.yml
+# Jump правила для chain=forward
+# Определяют порядок обработки трафика ЧЕРЕЗ роутер
+#
+# Порядок важен! Правила добавляются в таком порядке:
+# 1. jump → ISP-Forward (трафик из WAN внутрь)
+# 2. jump → VPN-Forward (трафик из VPN, если есть)
+# 3. jump → LAN-Forward (трафик из LAN наружу)
+# 4. jump → GUEST-Forward (трафик из гостевой сети, если есть)
+# 5. drop all (всё остальное блокируем)
+---
+- name: Add forward jump rules
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+
+  tasks:
+    # ===== ПРОВЕРКА INTERFACE-LISTS =====
+    # Проверяем какие interface-lists есть на роутере
+
+    - name: Check GUEST interface list exists
+      community.routeros.command:
+        commands:
+          - /interface/list/print count-only where name="GUEST"
+      register: guest_list_check
+
+    - name: Check VPN-OUT interface list exists
+      community.routeros.command:
+        commands:
+          - /interface/list/print count-only where name="VPN-OUT"
+      register: vpn_list_check
+
+    # Сохраняем результаты в переменные
+    - name: Set interface list flags
+      set_fact:
+        has_guest: "{{ guest_list_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 0 }}"
+        has_vpn: "{{ vpn_list_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 0 }}"
+
+    # Debug - показать какие interface-lists найдены
+    - name: Show detected interface lists
+      debug:
+        msg: "GUEST: {{ has_guest }}, VPN-OUT: {{ has_vpn }}"
+
+    # ===== JUMP ПРАВИЛА =====
+    # Добавляем в порядке обработки трафика
+
+    - name: Add jump to ISP-Forward
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=forward action=jump jump-target=ISP-Forward in-interface-list=WAN comment="Jump to ISP-Forward"
+
+    # VPN-Forward jump - только если есть VPN-OUT interface list
+    - name: Add jump to VPN-Forward
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=forward action=jump jump-target=VPN-Forward in-interface-list=VPN-OUT comment="Jump to VPN-Forward"
+      when: has_vpn
+
+    - name: Add jump to LAN-Forward
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=forward action=jump jump-target=LAN-Forward in-interface-list=LAN comment="Jump to LAN-Forward"
+
+    # GUEST-Forward jump - только если есть GUEST interface list
+    - name: Add jump to GUEST-Forward
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=forward action=jump jump-target=GUEST-Forward in-interface-list=GUEST comment="Jump to GUEST-Forward"
+      when: has_guest
+
+    # ===== DROP ALL =====
+    # Всё что не попало в jump - блокируем
+
+    - name: Add forward drop all
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=forward action=drop comment="Drop all other"
+
+    # Итоговое сообщение
+    - name: Show result
+      debug:
+        msg: "Forward jumps added (GUEST: {{ has_guest }}, VPN: {{ has_vpn }})"

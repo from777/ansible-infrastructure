@@ -2,57 +2,92 @@
 
 Плейбуки для настройки firewall на MikroTik роутерах.
 
-## Нумерация файлов
+## Структура файлов
 
 ```
-0x — подготовка
-    00 — safe-access (защита доступа с твоего IP)
-    01 — brute-force (защита от перебора паролей)
+firewall-full.yml       — главный, вызывает все по порядку
 
-1x — правила Input (трафик К роутеру)
-    10 — LAN-Input
-    11 — ISP-Input
-    12 — GUEST-Input
-    13 — VPN-Input
+0x — подготовка и структура
+00-safe-access.yml      — защита доступа с IP 212.20.46.209
+01-cleanup.yml          — удаляет ВСЕ старые правила
+02-input-jumps.yml      — jump правила для chain=input
+03-forward-jumps.yml    — jump правила для chain=forward
 
-2x — правила Forward (трафик ЧЕРЕЗ роутер)
-    20 — LAN-Forward
-    21 — ISP-Forward
-    22 — GUEST-Forward
-    23 — VPN-Forward
+1x — Input chains (трафик К роутеру)
+10-brute-force.yml      — защита от перебора паролей
+11-lan-input.yml        — LAN → роутер
+12-isp-input.yml        — WAN → роутер
+13-guest-input.yml      — GUEST → роутер (пропустит если нет GUEST)
+14-vpn-input.yml        — VPN → роутер (пропустит если нет VPN-OUT)
 
-3x — финализация
-    30 — main-jumps (главные jump правила)
-
-9x — опасные операции
-    99 — cleanup (удаление старых правил)
+2x — Forward chains (трафик ЧЕРЕЗ роутер)
+20-lan-forward.yml      — LAN → наружу
+21-isp-forward.yml      — WAN → внутрь
+22-guest-forward.yml    — GUEST → наружу (пропустит если нет GUEST)
+23-vpn-forward.yml      — VPN → наружу (пропустит если нет VPN-OUT)
 ```
 
-## Порядок выполнения
+## Как запускать
 
-1. `00-safe-access` — ПЕРВЫМ! Защищает доступ
-2. `01-brute-force` — защита от перебора
-3. `10-13` — правила Input
-4. `20-23` — правила Forward
-5. `30-main-jumps` — подключает chains
-6. `99-cleanup` — ПОСЛЕДНИМ, после проверки
+### Полная настройка (удалит старые правила!)
 
-## Для Mik_mom (нет GUEST/VPN)
+В Semaphore:
 
-Запускать:
-- 00, 01, 10, 11, 20, 21, 30
+```
+Name: MikroTik FW: Full Setup
+Path: mikrotik/firewall-filter/firewall-full.yml
+Inventory: mikrotik
+Vaults: Mik_Tim vault-password
+Limit: Mik_mom (для теста)
+```
 
-Не запускать:
-- 12, 13, 22, 23 (пропустят автоматически, но лучше не запускать)
+### Только часть (без удаления старых)
 
-## Для Mik_Tim (есть всё)
+```
+Path: mikrotik/firewall-filter/11-lan-input.yml
+```
 
-Запускать все по порядку.
+## Автоопределение
+
+Плейбуки 13, 14, 22, 23 сами проверяют есть ли interface-list GUEST/VPN-OUT.
+Если нет — пропускают. Можно запускать на любом роутере.
+
+## Порядок правил после выполнения
+
+```
+chain=input:
+  0. SAFE-ACCESS (защита доступа)
+  1. jump → LAN-Input
+  2. jump → ISP-Input
+  3. jump → VPN-Input (если есть)
+  4. jump → GUEST-Input (если есть)
+  5. drop all
+
+chain=forward:
+  1. jump → ISP-Forward
+  2. jump → VPN-Forward (если есть)
+  3. jump → LAN-Forward
+  4. jump → GUEST-Forward (если есть)
+  5. drop all
+```
+
+## ВНИМАНИЕ
+
+`01-cleanup.yml` удаляет ВСЕ правила кроме SAFE-ACCESS!
+
+Если нужно добавить правила к существующим — запускай отдельные файлы, НЕ firewall-full.yml.
 
 ## Добавление новых правил
 
 Просто создай файл с нужным номером:
-- `14-iot-input.yml` — новые Input правила
+
+- `15-iot-input.yml` — новые Input правила
 - `24-iot-forward.yml` — новые Forward правила
+
+Добавь его в `firewall-full.yml`:
+
+```yaml
+- import_playbook: 15-iot-input.yml
+```
 
 Перенумеровывать остальные файлы не нужно.

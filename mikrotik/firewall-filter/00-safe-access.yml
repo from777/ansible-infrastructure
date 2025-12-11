@@ -19,9 +19,15 @@
           - /ip/firewall/filter/print count-only where src-address="{{ safe_ip }}" action=accept chain=input comment="SAFE-ACCESS"
       register: safe_rule_count
 
+    # Извлекаем число из вывода и сохраняем в переменную
     - name: Set rule exists flag
       set_fact:
         safe_rule_exists: "{{ safe_rule_count.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 0 }}"
+
+    # Debug - показать результат проверки
+    - name: Debug safe rule check
+      debug:
+        msg: "Safe rule exists: {{ safe_rule_exists }}"
 
     # Добавляем правило В НАЧАЛО списка если его нет
     - name: Add safe access rule at the top
@@ -30,6 +36,7 @@
           - /ip/firewall/filter/add chain=input action=accept src-address="{{ safe_ip }}" comment="SAFE-ACCESS" place-before=0
       when: not safe_rule_exists
 
+    # Итоговое сообщение
     - name: Show result
       debug:
         msg: "Safe access rule for {{ safe_ip }} - {{ 'already exists' if safe_rule_exists else 'added' }}"
