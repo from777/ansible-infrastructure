@@ -1,0 +1,56 @@
+# 13-vpn-input.yml
+# Правила для трафика от VPN к роутеру
+# Разрешаем established/related, дропаем остальное
+---
+- name: Configure VPN-Input rules
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+
+  tasks:
+    # Проверяем есть ли interface-list VPN-OUT
+    - name: Check if VPN-OUT interface list exists
+      community.routeros.command:
+        commands:
+          - /interface/list/print count-only where name="VPN-OUT"
+      register: vpn_list_count
+
+    - name: Set VPN list exists flag
+      set_fact:
+        vpn_list_exists: "{{ vpn_list_count.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 0 }}"
+
+    # Пропускаем если нет VPN-OUT interface list
+    - name: Skip if no VPN-OUT interface list
+      debug:
+        msg: "VPN-OUT interface list not found - skipping VPN-Input rules"
+      when: not vpn_list_exists
+
+    # Проверяем есть ли уже правила VPN-Input
+    - name: Check if VPN-Input rules exist
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where chain="VPN-Input" action=accept
+      register: vpn_input_count
+      when: vpn_list_exists
+
+    - name: Set rules exist flag
+      set_fact:
+        vpn_input_exists: "{{ vpn_input_count.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 2 }}"
+      when: vpn_list_exists
+
+    # Добавляем правила VPN-Input
+    - name: Add VPN-Input rules
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=VPN-Input action=accept connection-state=established comment="VPN: Accept established"
+          - /ip/firewall/filter/add chain=VPN-Input action=accept connection-state=related comment="VPN: Accept related"
+          - /ip/firewall/filter/add chain=VPN-Input action=accept connection-state=untracked comment="VPN: Accept untracked"
+          - /ip/firewall/filter/add chain=VPN-Input action=drop connection-state=invalid comment="VPN: Drop invalid"
+          - /ip/firewall/filter/add chain=VPN-Input action=drop comment="VPN: Drop all other"
+      when: vpn_list_exists and not vpn_input_exists | default(false)
+
+    - name: Show result
+      debug:
+        msg: "VPN-Input rules - {{ 'skipped (no VPN-OUT list)' if not vpn_list_exists else ('already configured' if vpn_input_exists | default(false) else 'added') }}"

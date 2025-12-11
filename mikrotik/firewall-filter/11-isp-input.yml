@@ -1,0 +1,59 @@
+# 11-isp-input.yml
+# Правила для трафика от WAN к роутеру
+# Разрешаем established/related, дропаем invalid, jump к разрешённым сервисам
+---
+- name: Configure ISP-Input rules
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+
+  tasks:
+    # Проверяем есть ли уже правила ISP-Input
+    - name: Check if ISP-Input rules exist
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where chain="ISP-Input" action=accept
+      register: isp_input_count
+
+    - name: Set rules exist flag
+      set_fact:
+        isp_input_exists: "{{ isp_input_count.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 2 }}"
+
+    # Добавляем правила ISP-Input
+    - name: Add ISP-Input rules
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=ISP-Input action=accept connection-state=established comment="ISP: Accept established"
+          - /ip/firewall/filter/add chain=ISP-Input action=accept connection-state=related comment="ISP: Accept related"
+          - /ip/firewall/filter/add chain=ISP-Input action=accept connection-state=untracked comment="ISP: Accept untracked"
+          - /ip/firewall/filter/add chain=ISP-Input action=drop connection-state=invalid comment="ISP: Drop invalid"
+          - /ip/firewall/filter/add chain=ISP-Input action=jump jump-target=ISP-Input-Allow comment="ISP: Jump to allowed services"
+          - /ip/firewall/filter/add chain=ISP-Input action=drop comment="ISP: Drop all other"
+      when: not isp_input_exists
+
+    # Проверяем есть ли правила ISP-Input-Allow
+    - name: Check if ISP-Input-Allow rules exist
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where chain="ISP-Input-Allow" action=accept
+      register: isp_allow_count
+
+    - name: Set allow rules exist flag
+      set_fact:
+        isp_allow_exists: "{{ isp_allow_count.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 1 }}"
+
+    # Добавляем правила ISP-Input-Allow
+    - name: Add ISP-Input-Allow rules
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=ISP-Input-Allow action=accept protocol=icmp comment="Allow ICMP"
+          - /ip/firewall/filter/add chain=ISP-Input-Allow action=jump jump-target=Brute-force protocol=tcp dst-port=22 connection-nat-state=dstnat comment="SSH via Brute-force"
+          - /ip/firewall/filter/add chain=ISP-Input-Allow action=drop protocol=tcp dst-port=8291 comment="Drop Winbox from WAN"
+          - /ip/firewall/filter/add chain=ISP-Input-Allow action=accept protocol=udp dst-port=51820 comment="WireGuard"
+      when: not isp_allow_exists
+
+    - name: Show result
+      debug:
+        msg: "ISP-Input rules - {{ 'already configured' if isp_input_exists else 'added' }}"

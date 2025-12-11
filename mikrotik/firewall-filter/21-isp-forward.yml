@@ -1,0 +1,38 @@
+# 21-isp-forward.yml
+# Правила для трафика из WAN внутрь
+# Разрешаем только established/related и DSTNAT
+---
+- name: Configure ISP-Forward rules
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+
+  tasks:
+    # Проверяем есть ли уже правила ISP-Forward
+    - name: Check if ISP-Forward rules exist
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where chain="ISP-Forward" action=accept
+      register: isp_forward_count
+
+    - name: Set rules exist flag
+      set_fact:
+        isp_forward_exists: "{{ isp_forward_count.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 3 }}"
+
+    # Добавляем правила ISP-Forward
+    - name: Add ISP-Forward rules
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=ISP-Forward action=accept connection-state=established comment="ISP-FWD: Accept established"
+          - /ip/firewall/filter/add chain=ISP-Forward action=accept connection-state=related comment="ISP-FWD: Accept related"
+          - /ip/firewall/filter/add chain=ISP-Forward action=accept connection-state=untracked comment="ISP-FWD: Accept untracked"
+          - /ip/firewall/filter/add chain=ISP-Forward action=drop connection-state=invalid comment="ISP-FWD: Drop invalid"
+          - /ip/firewall/filter/add chain=ISP-Forward action=accept connection-nat-state=dstnat comment="ISP-FWD: Accept DST-NAT"
+          - /ip/firewall/filter/add chain=ISP-Forward action=drop comment="ISP-FWD: Drop all other from WAN"
+      when: not isp_forward_exists
+
+    - name: Show result
+      debug:
+        msg: "ISP-Forward rules - {{ 'already configured' if isp_forward_exists else 'added' }}"

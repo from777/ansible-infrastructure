@@ -1,0 +1,61 @@
+# 22-guest-forward.yml
+# Правила для трафика из гостевой сети наружу
+# Блокируем доступ к локальным сетям, разрешаем только в интернет
+# НЕ ЗАПУСКАТЬ на роутерах без гостевой сети!
+---
+- name: Configure GUEST-Forward rules
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+
+  tasks:
+    # Проверяем есть ли interface-list GUEST
+    - name: Check if GUEST interface list exists
+      community.routeros.command:
+        commands:
+          - /interface/list/print count-only where name="GUEST"
+      register: guest_list_count
+
+    - name: Set GUEST list exists flag
+      set_fact:
+        guest_list_exists: "{{ guest_list_count.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 0 }}"
+
+    # Пропускаем если нет GUEST interface list
+    - name: Skip if no GUEST interface list
+      debug:
+        msg: "GUEST interface list not found - skipping GUEST-Forward rules"
+      when: not guest_list_exists
+
+    # Проверяем есть ли уже правила GUEST-Forward
+    - name: Check if GUEST-Forward rules exist
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where chain="GUEST-Forward" action=accept
+      register: guest_forward_count
+      when: guest_list_exists
+
+    - name: Set rules exist flag
+      set_fact:
+        guest_forward_exists: "{{ guest_forward_count.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 3 }}"
+      when: guest_list_exists
+
+    # Добавляем правила GUEST-Forward
+    - name: Add GUEST-Forward rules
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=GUEST-Forward action=accept connection-state=established comment="GUEST-FWD: Accept established"
+          - /ip/firewall/filter/add chain=GUEST-Forward action=accept connection-state=related comment="GUEST-FWD: Accept related"
+          - /ip/firewall/filter/add chain=GUEST-Forward action=accept connection-state=untracked comment="GUEST-FWD: Accept untracked"
+          - /ip/firewall/filter/add chain=GUEST-Forward action=drop connection-state=invalid comment="GUEST-FWD: Drop invalid"
+          - /ip/firewall/filter/add chain=GUEST-Forward action=drop dst-address=10.0.0.0/8 comment="GUEST-FWD: Block RFC1918 10.x"
+          - /ip/firewall/filter/add chain=GUEST-Forward action=drop dst-address=172.16.0.0/12 comment="GUEST-FWD: Block RFC1918 172.x"
+          - /ip/firewall/filter/add chain=GUEST-Forward action=drop dst-address=192.168.0.0/16 comment="GUEST-FWD: Block RFC1918 192.x"
+          - /ip/firewall/filter/add chain=GUEST-Forward action=accept out-interface-list=WAN comment="GUEST-FWD: Allow to WAN"
+          - /ip/firewall/filter/add chain=GUEST-Forward action=drop comment="GUEST-FWD: Drop all other"
+      when: guest_list_exists and not guest_forward_exists | default(false)
+
+    - name: Show result
+      debug:
+        msg: "GUEST-Forward rules - {{ 'skipped (no GUEST list)' if not guest_list_exists else ('already configured' if guest_forward_exists | default(false) else 'added') }}"
