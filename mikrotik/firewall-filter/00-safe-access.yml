@@ -1,0 +1,35 @@
+# 00-safe-access.yml
+# ВЫПОЛНЯТЬ ПЕРВЫМ! Защита доступа с твоего IP
+# Это правило гарантирует что ты не потеряешь доступ к роутеру
+---
+- name: Add safe access rule
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    # Твой внешний IP - с него всегда разрешён доступ
+    safe_ip: "212.20.46.209"
+
+  tasks:
+    # Проверяем есть ли уже защитное правило
+    - name: Check if safe access rule exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where src-address="{{ safe_ip }}" action=accept chain=input comment="SAFE-ACCESS"
+      register: safe_rule_count
+
+    - name: Set rule exists flag
+      set_fact:
+        safe_rule_exists: "{{ safe_rule_count.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 0 }}"
+
+    # Добавляем правило В НАЧАЛО списка если его нет
+    - name: Add safe access rule at the top
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=input action=accept src-address="{{ safe_ip }}" comment="SAFE-ACCESS" place-before=0
+      when: not safe_rule_exists
+
+    - name: Show result
+      debug:
+        msg: "Safe access rule for {{ safe_ip }} - {{ 'already exists' if safe_rule_exists else 'added' }}"
