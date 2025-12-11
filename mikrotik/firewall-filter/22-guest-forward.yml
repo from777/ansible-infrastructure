@@ -48,28 +48,28 @@
     - name: Add GUEST-Forward accept established
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Forward action=accept connection-state=established comment="GUEST-FWD: Accept established"
+          - /ip/firewall/filter/add chain=GUEST-Forward action=accept connection-state=established comment="GUEST-FWD Accept established"
       when: has_guest
 
     # Разрешаем related соединения
     - name: Add GUEST-Forward accept related
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Forward action=accept connection-state=related comment="GUEST-FWD: Accept related"
+          - /ip/firewall/filter/add chain=GUEST-Forward action=accept connection-state=related comment="GUEST-FWD Accept related"
       when: has_guest
 
     # Разрешаем untracked соединения
     - name: Add GUEST-Forward accept untracked
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Forward action=accept connection-state=untracked comment="GUEST-FWD: Accept untracked"
+          - /ip/firewall/filter/add chain=GUEST-Forward action=accept connection-state=untracked comment="GUEST-FWD Accept untracked"
       when: has_guest
 
     # Блокируем invalid соединения
     - name: Add GUEST-Forward drop invalid
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Forward action=drop connection-state=invalid comment="GUEST-FWD: Drop invalid"
+          - /ip/firewall/filter/add chain=GUEST-Forward action=drop connection-state=invalid comment="GUEST-FWD Drop invalid"
       when: has_guest
 
     # ===== БЛОКИРОВКА ЛОКАЛЬНЫХ СЕТЕЙ (RFC1918) =====
@@ -79,21 +79,21 @@
     - name: Add GUEST-Forward block RFC1918 10.x
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Forward action=drop dst-address=10.0.0.0/8 comment="GUEST-FWD: Block RFC1918 10.x"
+          - /ip/firewall/filter/add chain=GUEST-Forward action=drop dst-address=10.0.0.0/8 comment="GUEST-FWD Block RFC1918 10.x"
       when: has_guest
 
     # Блокируем 172.16.0.0/12
     - name: Add GUEST-Forward block RFC1918 172.x
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Forward action=drop dst-address=172.16.0.0/12 comment="GUEST-FWD: Block RFC1918 172.x"
+          - /ip/firewall/filter/add chain=GUEST-Forward action=drop dst-address=172.16.0.0/12 comment="GUEST-FWD Block RFC1918 172.x"
       when: has_guest
 
     # Блокируем 192.168.0.0/16
     - name: Add GUEST-Forward block RFC1918 192.x
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Forward action=drop dst-address=192.168.0.0/16 comment="GUEST-FWD: Block RFC1918 192.x"
+          - /ip/firewall/filter/add chain=GUEST-Forward action=drop dst-address=192.168.0.0/16 comment="GUEST-FWD Block RFC1918 192.x"
       when: has_guest
 
     # ===== РАЗРЕШАЕМ ВЫХОД В ИНТЕРНЕТ =====
@@ -102,14 +102,14 @@
     - name: Add GUEST-Forward allow to WAN
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Forward action=accept out-interface-list=WAN comment="GUEST-FWD: Allow to WAN"
+          - /ip/firewall/filter/add chain=GUEST-Forward action=accept out-interface-list=WAN comment="GUEST-FWD Allow to WAN"
       when: has_guest
 
     # Всё остальное блокируем
     - name: Add GUEST-Forward drop all
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Forward action=drop comment="GUEST-FWD: Drop all other"
+          - /ip/firewall/filter/add chain=GUEST-Forward action=drop comment="GUEST-FWD Drop all other"
       when: has_guest
 
     # Итоговое сообщение

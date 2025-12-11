@@ -17,31 +17,31 @@
     - name: Add LAN-Forward accept established
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=LAN-Forward action=accept connection-state=established comment="LAN-FWD: Accept established"
+          - /ip/firewall/filter/add chain=LAN-Forward action=accept connection-state=established comment="LAN-FWD Accept established"
 
     # Разрешаем related соединения
     - name: Add LAN-Forward accept related
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=LAN-Forward action=accept connection-state=related comment="LAN-FWD: Accept related"
+          - /ip/firewall/filter/add chain=LAN-Forward action=accept connection-state=related comment="LAN-FWD Accept related"
 
     # Разрешаем untracked соединения
     - name: Add LAN-Forward accept untracked
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=LAN-Forward action=accept connection-state=untracked comment="LAN-FWD: Accept untracked"
+          - /ip/firewall/filter/add chain=LAN-Forward action=accept connection-state=untracked comment="LAN-FWD Accept untracked"
 
     # Блокируем invalid соединения (битые пакеты)
     - name: Add LAN-Forward drop invalid
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=LAN-Forward action=drop connection-state=invalid comment="LAN-FWD: Drop invalid"
+          - /ip/firewall/filter/add chain=LAN-Forward action=drop connection-state=invalid comment="LAN-FWD Drop invalid"
 
     # Разрешаем новые соединения из LAN (доверенная сеть)
     - name: Add LAN-Forward accept new
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=LAN-Forward action=accept comment="LAN-FWD: Accept new from LAN"
+          - /ip/firewall/filter/add chain=LAN-Forward action=accept comment="LAN-FWD Accept new from LAN"
 
     # Итоговое сообщение
     - name: Show result

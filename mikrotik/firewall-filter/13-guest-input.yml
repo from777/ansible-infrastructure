@@ -49,49 +49,49 @@
     - name: Add GUEST-Input accept established
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Input action=accept connection-state=established comment="GUEST: Accept established"
+          - /ip/firewall/filter/add chain=GUEST-Input action=accept connection-state=established comment="GUEST Accept established"
       when: has_guest
 
     # Разрешаем related соединения
     - name: Add GUEST-Input accept related
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Input action=accept connection-state=related comment="GUEST: Accept related"
+          - /ip/firewall/filter/add chain=GUEST-Input action=accept connection-state=related comment="GUEST Accept related"
       when: has_guest
 
     # Разрешаем untracked соединения
     - name: Add GUEST-Input accept untracked
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Input action=accept connection-state=untracked comment="GUEST: Accept untracked"
+          - /ip/firewall/filter/add chain=GUEST-Input action=accept connection-state=untracked comment="GUEST Accept untracked"
       when: has_guest
 
     # Блокируем invalid соединения
     - name: Add GUEST-Input drop invalid
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Input action=drop connection-state=invalid comment="GUEST: Drop invalid"
+          - /ip/firewall/filter/add chain=GUEST-Input action=drop connection-state=invalid comment="GUEST Drop invalid"
       when: has_guest
 
     # Разрешаем DNS (UDP 53) - чтобы работал интернет
     - name: Add GUEST-Input allow DNS
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Input action=accept protocol=udp dst-port=53 comment="GUEST: Allow DNS"
+          - /ip/firewall/filter/add chain=GUEST-Input action=accept protocol=udp dst-port=53 comment="GUEST Allow DNS"
       when: has_guest
 
     # Разрешаем DHCP (UDP 67) - чтобы получили IP
     - name: Add GUEST-Input allow DHCP
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Input action=accept protocol=udp dst-port=67 comment="GUEST: Allow DHCP"
+          - /ip/firewall/filter/add chain=GUEST-Input action=accept protocol=udp dst-port=67 comment="GUEST Allow DHCP"
       when: has_guest
 
     # Всё остальное блокируем
     - name: Add GUEST-Input drop all
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Input action=drop comment="GUEST: Drop all other"
+          - /ip/firewall/filter/add chain=GUEST-Input action=drop comment="GUEST Drop all other"
       when: has_guest
 
     # Итоговое сообщение

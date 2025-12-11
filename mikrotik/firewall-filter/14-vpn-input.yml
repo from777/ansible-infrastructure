@@ -47,35 +47,35 @@
     - name: Add VPN-Input accept established
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=VPN-Input action=accept connection-state=established comment="VPN: Accept established"
+          - /ip/firewall/filter/add chain=VPN-Input action=accept connection-state=established comment="VPN Accept established"
       when: has_vpn
 
     # Разрешаем related соединения
     - name: Add VPN-Input accept related
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=VPN-Input action=accept connection-state=related comment="VPN: Accept related"
+          - /ip/firewall/filter/add chain=VPN-Input action=accept connection-state=related comment="VPN Accept related"
       when: has_vpn
 
     # Разрешаем untracked соединения
     - name: Add VPN-Input accept untracked
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=VPN-Input action=accept connection-state=untracked comment="VPN: Accept untracked"
+          - /ip/firewall/filter/add chain=VPN-Input action=accept connection-state=untracked comment="VPN Accept untracked"
       when: has_vpn
 
     # Блокируем invalid соединения
     - name: Add VPN-Input drop invalid
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=VPN-Input action=drop connection-state=invalid comment="VPN: Drop invalid"
+          - /ip/firewall/filter/add chain=VPN-Input action=drop connection-state=invalid comment="VPN Drop invalid"
       when: has_vpn
 
     # Всё остальное блокируем
     - name: Add VPN-Input drop all
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=VPN-Input action=drop comment="VPN: Drop all other"
+          - /ip/firewall/filter/add chain=VPN-Input action=drop comment="VPN Drop all other"
       when: has_vpn
 
     # Итоговое сообщение
