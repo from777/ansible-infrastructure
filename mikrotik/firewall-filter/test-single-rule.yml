@@ -1,0 +1,48 @@
+# test-single-rule.yml
+# Тестовый плейбук - добавляет одно правило и проверяет результат
+---
+- name: Test single rule add
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+
+  tasks:
+    # Показать текущие правила Brute-force
+    - name: Show current Brute-force rules BEFORE
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print where chain=Brute-force
+      register: before_output
+
+    - name: Display BEFORE
+      debug:
+        var: before_output.stdout_lines
+
+    # Добавить правило
+    - name: Add test rule
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=Brute-force action=drop comment="TEST-ANSIBLE"
+      register: add_output
+
+    - name: Display add result
+      debug:
+        var: add_output
+
+    # Пауза
+    - name: Wait 3 seconds
+      pause:
+        seconds: 3
+
+    # Показать правила после
+    - name: Show current Brute-force rules AFTER
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print where chain=Brute-force
+      register: after_output
+
+    - name: Display AFTER
+      debug:
+        var: after_output.stdout_lines
