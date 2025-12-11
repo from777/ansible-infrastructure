@@ -1,0 +1,63 @@
+# Mik_mom_firewall_custom_rules.yml
+# Кастомные правила для роутера Mik_mom
+#
+# Этот плейбук запускается ПОСЛЕ firewall-full.yml
+# Добавляет специфичные правила которых нет на других роутерах
+#
+# Правила интегрируются в новую структуру chains
+---
+- name: Add custom rules for Mik_mom
+  hosts: Mik_mom
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+
+  tasks:
+    # ===== ПРОВЕРКА ЧТО БАЗОВЫЕ ПРАВИЛА НА МЕСТЕ =====
+
+    - name: Check if base firewall rules exist
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="Drop all other"
+      register: drop_all_check
+
+    - name: Set base rules exist flag
+      set_fact:
+        base_rules_exist: "{{ drop_all_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 0 }}"
+
+    - name: Fail if base rules not found
+      fail:
+        msg: "Base firewall rules not found! Run firewall-full.yml first!"
+      when: not base_rules_exist
+
+    # ===== RDP К СЕРВЕРУ 192.168.0.242 ЧЕРЕЗ VPN =====
+    # Разрешаем RDP трафик из wg-to-home к серверу 242
+    # Это правило нужно для удалённого доступа к серверу через WireGuard туннель
+
+    - name: Check if RDP rule already exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where dst-address="192.168.0.242" dst-port="3389" protocol=tcp
+      register: rdp_rule_check
+
+    - name: Set RDP rule exists flag
+      set_fact:
+        rdp_rule_exists: "{{ rdp_rule_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 0 }}"
+
+    - name: Debug RDP rule check
+      debug:
+        msg: "RDP rule to 192.168.0.242 exists: {{ rdp_rule_exists }}"
+
+    # Добавляем правило ПЕРЕД финальным "Drop all other" в chain=forward
+    - name: Add RDP rule to server 242 via WireGuard
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=forward action=accept protocol=tcp dst-address=192.168.0.242 in-interface=wg-to-home dst-port=3389 comment="CUSTOM: RDP to server 242 via WG" place-before=[find chain=forward action=drop comment="Drop all other"]
+      when: not rdp_rule_exists
+
+    # ===== ИТОГ =====
+
+    - name: Show result
+      debug:
+        msg: "Custom rules for Mik_mom - {{ 'RDP rule added' if not rdp_rule_exists else 'RDP rule already exists' }}"
