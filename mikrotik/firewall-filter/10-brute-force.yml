@@ -25,43 +25,43 @@
     - name: Add Brute-force drop blocked
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=Brute-force action=drop src-address-list=Brute-force-block comment="BF: Drop blocked"
+          - /ip/firewall/filter/add chain=Brute-force action=drop src-address-list=Brute-force-block comment="BF Drop blocked"
 
     # 2. Если IP уже в списке 4 - блокируем на 8 часов
     - name: Add Brute-force block after 4th
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=Brute-force action=add-src-to-address-list src-address-list=Brute-force-4 address-list=Brute-force-block address-list-timeout=8h comment="BF: Block after 4th"
+          - /ip/firewall/filter/add chain=Brute-force action=add-src-to-address-list src-address-list=Brute-force-4 address-list=Brute-force-block address-list-timeout=8h comment="BF Block after 4th"
 
     # 3. Если IP в списке 3 - переводим в список 4
     - name: Add Brute-force 4th attempt
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=Brute-force action=add-src-to-address-list src-address-list=Brute-force-3 address-list=Brute-force-4 address-list-timeout=30s comment="BF: 4th attempt"
+          - /ip/firewall/filter/add chain=Brute-force action=add-src-to-address-list src-address-list=Brute-force-3 address-list=Brute-force-4 address-list-timeout=30s comment="BF 4th attempt"
 
     # 4. Если IP в списке 2 - переводим в список 3
     - name: Add Brute-force 3rd attempt
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=Brute-force action=add-src-to-address-list src-address-list=Brute-force-2 address-list=Brute-force-3 address-list-timeout=30s comment="BF: 3rd attempt"
+          - /ip/firewall/filter/add chain=Brute-force action=add-src-to-address-list src-address-list=Brute-force-2 address-list=Brute-force-3 address-list-timeout=30s comment="BF 3rd attempt"
 
     # 5. Если IP в списке 1 - переводим в список 2
     - name: Add Brute-force 2nd attempt
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=Brute-force action=add-src-to-address-list src-address-list=Brute-force-1 address-list=Brute-force-2 address-list-timeout=30s comment="BF: 2nd attempt"
+          - /ip/firewall/filter/add chain=Brute-force action=add-src-to-address-list src-address-list=Brute-force-1 address-list=Brute-force-2 address-list-timeout=30s comment="BF 2nd attempt"
 
     # 6. Первое подключение - добавляем в список 1
     - name: Add Brute-force 1st attempt
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=Brute-force action=add-src-to-address-list address-list=Brute-force-1 address-list-timeout=30s comment="BF: 1st attempt"
+          - /ip/firewall/filter/add chain=Brute-force action=add-src-to-address-list address-list=Brute-force-1 address-list-timeout=30s comment="BF 1st attempt"
 
     # 7. Если не заблокирован - разрешаем
     - name: Add Brute-force accept
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=Brute-force action=accept comment="BF: Accept if not blocked"
+          - /ip/firewall/filter/add chain=Brute-force action=accept comment="BF Accept if not blocked"
 
     # Итоговое сообщение
     - name: Show result
