@@ -7,6 +7,7 @@
 # Это изолирует гостей от основной сети
 #
 # Автоматически пропускается если нет interface-list GUEST
+# Правила BlackList добавляются только если есть соответствующие connection-mark
 ---
 - name: Configure GUEST-Forward chain
   hosts: mikrotik
@@ -41,6 +42,34 @@
         msg: "GUEST interface list not found - skipping GUEST-Forward rules"
       when: not has_guest
 
+    # ===== ПРОВЕРКА BLACKLIST МАРКИРОВОК =====
+    # Проверяем есть ли mangle правила с BlackList маркировками
+
+    - name: Check BlackList_RU connection-mark exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/mangle/print count-only where new-connection-mark="BlackList_RU"
+      register: blacklist_ru_check
+      when: has_guest
+
+    - name: Check BlackList_EU connection-mark exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/mangle/print count-only where new-connection-mark="BlackList_EU"
+      register: blacklist_eu_check
+      when: has_guest
+
+    - name: Set BlackList flags
+      set_fact:
+        has_blacklist_ru: "{{ blacklist_ru_check.stdout[0] | default('0') | regex_search('([0-9]+)\\s*$') | int > 0 }}"
+        has_blacklist_eu: "{{ blacklist_eu_check.stdout[0] | default('0') | regex_search('([0-9]+)\\s*$') | int > 0 }}"
+      when: has_guest
+
+    - name: Debug BlackList check
+      debug:
+        msg: "BlackList_RU: {{ has_blacklist_ru | default(false) }}, BlackList_EU: {{ has_blacklist_eu | default(false) }}"
+      when: has_guest
+
     # ===== GUEST-Forward ПРАВИЛА =====
     # Выполняются только если есть GUEST interface list
 
@@ -71,6 +100,22 @@
         commands:
           - /ip/firewall/filter/add chain=GUEST-Forward action=drop connection-state=invalid comment="GUEST-FWD Drop invalid"
       when: has_guest
+
+    # ===== РАЗРЕШАЕМ BLACKLIST VPN МАРШРУТЫ =====
+    # Трафик помеченный для VPN должен проходить до блокировки RFC1918
+    # Эти правила добавляются только если есть соответствующие mangle маркировки
+
+    - name: Add GUEST-Forward accept BlackList_RU
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=GUEST-Forward action=accept connection-mark=BlackList_RU comment="GUEST-FWD Allow BlackList_RU VPN"
+      when: has_guest and has_blacklist_ru | default(false)
+
+    - name: Add GUEST-Forward accept BlackList_EU
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/add chain=GUEST-Forward action=accept connection-mark=BlackList_EU comment="GUEST-FWD Allow BlackList_EU VPN"
+      when: has_guest and has_blacklist_eu | default(false)
 
     # ===== БЛОКИРОВКА ЛОКАЛЬНЫХ СЕТЕЙ (RFC1918) =====
     # Гости не должны иметь доступ к локальным устройствам
@@ -115,4 +160,7 @@
     # Итоговое сообщение
     - name: Show result
       debug:
-        msg: "GUEST-Forward chain - {{ 'added (guests isolated from LAN)' if has_guest else 'skipped (no GUEST list)' }}"
+        msg: >
+          GUEST-Forward chain - {{ 'configured' if has_guest else 'skipped (no GUEST list)' }}
+          {{ '| BlackList_RU: enabled' if (has_guest and has_blacklist_ru | default(false)) else '' }}
+          {{ '| BlackList_EU: enabled' if (has_guest and has_blacklist_eu | default(false)) else '' }}
