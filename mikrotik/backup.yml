@@ -6,7 +6,7 @@
     ansible_connection: ansible.netcommon.network_cli
     ansible_network_os: community.routeros.routeros
     ansible_become: no
-    backup_dir: "{{ playbook_dir }}/mikrotik/backups"
+    backup_dir: "{{ playbook_dir }}/backups"
   tasks:
     - name: Ensure backup directory exists
       delegate_to: localhost
@@ -34,7 +34,7 @@
         cd {{ playbook_dir }}
         git config user.email "semaphore@local"
         git config user.name "Semaphore"
-        git add mikrotik/backups/
+        git add backups/
         git diff --cached --quiet || git commit -m "Backup {{ inventory_hostname }} - $(date +%Y-%m-%d)"
         git push
       run_once: true
