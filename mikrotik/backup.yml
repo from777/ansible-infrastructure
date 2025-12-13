@@ -6,8 +6,16 @@
     ansible_connection: ansible.netcommon.network_cli
     ansible_network_os: community.routeros.routeros
     ansible_become: no
-    backup_dir: "{{ playbook_dir }}/backups"
+    backup_dir: "{{ playbook_dir }}/mikrotik/backups"
   tasks:
+    - name: Ensure backup directory exists
+      delegate_to: localhost
+      file:
+        path: "{{ backup_dir }}"
+        state: directory
+        mode: '0755'
+      run_once: true
+
     - name: Get export configuration
       community.routeros.command:
         commands:
@@ -20,17 +28,13 @@
         content: "{{ config_output.stdout[0] }}"
         dest: "{{ backup_dir }}/{{ inventory_hostname }}.rsc"
 
-    - name: Git add backup file
+    - name: Git commit and push
       delegate_to: localhost
       shell: |
         cd {{ playbook_dir }}
         git config user.email "semaphore@local"
         git config user.name "Semaphore"
-        git add backups/
-        git commit -m "Backup {{ inventory_hostname }} - {{ ansible_date_time.date | default('manual') }}" || true
-      
-    - name: Git push
-      delegate_to: localhost
-      shell: |
-        cd {{ playbook_dir }}
+        git add mikrotik/backups/
+        git diff --cached --quiet || git commit -m "Backup {{ inventory_hostname }} - $(date +%Y-%m-%d)"
         git push
+      run_once: true
