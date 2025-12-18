@@ -1,0 +1,31 @@
+---
+- name: "05: SMB Unmount"
+  hosts: mikrotik
+  gather_facts: no
+  vars_files:
+    - vars.yml
+  
+  tasks:
+    - name: Отмонтировать SMB
+      ansible.posix.mount:
+        path: "{{ smb_mount_point }}"
+        state: unmounted
+      delegate_to: localhost
+      become: yes
+      ignore_errors: yes
+
+    - name: Удалить точку монтирования
+      ansible.builtin.file:
+        path: "{{ smb_mount_point }}"
+        state: absent
+      delegate_to: localhost
+      become: yes
+
+    - name: Отключить SMB
+      community.routeros.command:
+        commands:
+          - /ip smb set enabled=no
+
+    - name: Результат
+      ansible.builtin.debug:
+        msg: "SMB отключен"

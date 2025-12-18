@@ -1,0 +1,46 @@
+---
+- name: "03: Configs"
+  hosts: mikrotik
+  gather_facts: no
+  vars_files:
+    - vars.yml
+  
+  tasks:
+    - name: Создать папки
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ smb_mount_point }}/docker/{{ container_name }}"
+        - "{{ smb_mount_point }}/docker_configs/{{ container_name }}"
+        - "{{ smb_mount_point }}/docker_configs/{{ container_name }}/template"
+        - "{{ smb_mount_point }}/docker_configs/{{ container_name }}/awg"
+        - "{{ smb_mount_point }}/docker_configs/{{ container_name }}/srv"
+      delegate_to: localhost
+      become: yes
+
+    - name: Копировать конфиг mihomo
+      ansible.builtin.copy:
+        src: configs/template/custom_config.yaml
+        dest: "{{ smb_mount_point }}/docker_configs/{{ container_name }}/template/custom_config.yaml"
+      delegate_to: localhost
+      become: yes
+
+    - name: Копировать AWG конфиг
+      ansible.builtin.copy:
+        src: configs/awg/warp.conf
+        dest: "{{ smb_mount_point }}/docker_configs/{{ container_name }}/awg/warp.conf"
+      delegate_to: localhost
+      become: yes
+
+    - name: Копировать VLESS конфиг
+      ansible.builtin.copy:
+        src: configs/srv/proxies.yaml
+        dest: "{{ smb_mount_point }}/docker_configs/{{ container_name }}/srv/proxies.yaml"
+      delegate_to: localhost
+      become: yes
+
+    - name: Результат
+      ansible.builtin.debug:
+        msg: "Конфиги скопированы"

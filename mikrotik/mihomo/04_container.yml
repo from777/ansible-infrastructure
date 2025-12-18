@@ -1,0 +1,64 @@
+---
+- name: "04: Container"
+  hosts: mikrotik
+  gather_facts: no
+  vars_files:
+    - vars.yml
+  
+  tasks:
+    - name: Проверить существование mount
+      community.routeros.command:
+        commands:
+          - /container mounts print count-only where name={{ container_name }}_conf
+      register: mount_exists
+
+    - name: Создать mount
+      community.routeros.command:
+        commands:
+          - /container mounts add name={{ container_name }}_conf src={{ usb_path }}/docker_configs/{{ container_name }} dst=/etc/mihomo
+      when: mount_exists.stdout[0] | int == 0
+
+    - name: Проверить существование envlist
+      community.routeros.command:
+        commands:
+          - /container envs print count-only where list={{ container_name }}_env
+      register: env_exists
+
+    - name: Создать envlist
+      community.routeros.command:
+        commands:
+          - /container envs add list={{ container_name }}_env key=CONFIG value=custom_config.yaml
+      when: env_exists.stdout[0] | int == 0
+
+    - name: Проверить существование контейнера
+      community.routeros.command:
+        commands:
+          - /container print count-only where name="{{ container_name }}"
+      register: container_exists
+
+    - name: Создать контейнер
+      community.routeros.command:
+        commands:
+          - /container add remote-image={{ container_image }} interface={{ container_name }} root-dir={{ usb_path }}/docker/{{ container_name }} mounts={{ container_name }}_conf envlists={{ container_name }}_env dns={{ container_dns }} logging=yes name="{{ container_name }}" start-on-boot=yes
+      when: container_exists.stdout[0] | int == 0
+
+    - name: Ожидание загрузки образа
+      ansible.builtin.pause:
+        seconds: 30
+        prompt: "Загрузка образа..."
+      when: container_exists.stdout[0] | int == 0
+
+    - name: Запустить контейнер
+      community.routeros.command:
+        commands:
+          - /container start [find name="{{ container_name }}"]
+
+    - name: Проверить статус
+      community.routeros.command:
+        commands:
+          - /container print where name="{{ container_name }}"
+      register: result
+
+    - name: Результат
+      ansible.builtin.debug:
+        var: result.stdout_lines

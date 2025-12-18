@@ -1,0 +1,53 @@
+---
+- name: "02: SMB Mount"
+  hosts: mikrotik
+  gather_facts: no
+  vars_files:
+    - vars.yml
+  
+  tasks:
+    - name: Проверить SMB статус
+      community.routeros.command:
+        commands:
+          - /ip smb print
+      register: smb_status
+
+    - name: Включить SMB
+      community.routeros.command:
+        commands:
+          - /ip smb set enabled=yes interfaces={{ smb_interface }}
+      when: "'enabled: no' in smb_status.stdout[0]"
+
+    - name: Проверить существование SMB шары
+      community.routeros.command:
+        commands:
+          - /ip smb shares print count-only where name={{ usb_path }}
+      register: share_exists
+
+    - name: Создать SMB шару
+      community.routeros.command:
+        commands:
+          - /ip smb shares add name={{ usb_path }} directory={{ usb_path }}
+      when: share_exists.stdout[0] | int == 0
+
+    - name: Создать точку монтирования
+      ansible.builtin.file:
+        path: "{{ smb_mount_point }}"
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+      become: yes
+
+    - name: Смонтировать SMB
+      ansible.posix.mount:
+        path: "{{ smb_mount_point }}"
+        src: "//{{ ansible_host }}/{{ usb_path }}"
+        fstype: cifs
+        opts: "username={{ ansible_user }},password={{ ansible_password }},vers=2.0"
+        state: mounted
+      delegate_to: localhost
+      become: yes
+
+    - name: Результат
+      ansible.builtin.debug:
+        msg: "SMB смонтирован в {{ smb_mount_point }}"

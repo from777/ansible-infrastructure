@@ -1,0 +1,16 @@
+---
+# ============================================================
+# ПЕРЕМЕННЫЕ КОНТЕЙНЕРА
+# ============================================================
+
+container_name: "test_super_test"
+container_ip: "192.168.254.6"
+container_gateway: "192.168.254.1"
+docker_bridge: "Bridge-Docker"
+usb_path: "usb1"
+container_image: "wiktorbgu/mihomo-mikrotik:latest"
+container_dns: "1.1.1.1,8.8.8.8,9.9.9.9"
+
+# SMB
+smb_mount_point: "/mnt/mikrotik_smb"
+smb_interface: "bridge1"
