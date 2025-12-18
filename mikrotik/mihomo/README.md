@@ -5,7 +5,7 @@
 ```
 mihomo/
 ├── vars.yml           ← Переменные (имя, IP)
-├── deploy_all.yml     ← Всё сразу
+├── mihomo_all.yml     ← Всё сразу
 ├── 01_network.yml     ← Сеть
 ├── 02_smb_mount.yml   ← SMB mount
 ├── 03_configs.yml     ← Копирование конфигов
@@ -21,7 +21,7 @@ mihomo/
 
 ```bash
 # Всё сразу
-ansible-playbook deploy_all.yml --ask-become-pass
+ansible-playbook mihomo_all.yml --ask-become-pass
 
 # По шагам
 ansible-playbook 01_network.yml
