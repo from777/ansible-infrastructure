@@ -1,5 +1,6 @@
 # 02_smb_mount.yml
-# Устанавливает пароль для smbuser и монтирует шару
+# Полная настройка SMB с нуля на чистом роутере
+# RouterOS 7 поддерживает только SMB2.1, SMB3.0, SMB3.1.1
 ---
 - name: "02: SMB Mount"
   hosts: mikrotik
@@ -7,13 +8,15 @@
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
-    # Пароль для SMB (будет установлен автоматически)
     smb_user: "smbuser"
     smb_password: "mihomo123"
+    smb_share_name: "usb1"
+    smb_share_dir: "usb1/smb_share"
   vars_files:
     - vars.yml
 
   tasks:
+    # ===== SMB СЕРВЕР =====
     - name: Проверить SMB статус
       community.routeros.command:
         commands:
@@ -26,24 +29,56 @@
           - /ip smb set enabled=yes interfaces={{ smb_interface }}
       when: "'enabled: no' in smb_status.stdout[0]"
 
-    # Установить пароль для smbuser
+    # ===== SMB ПОЛЬЗОВАТЕЛЬ =====
+    - name: Проверить SMB пользователя
+      community.routeros.command:
+        commands:
+          - /ip smb users print count-only where name={{ smb_user }}
+      register: smb_user_exists
+
+    - name: Создать SMB пользователя
+      community.routeros.command:
+        commands:
+          - /ip smb users add name={{ smb_user }} password={{ smb_password }} read-only=no
+      when: smb_user_exists.stdout[0] | int == 0
+
     - name: Установить пароль SMB пользователя
       community.routeros.command:
         commands:
-          - /ip smb users set [find name={{ smb_user }}] password={{ smb_password }} read-only=no
+          - /ip smb users set [find name={{ smb_user }}] password={{ smb_password }} read-only=no disabled=no
 
-    - name: Проверить существование SMB шары
+    # ===== ДИРЕКТОРИЯ ДЛЯ ШАРЫ =====
+    - name: Проверить директорию для шары
       community.routeros.command:
         commands:
-          - /ip smb shares print count-only where name={{ usb_path }}
+          - /file print count-only where name="{{ smb_share_dir }}"
+      register: share_dir_exists
+
+    - name: Создать директорию для шары
+      community.routeros.command:
+        commands:
+          - /file add name={{ smb_share_dir }} type=directory
+      when: share_dir_exists.stdout[0] | int == 0
+
+    # ===== SMB ШАРА =====
+    - name: Проверить SMB шару
+      community.routeros.command:
+        commands:
+          - /ip smb shares print count-only where name={{ smb_share_name }}
       register: share_exists
 
     - name: Создать SMB шару
       community.routeros.command:
         commands:
-          - /ip smb shares add name={{ usb_path }} directory={{ usb_path }}
+          - /ip smb shares add name={{ smb_share_name }} directory={{ smb_share_dir }}
       when: share_exists.stdout[0] | int == 0
 
+    - name: Настроить SMB шару
+      community.routeros.command:
+        commands:
+          - /ip smb shares set [find name={{ smb_share_name }}] directory={{ smb_share_dir }} valid-users={{ smb_user }}
+
+    # ===== МОНТИРОВАНИЕ НА LOCALHOST =====
     - name: Создать точку монтирования
       ansible.builtin.file:
         path: "{{ smb_mount_point }}"
@@ -52,21 +87,19 @@
       delegate_to: localhost
       become: yes
 
-    - name: Смонтировать SMB (vers=2.0)
-      ansible.builtin.shell: |
-        mount -t cifs "//{{ ansible_host }}/{{ usb_path }}" "{{ smb_mount_point }}" -o username={{ smb_user }},password={{ smb_password }},vers=2.0,nounix,noserverino
+    - name: Проверить не смонтировано ли уже
+      ansible.builtin.shell: mount | grep "{{ smb_mount_point }}" || true
       delegate_to: localhost
-      become: yes
-      register: mount_v2
-      ignore_errors: yes
+      register: already_mounted
+      changed_when: false
 
-    - name: Смонтировать SMB (vers=1.0)
+    - name: Смонтировать SMB
       ansible.builtin.shell: |
-        mount -t cifs "//{{ ansible_host }}/{{ usb_path }}" "{{ smb_mount_point }}" -o username={{ smb_user }},password={{ smb_password }},vers=1.0,nounix,noserverino
+        mount -t cifs "//{{ ansible_host }}/{{ smb_share_name }}" "{{ smb_mount_point }}" -o username={{ smb_user }},password={{ smb_password }},vers=2.1
       delegate_to: localhost
       become: yes
-      when: mount_v2.rc != 0
+      when: already_mounted.stdout == ""
 
     - name: Результат
       ansible.builtin.debug:
-        msg: "SMB смонтирован в {{ smb_mount_point }}"
+        msg: "SMB смонтирован: //{{ ansible_host }}/{{ smb_share_name }} → {{ smb_mount_point }}"

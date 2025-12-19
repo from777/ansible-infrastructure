@@ -1,4 +1,5 @@
 # 05_smb_unmount.yml
+# Размонтирует SMB шару
 ---
 - name: "05: SMB Unmount"
   hosts: mikrotik
@@ -6,31 +7,22 @@
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
-    ansible_connection: ansible.netcommon.network_cli
   vars_files:
     - vars.yml
-  
+
   tasks:
-    - name: Отмонтировать SMB
-      ansible.posix.mount:
-        path: "{{ smb_mount_point }}"
-        state: unmounted
+    - name: Проверить монтирование
+      ansible.builtin.shell: mount | grep "{{ smb_mount_point }}" || true
+      delegate_to: localhost
+      register: is_mounted
+      changed_when: false
+
+    - name: Размонтировать SMB
+      ansible.builtin.shell: umount "{{ smb_mount_point }}"
       delegate_to: localhost
       become: yes
-      ignore_errors: yes
-
-    - name: Удалить точку монтирования
-      ansible.builtin.file:
-        path: "{{ smb_mount_point }}"
-        state: absent
-      delegate_to: localhost
-      become: yes
-
-    - name: Отключить SMB
-      community.routeros.command:
-        commands:
-          - /ip smb set enabled=no
+      when: is_mounted.stdout != ""
 
     - name: Результат
       ansible.builtin.debug:
-        msg: "SMB отключен"
+        msg: "SMB размонтирован: {{ smb_mount_point }}"

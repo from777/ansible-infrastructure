@@ -1,4 +1,9 @@
 # 04_container.yml
+# Создаёт контейнер на роутере
+#
+# Пути на роутере:
+#   root-dir: usb1/smb_share/docker/container_name
+#   mounts:   usb1/smb_share/docker_configs/container_name → /etc/mihomo
 ---
 - name: "04: Container"
   hosts: mikrotik
@@ -6,10 +11,36 @@
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
+    smb_base: "usb1/smb_share"
   vars_files:
     - vars.yml
 
   tasks:
+    # ===== VETH INTERFACE =====
+    - name: Проверить veth
+      community.routeros.command:
+        commands:
+          - /interface veth print count-only where name={{ container_name }}
+      register: veth_exists
+
+    - name: Создать veth
+      community.routeros.command:
+        commands:
+          - /interface veth add name={{ container_name }} address={{ container_ip }}/24 gateway={{ container_gateway }}
+      when: veth_exists.stdout[0] | int == 0
+
+    - name: Проверить veth в bridge
+      community.routeros.command:
+        commands:
+          - /interface bridge port print count-only where interface={{ container_name }}
+      register: veth_in_bridge
+
+    - name: Добавить veth в bridge
+      community.routeros.command:
+        commands:
+          - /interface bridge port add bridge={{ docker_bridge }} interface={{ container_name }}
+      when: veth_in_bridge.stdout[0] | int == 0
+
     # ===== MOUNT =====
     - name: Проверить mount
       community.routeros.command:
@@ -20,7 +51,7 @@
     - name: Создать mount
       community.routeros.command:
         commands:
-          - /container mounts add name={{ container_name }}_conf src={{ usb_path }}/docker_configs/{{ container_name }} dst=/etc/mihomo
+          - /container mounts add name={{ container_name }}_conf src={{ smb_base }}/docker_configs/{{ container_name }} dst=/etc/mihomo
       when: mount_exists.stdout[0] | int == 0
 
     # ===== ENVLIST =====
@@ -30,7 +61,6 @@
           - /container envs print count-only where list={{ container_name }}_env
       register: env_exists
 
-    # Создаём env только если указан container_config
     - name: Создать envlist с CONFIG
       community.routeros.command:
         commands:
@@ -40,8 +70,7 @@
         - container_config is defined
         - container_config | length > 0
 
-    # Если CONFIG не указан — создаём пустой envlist (образ использует дефолт)
-    - name: Создать пустой envlist
+    - name: Создать envlist без CONFIG
       community.routeros.command:
         commands:
           - /container envs add list={{ container_name }}_env key=TZ value=Europe/Moscow
@@ -59,7 +88,7 @@
     - name: Создать контейнер
       community.routeros.command:
         commands:
-          - /container add remote-image={{ container_image }} interface={{ container_name }} root-dir={{ usb_path }}/docker/{{ container_name }} mounts={{ container_name }}_conf envlist={{ container_name }}_env dns={{ container_dns }} logging=yes name="{{ container_name }}" start-on-boot=yes
+          - /container add remote-image={{ container_image }} interface={{ container_name }} root-dir={{ smb_base }}/docker/{{ container_name }} mounts={{ container_name }}_conf envlist={{ container_name }}_env dns={{ container_dns }} logging=yes name="{{ container_name }}" start-on-boot=yes
       when: container_exists.stdout[0] | int == 0
 
     - name: Ожидание загрузки образа
@@ -84,6 +113,6 @@
       ansible.builtin.debug:
         msg: |
           Контейнер: {{ container_name }}
+          IP: {{ container_ip }}
           DNS: {{ container_dns }}
-          CONFIG: {{ container_config | default('default (auto)') }}
           UI: http://{{ container_ip }}:9090/ui/

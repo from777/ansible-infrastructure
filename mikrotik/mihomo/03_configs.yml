@@ -1,12 +1,8 @@
 # 03_configs.yml
 # Копирует конфиги на роутер через SMB
 #
-# Образ wiktorbgu/mihomo-mikrotik автоматически:
-# - Читает все .conf из /etc/mihomo/awg/
-# - Конвертирует в YAML и генерирует awg.yaml
-# - Добавляет proxy-provider AWG
-#
-# Поэтому custom_config.yaml НЕ должен содержать proxy-providers для AWG
+# SMB шара монтируется в smb_mount_point
+# Структура на роутере: usb1/smb_share/docker_configs/container_name/
 ---
 - name: "03: Configs"
   hosts: mikrotik
@@ -18,20 +14,21 @@
     - vars.yml
 
   tasks:
-    - name: Создать папки
+    # ===== СОЗДАТЬ ПАПКИ =====
+    - name: Создать структуру папок
       ansible.builtin.file:
         path: "{{ item }}"
         state: directory
         mode: '0755'
       loop:
-        - "{{ smb_mount_point }}/docker/{{ container_name }}"
         - "{{ smb_mount_point }}/docker_configs/{{ container_name }}"
         - "{{ smb_mount_point }}/docker_configs/{{ container_name }}/awg"
         - "{{ smb_mount_point }}/docker_configs/{{ container_name }}/srv"
+        - "{{ smb_mount_point }}/docker/{{ container_name }}"
       delegate_to: localhost
       become: yes
 
-    # Копируем ВСЕ .conf файлы из configs/awg/
+    # ===== КОПИРОВАТЬ AWG КОНФИГИ =====
     - name: Найти все AWG конфиги
       ansible.builtin.find:
         paths: "{{ playbook_dir }}/configs/awg"
@@ -39,18 +36,19 @@
       register: awg_files
       delegate_to: localhost
 
-    - name: Копировать все AWG конфиги ({{ awg_files.files | length }} файлов)
+    - name: Копировать AWG конфиги ({{ awg_files.files | length }} файлов)
       ansible.builtin.copy:
         src: "{{ item.path }}"
         dest: "{{ smb_mount_point }}/docker_configs/{{ container_name }}/awg/"
+        mode: '0644'
       loop: "{{ awg_files.files }}"
       loop_control:
         label: "{{ item.path | basename }}"
       delegate_to: localhost
       become: yes
 
-    # Копируем custom_config.yaml если есть
-    - name: Проверить наличие custom_config.yaml
+    # ===== КОПИРОВАТЬ CUSTOM CONFIG =====
+    - name: Проверить custom_config.yaml
       ansible.builtin.stat:
         path: "{{ playbook_dir }}/configs/custom_config.yaml"
       register: custom_config
@@ -60,11 +58,12 @@
       ansible.builtin.copy:
         src: "{{ playbook_dir }}/configs/custom_config.yaml"
         dest: "{{ smb_mount_point }}/docker_configs/{{ container_name }}/custom_config.yaml"
+        mode: '0644'
       when: custom_config.stat.exists
       delegate_to: localhost
       become: yes
 
-    # Копируем SRV конфиги если есть
+    # ===== КОПИРОВАТЬ SRV КОНФИГИ =====
     - name: Найти SRV конфиги
       ansible.builtin.find:
         paths: "{{ playbook_dir }}/configs/srv"
@@ -77,6 +76,7 @@
       ansible.builtin.copy:
         src: "{{ item.path }}"
         dest: "{{ smb_mount_point }}/docker_configs/{{ container_name }}/srv/"
+        mode: '0644'
       loop: "{{ srv_files.files | default([]) }}"
       loop_control:
         label: "{{ item.path | basename }}"
