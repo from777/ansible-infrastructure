@@ -6,10 +6,9 @@
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
-    ansible_connection: ansible.netcommon.network_cli
   vars_files:
     - vars.yml
-  
+
   tasks:
     - name: Проверить SMB статус
       community.routeros.command:
@@ -48,7 +47,7 @@
         path: "{{ smb_mount_point }}"
         src: "//{{ ansible_host }}/{{ usb_path }}"
         fstype: cifs
-        opts: "username={{ ansible_user }},password={{ ansible_password }},vers=2.0"
+        opts: "username={{ ansible_user }},password={{ ansible_password }},vers=1.0,sec=ntlm"
         state: mounted
       delegate_to: localhost
       become: yes
