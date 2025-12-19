@@ -26,7 +26,7 @@
 
     - name: Set GUEST list exists flag
       set_fact:
-        has_guest: "{{ guest_list_check.stdout[0] | int > 0 }}"
+        has_guest: "{{ guest_list_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 0 }}"
 
     - name: Debug GUEST list check
       debug:
@@ -49,14 +49,14 @@
 
     - name: Debug established check
       debug:
-        msg: "established check stdout: '{{ guest_established_check.stdout[0] }}' parsed: {{ guest_established_check.stdout[0] | default('0') | int }}"
+        msg: "established count: {{ guest_established_check.stdout[0] | regex_search('([0-9]+)\\s*$') }}"
       when: has_guest
 
     - name: Add GUEST-Input accept established
       community.routeros.command:
         commands:
           - /ip firewall filter add chain=GUEST-Input action=accept connection-state=established comment="GUEST Accept established"
-      when: has_guest and (guest_established_check.stdout[0] | default('0') | int == 0)
+      when: has_guest and (guest_established_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0)
 
     # --- related ---
     - name: Check GUEST-Input related exists
@@ -68,14 +68,14 @@
 
     - name: Debug related check
       debug:
-        msg: "related check stdout: '{{ guest_related_check.stdout[0] }}' parsed: {{ guest_related_check.stdout[0] | default('0') | int }}"
+        msg: "related count: {{ guest_related_check.stdout[0] | regex_search('([0-9]+)\\s*$') }}"
       when: has_guest
 
     - name: Add GUEST-Input accept related
       community.routeros.command:
         commands:
           - /ip firewall filter add chain=GUEST-Input action=accept connection-state=related comment="GUEST Accept related"
-      when: has_guest and (guest_related_check.stdout[0] | default('0') | int == 0)
+      when: has_guest and (guest_related_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0)
 
     # --- untracked ---
     - name: Check GUEST-Input untracked exists
@@ -89,7 +89,7 @@
       community.routeros.command:
         commands:
           - /ip firewall filter add chain=GUEST-Input action=accept connection-state=untracked comment="GUEST Accept untracked"
-      when: has_guest and (guest_untracked_check.stdout[0] | default('0') | int == 0)
+      when: has_guest and (guest_untracked_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0)
 
     # --- invalid ---
     - name: Check GUEST-Input invalid exists
@@ -103,7 +103,7 @@
       community.routeros.command:
         commands:
           - /ip firewall filter add chain=GUEST-Input action=drop connection-state=invalid comment="GUEST Drop invalid"
-      when: has_guest and (guest_invalid_check.stdout[0] | default('0') | int == 0)
+      when: has_guest and (guest_invalid_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0)
 
     # --- DNS ---
     - name: Check GUEST-Input DNS exists
@@ -117,7 +117,7 @@
       community.routeros.command:
         commands:
           - /ip firewall filter add chain=GUEST-Input action=accept protocol=udp dst-port=53 comment="GUEST Allow DNS"
-      when: has_guest and (guest_dns_check.stdout[0] | default('0') | int == 0)
+      when: has_guest and (guest_dns_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0)
 
     # --- DHCP ---
     - name: Check GUEST-Input DHCP exists
@@ -131,7 +131,7 @@
       community.routeros.command:
         commands:
           - /ip firewall filter add chain=GUEST-Input action=accept protocol=udp dst-port=67 comment="GUEST Allow DHCP"
-      when: has_guest and (guest_dhcp_check.stdout[0] | default('0') | int == 0)
+      when: has_guest and (guest_dhcp_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0)
 
     # --- drop all ---
     - name: Check GUEST-Input drop all exists
@@ -145,7 +145,7 @@
       community.routeros.command:
         commands:
           - /ip firewall filter add chain=GUEST-Input action=drop comment="GUEST Drop all other"
-      when: has_guest and (guest_drop_check.stdout[0] | default('0') | int == 0)
+      when: has_guest and (guest_drop_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0)
 
     - name: Show result
       debug:
