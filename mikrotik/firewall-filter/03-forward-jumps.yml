@@ -18,8 +18,6 @@
 
   tasks:
     # ===== ПРОВЕРКА INTERFACE-LISTS =====
-    # Проверяем какие interface-lists есть на роутере
-
     - name: Check GUEST interface list exists
       community.routeros.command:
         commands:
@@ -32,53 +30,84 @@
           - /interface/list/print count-only where name="VPN-OUT"
       register: vpn_list_check
 
-    # Сохраняем результаты в переменные
     - name: Set interface list flags
       set_fact:
-        has_guest: "{{ guest_list_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 0 }}"
-        has_vpn: "{{ vpn_list_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 0 }}"
+        has_guest: "{{ guest_list_check.stdout[0] | int > 0 }}"
+        has_vpn: "{{ vpn_list_check.stdout[0] | int > 0 }}"
 
-    # Debug - показать какие interface-lists найдены
     - name: Show detected interface lists
       debug:
         msg: "GUEST: {{ has_guest }}, VPN-OUT: {{ has_vpn }}"
 
-    # ===== JUMP ПРАВИЛА =====
-    # Добавляем в порядке обработки трафика
+    # ===== JUMP ПРАВИЛА С ПРОВЕРКОЙ =====
+
+    # --- ISP-Forward ---
+    - name: Check ISP-Forward jump exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="Jump to ISP-Forward"
+      register: isp_forward_check
 
     - name: Add jump to ISP-Forward
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=forward action=jump jump-target=ISP-Forward in-interface-list=WAN comment="Jump to ISP-Forward"
+      when: isp_forward_check.stdout[0] | int == 0
 
-    # VPN-Forward jump - только если есть VPN-OUT interface list
+    # --- VPN-Forward ---
+    - name: Check VPN-Forward jump exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="Jump to VPN-Forward"
+      register: vpn_forward_check
+      when: has_vpn
+
     - name: Add jump to VPN-Forward
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=forward action=jump jump-target=VPN-Forward in-interface-list=VPN-OUT comment="Jump to VPN-Forward"
-      when: has_vpn
+      when: has_vpn and (vpn_forward_check.stdout[0] | int == 0)
+
+    # --- LAN-Forward ---
+    - name: Check LAN-Forward jump exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="Jump to LAN-Forward"
+      register: lan_forward_check
 
     - name: Add jump to LAN-Forward
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=forward action=jump jump-target=LAN-Forward in-interface-list=LAN comment="Jump to LAN-Forward"
+      when: lan_forward_check.stdout[0] | int == 0
 
-    # GUEST-Forward jump - только если есть GUEST interface list
+    # --- GUEST-Forward ---
+    - name: Check GUEST-Forward jump exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="Jump to GUEST-Forward"
+      register: guest_forward_check
+      when: has_guest
+
     - name: Add jump to GUEST-Forward
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=forward action=jump jump-target=GUEST-Forward in-interface-list=GUEST comment="Jump to GUEST-Forward"
-      when: has_guest
+      when: has_guest and (guest_forward_check.stdout[0] | int == 0)
 
-    # ===== DROP ALL =====
-    # Всё что не попало в jump - блокируем
+    # --- DROP ALL ---
+    - name: Check forward drop all exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="Drop all other forward"
+      register: drop_all_check
 
     - name: Add forward drop all
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=forward action=drop comment="Drop all other"
+          - /ip/firewall/filter/add chain=forward action=drop comment="Drop all other forward"
+      when: drop_all_check.stdout[0] | int == 0
 
-    # Итоговое сообщение
     - name: Show result
       debug:
-        msg: "Forward jumps added (GUEST: {{ has_guest }}, VPN: {{ has_vpn }})"
+        msg: "Forward jumps configured (GUEST: {{ has_guest }}, VPN: {{ has_vpn }})"

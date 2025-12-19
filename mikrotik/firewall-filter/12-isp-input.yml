@@ -19,72 +19,139 @@
 
   tasks:
     # ===== ISP-Input chain =====
-    # Основная обработка трафика из WAN
 
-    # Разрешаем established соединения (ответы на наши запросы)
+    # --- established ---
+    - name: Check ISP-Input established exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="ISP Accept established"
+      register: isp_established_check
+
     - name: Add ISP-Input accept established
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=ISP-Input action=accept connection-state=established comment="ISP Accept established"
+      when: isp_established_check.stdout[0] | int == 0
 
-    # Разрешаем related соединения (связанные с established)
+    # --- related ---
+    - name: Check ISP-Input related exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="ISP Accept related"
+      register: isp_related_check
+
     - name: Add ISP-Input accept related
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=ISP-Input action=accept connection-state=related comment="ISP Accept related"
+      when: isp_related_check.stdout[0] | int == 0
 
-    # Разрешаем untracked соединения
+    # --- untracked ---
+    - name: Check ISP-Input untracked exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="ISP Accept untracked"
+      register: isp_untracked_check
+
     - name: Add ISP-Input accept untracked
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=ISP-Input action=accept connection-state=untracked comment="ISP Accept untracked"
+      when: isp_untracked_check.stdout[0] | int == 0
 
-    # Блокируем invalid соединения (битые пакеты)
+    # --- invalid ---
+    - name: Check ISP-Input invalid exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="ISP Drop invalid"
+      register: isp_invalid_check
+
     - name: Add ISP-Input drop invalid
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=ISP-Input action=drop connection-state=invalid comment="ISP Drop invalid"
+      when: isp_invalid_check.stdout[0] | int == 0
 
-    # Переходим к проверке разрешённых сервисов
+    # --- jump to allowed ---
+    - name: Check ISP-Input jump exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="ISP Jump to allowed"
+      register: isp_jump_check
+
     - name: Add ISP-Input jump to allowed
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=ISP-Input action=jump jump-target=ISP-Input-Allow comment="ISP Jump to allowed"
+      when: isp_jump_check.stdout[0] | int == 0
 
-    # Всё остальное блокируем
+    # --- drop all ---
+    - name: Check ISP-Input drop all exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="ISP Drop all other"
+      register: isp_drop_check
+
     - name: Add ISP-Input drop all
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=ISP-Input action=drop comment="ISP Drop all other"
+      when: isp_drop_check.stdout[0] | int == 0
 
     # ===== ISP-Input-Allow chain =====
-    # Здесь перечисляем разрешённые сервисы из интернета
 
-    # Разрешаем ICMP (ping)
+    # --- ICMP ---
+    - name: Check ISP-Input-Allow ICMP exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="Allow ICMP"
+      register: isp_icmp_check
+
     - name: Add ISP-Input-Allow ICMP
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=ISP-Input-Allow action=accept protocol=icmp comment="Allow ICMP"
+      when: isp_icmp_check.stdout[0] | int == 0
 
-    # SSH через brute-force защиту (только если пришёл через DST-NAT)
+    # --- SSH via Brute-force ---
+    - name: Check ISP-Input-Allow SSH exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="SSH via Brute-force"
+      register: isp_ssh_check
+
     - name: Add ISP-Input-Allow SSH via Brute-force
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=ISP-Input-Allow action=jump jump-target=Brute-force protocol=tcp dst-port=22 connection-nat-state=dstnat comment="SSH via Brute-force"
+      when: isp_ssh_check.stdout[0] | int == 0
 
-    # Блокируем Winbox из WAN (небезопасно)
+    # --- Drop Winbox ---
+    - name: Check ISP-Input-Allow drop Winbox exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="Drop Winbox from WAN"
+      register: isp_winbox_check
+
     - name: Add ISP-Input-Allow drop Winbox
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=ISP-Input-Allow action=drop protocol=tcp dst-port=8291 comment="Drop Winbox from WAN"
+      when: isp_winbox_check.stdout[0] | int == 0
 
-    # Разрешаем WireGuard
+    # --- WireGuard ---
+    - name: Check ISP-Input-Allow WireGuard exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="WireGuard"
+      register: isp_wg_check
+
     - name: Add ISP-Input-Allow WireGuard
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=ISP-Input-Allow action=accept protocol=udp dst-port=51820 comment="WireGuard"
+      when: isp_wg_check.stdout[0] | int == 0
 
-    # Итоговое сообщение
     - name: Show result
       debug:
-        msg: "ISP-Input and ISP-Input-Allow chains added"
+        msg: "ISP-Input and ISP-Input-Allow chains configured"

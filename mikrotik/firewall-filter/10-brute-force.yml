@@ -18,52 +18,97 @@
     ansible_network_os: community.routeros.routeros
 
   tasks:
-    # Добавляем правила Brute-force chain
-    # Порядок правил важен!
+    # --- Drop blocked ---
+    - name: Check BF drop blocked exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="BF Drop blocked"
+      register: bf_drop_check
 
-    # 1. Сначала блокируем уже заблокированных
     - name: Add Brute-force drop blocked
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=Brute-force action=drop src-address-list=Brute-force-block comment="BF Drop blocked"
+      when: bf_drop_check.stdout[0] | int == 0
 
-    # 2. Если IP уже в списке 4 - блокируем на 8 часов
+    # --- Block after 4th ---
+    - name: Check BF block after 4th exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="BF Block after 4th"
+      register: bf_block_check
+
     - name: Add Brute-force block after 4th
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=Brute-force action=add-src-to-address-list src-address-list=Brute-force-4 address-list=Brute-force-block address-list-timeout=8h comment="BF Block after 4th"
+      when: bf_block_check.stdout[0] | int == 0
 
-    # 3. Если IP в списке 3 - переводим в список 4
+    # --- 4th attempt ---
+    - name: Check BF 4th attempt exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="BF 4th attempt"
+      register: bf_4th_check
+
     - name: Add Brute-force 4th attempt
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=Brute-force action=add-src-to-address-list src-address-list=Brute-force-3 address-list=Brute-force-4 address-list-timeout=30s comment="BF 4th attempt"
+      when: bf_4th_check.stdout[0] | int == 0
 
-    # 4. Если IP в списке 2 - переводим в список 3
+    # --- 3rd attempt ---
+    - name: Check BF 3rd attempt exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="BF 3rd attempt"
+      register: bf_3rd_check
+
     - name: Add Brute-force 3rd attempt
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=Brute-force action=add-src-to-address-list src-address-list=Brute-force-2 address-list=Brute-force-3 address-list-timeout=30s comment="BF 3rd attempt"
+      when: bf_3rd_check.stdout[0] | int == 0
 
-    # 5. Если IP в списке 1 - переводим в список 2
+    # --- 2nd attempt ---
+    - name: Check BF 2nd attempt exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="BF 2nd attempt"
+      register: bf_2nd_check
+
     - name: Add Brute-force 2nd attempt
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=Brute-force action=add-src-to-address-list src-address-list=Brute-force-1 address-list=Brute-force-2 address-list-timeout=30s comment="BF 2nd attempt"
+      when: bf_2nd_check.stdout[0] | int == 0
 
-    # 6. Первое подключение - добавляем в список 1
+    # --- 1st attempt ---
+    - name: Check BF 1st attempt exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="BF 1st attempt"
+      register: bf_1st_check
+
     - name: Add Brute-force 1st attempt
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=Brute-force action=add-src-to-address-list address-list=Brute-force-1 address-list-timeout=30s comment="BF 1st attempt"
+      when: bf_1st_check.stdout[0] | int == 0
 
-    # 7. Если не заблокирован - разрешаем
+    # --- Accept if not blocked ---
+    - name: Check BF accept exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="BF Accept if not blocked"
+      register: bf_accept_check
+
     - name: Add Brute-force accept
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=Brute-force action=accept comment="BF Accept if not blocked"
+      when: bf_accept_check.stdout[0] | int == 0
 
-    # Итоговое сообщение
     - name: Show result
       debug:
-        msg: "Brute-force protection chain added"
+        msg: "Brute-force protection chain configured"

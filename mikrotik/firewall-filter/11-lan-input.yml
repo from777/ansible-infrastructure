@@ -14,13 +14,18 @@
     ansible_network_os: community.routeros.routeros
 
   tasks:
-    # LAN - доверенная сеть, разрешаем весь трафик к роутеру
+    - name: Check LAN-Input accept all exists
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print count-only where comment="Accept all from LAN"
+      register: lan_accept_check
+
     - name: Add LAN-Input accept all
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=LAN-Input action=accept comment="Accept all from LAN"
+      when: lan_accept_check.stdout[0] | int == 0
 
-    # Итоговое сообщение
     - name: Show result
       debug:
-        msg: "LAN-Input chain added - all traffic from LAN accepted"
+        msg: "LAN-Input chain configured - all traffic from LAN accepted"

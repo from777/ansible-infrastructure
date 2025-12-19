@@ -1,0 +1,60 @@
+# 00_container_mode.yml
+# Включение поддержки контейнеров на MikroTik
+# ТРЕБУЕТ ПЕРЕЗАГРУЗКИ или нажатия кнопки reset на роутере!
+#
+# Запускать ОДИН РАЗ при первичной настройке
+---
+- name: Enable container mode
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    usb_path: "usb1"
+
+  tasks:
+    # ===== ПРОВЕРКА ТЕКУЩЕГО СОСТОЯНИЯ =====
+    - name: Check current container mode
+      community.routeros.command:
+        commands:
+          - /system/device-mode/print
+      register: device_mode
+
+    - name: Show current device mode
+      debug:
+        msg: "{{ device_mode.stdout_lines }}"
+
+    # ===== CONTAINER CONFIG =====
+    # Настройка registry и tmpdir (не требует перезагрузки)
+    - name: Configure container registry and tmpdir
+      community.routeros.command:
+        commands:
+          - /container/config/set registry-url=https://registry-1.docker.io tmpdir={{ usb_path }}/docker/pull
+
+    - name: Verify container config
+      community.routeros.command:
+        commands:
+          - /container/config/print
+      register: container_config
+
+    - name: Show container config
+      debug:
+        msg: "{{ container_config.stdout_lines }}"
+
+    # ===== ВКЛЮЧЕНИЕ CONTAINER MODE =====
+    # Эта команда требует физического подтверждения!
+    - name: Enable container mode (REQUIRES REBOOT OR RESET BUTTON!)
+      community.routeros.command:
+        commands:
+          - /system/device-mode/update container=yes
+      ignore_errors: yes
+
+    - name: IMPORTANT
+      debug:
+        msg: |
+          ==========================================
+          ТРЕБУЕТСЯ ДЕЙСТВИЕ!
+          После выполнения нажми кнопку RESET на роутере
+          или перезагрузи роутер.
+          Без этого контейнеры не заработают!
+          ==========================================
