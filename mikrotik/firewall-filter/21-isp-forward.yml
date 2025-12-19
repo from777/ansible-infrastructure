@@ -19,79 +19,79 @@
     - name: Check ISP-Forward established exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="ISP-FWD Accept established"
+          - /ip firewall filter print count-only where comment~"ISP-FWD Accept established"
       register: isp_established_check
 
     - name: Add ISP-Forward accept established
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=ISP-Forward action=accept connection-state=established comment="ISP-FWD Accept established"
-      when: isp_established_check.stdout[0] | int == 0
+          - /ip firewall filter add chain=ISP-Forward action=accept connection-state=established comment="ISP-FWD Accept established"
+      when: isp_established_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0
 
     # --- related ---
     - name: Check ISP-Forward related exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="ISP-FWD Accept related"
+          - /ip firewall filter print count-only where comment~"ISP-FWD Accept related"
       register: isp_related_check
 
     - name: Add ISP-Forward accept related
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=ISP-Forward action=accept connection-state=related comment="ISP-FWD Accept related"
-      when: isp_related_check.stdout[0] | int == 0
+          - /ip firewall filter add chain=ISP-Forward action=accept connection-state=related comment="ISP-FWD Accept related"
+      when: isp_related_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0
 
     # --- untracked ---
     - name: Check ISP-Forward untracked exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="ISP-FWD Accept untracked"
+          - /ip firewall filter print count-only where comment~"ISP-FWD Accept untracked"
       register: isp_untracked_check
 
     - name: Add ISP-Forward accept untracked
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=ISP-Forward action=accept connection-state=untracked comment="ISP-FWD Accept untracked"
-      when: isp_untracked_check.stdout[0] | int == 0
+          - /ip firewall filter add chain=ISP-Forward action=accept connection-state=untracked comment="ISP-FWD Accept untracked"
+      when: isp_untracked_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0
 
     # --- invalid ---
     - name: Check ISP-Forward invalid exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="ISP-FWD Drop invalid"
+          - /ip firewall filter print count-only where comment~"ISP-FWD Drop invalid"
       register: isp_invalid_check
 
     - name: Add ISP-Forward drop invalid
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=ISP-Forward action=drop connection-state=invalid comment="ISP-FWD Drop invalid"
-      when: isp_invalid_check.stdout[0] | int == 0
+          - /ip firewall filter add chain=ISP-Forward action=drop connection-state=invalid comment="ISP-FWD Drop invalid"
+      when: isp_invalid_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0
 
     # --- DST-NAT ---
     - name: Check ISP-Forward DST-NAT exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="ISP-FWD Accept DST-NAT"
+          - /ip firewall filter print count-only where comment~"ISP-FWD Accept DST-NAT"
       register: isp_dstnat_check
 
     - name: Add ISP-Forward accept DST-NAT
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=ISP-Forward action=accept connection-nat-state=dstnat comment="ISP-FWD Accept DST-NAT"
-      when: isp_dstnat_check.stdout[0] | int == 0
+          - /ip firewall filter add chain=ISP-Forward action=accept connection-nat-state=dstnat comment="ISP-FWD Accept DST-NAT"
+      when: isp_dstnat_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0
 
     # --- drop all ---
     - name: Check ISP-Forward drop all exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="ISP-FWD Drop all other"
+          - /ip firewall filter print count-only where comment~"ISP-FWD Drop all other"
       register: isp_drop_check
 
     - name: Add ISP-Forward drop all
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=ISP-Forward action=drop comment="ISP-FWD Drop all other"
-      when: isp_drop_check.stdout[0] | int == 0
+          - /ip firewall filter add chain=ISP-Forward action=drop comment="ISP-FWD Drop all other"
+      when: isp_drop_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0
 
     - name: Show result
       debug:

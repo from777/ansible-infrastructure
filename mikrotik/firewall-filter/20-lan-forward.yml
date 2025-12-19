@@ -17,66 +17,66 @@
     - name: Check LAN-Forward established exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="LAN-FWD Accept established"
+          - /ip firewall filter print count-only where comment~"LAN-FWD Accept established"
       register: lan_established_check
 
     - name: Add LAN-Forward accept established
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=LAN-Forward action=accept connection-state=established comment="LAN-FWD Accept established"
-      when: lan_established_check.stdout[0] | int == 0
+          - /ip firewall filter add chain=LAN-Forward action=accept connection-state=established comment="LAN-FWD Accept established"
+      when: lan_established_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0
 
     # --- related ---
     - name: Check LAN-Forward related exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="LAN-FWD Accept related"
+          - /ip firewall filter print count-only where comment~"LAN-FWD Accept related"
       register: lan_related_check
 
     - name: Add LAN-Forward accept related
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=LAN-Forward action=accept connection-state=related comment="LAN-FWD Accept related"
-      when: lan_related_check.stdout[0] | int == 0
+          - /ip firewall filter add chain=LAN-Forward action=accept connection-state=related comment="LAN-FWD Accept related"
+      when: lan_related_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0
 
     # --- untracked ---
     - name: Check LAN-Forward untracked exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="LAN-FWD Accept untracked"
+          - /ip firewall filter print count-only where comment~"LAN-FWD Accept untracked"
       register: lan_untracked_check
 
     - name: Add LAN-Forward accept untracked
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=LAN-Forward action=accept connection-state=untracked comment="LAN-FWD Accept untracked"
-      when: lan_untracked_check.stdout[0] | int == 0
+          - /ip firewall filter add chain=LAN-Forward action=accept connection-state=untracked comment="LAN-FWD Accept untracked"
+      when: lan_untracked_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0
 
     # --- invalid ---
     - name: Check LAN-Forward invalid exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="LAN-FWD Drop invalid"
+          - /ip firewall filter print count-only where comment~"LAN-FWD Drop invalid"
       register: lan_invalid_check
 
     - name: Add LAN-Forward drop invalid
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=LAN-Forward action=drop connection-state=invalid comment="LAN-FWD Drop invalid"
-      when: lan_invalid_check.stdout[0] | int == 0
+          - /ip firewall filter add chain=LAN-Forward action=drop connection-state=invalid comment="LAN-FWD Drop invalid"
+      when: lan_invalid_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0
 
     # --- accept new ---
     - name: Check LAN-Forward accept new exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="LAN-FWD Accept new from LAN"
+          - /ip firewall filter print count-only where comment~"LAN-FWD Accept new from LAN"
       register: lan_accept_check
 
     - name: Add LAN-Forward accept new
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=LAN-Forward action=accept comment="LAN-FWD Accept new from LAN"
-      when: lan_accept_check.stdout[0] | int == 0
+          - /ip firewall filter add chain=LAN-Forward action=accept comment="LAN-FWD Accept new from LAN"
+      when: lan_accept_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0
 
     - name: Show result
       debug:

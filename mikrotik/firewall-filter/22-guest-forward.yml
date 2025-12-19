@@ -21,12 +21,12 @@
     - name: Check GUEST interface list exists
       community.routeros.command:
         commands:
-          - /interface/list/print count-only where name="GUEST"
+          - /interface list print count-only where name=GUEST
       register: guest_list_check
 
     - name: Set GUEST list exists flag
       set_fact:
-        has_guest: "{{ guest_list_check.stdout[0] | int > 0 }}"
+        has_guest: "{{ guest_list_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 0 }}"
 
     - name: Debug GUEST list check
       debug:
@@ -41,21 +41,21 @@
     - name: Check BlackList_RU connection-mark exists
       community.routeros.command:
         commands:
-          - /ip/firewall/mangle/print count-only where new-connection-mark="BlackList_RU"
+          - /ip firewall mangle print count-only where new-connection-mark=BlackList_RU
       register: blacklist_ru_check
       when: has_guest
 
     - name: Check BlackList_EU connection-mark exists
       community.routeros.command:
         commands:
-          - /ip/firewall/mangle/print count-only where new-connection-mark="BlackList_EU"
+          - /ip firewall mangle print count-only where new-connection-mark=BlackList_EU
       register: blacklist_eu_check
       when: has_guest
 
     - name: Set BlackList flags
       set_fact:
-        has_blacklist_ru: "{{ blacklist_ru_check.stdout[0] | default('0') | int > 0 }}"
-        has_blacklist_eu: "{{ blacklist_eu_check.stdout[0] | default('0') | int > 0 }}"
+        has_blacklist_ru: "{{ blacklist_ru_check.stdout[0] | regex_search('([0-9]+)\\s*$') | default('0') | int > 0 }}"
+        has_blacklist_eu: "{{ blacklist_eu_check.stdout[0] | regex_search('([0-9]+)\\s*$') | default('0') | int > 0 }}"
       when: has_guest
 
     - name: Debug BlackList check
@@ -69,57 +69,57 @@
     - name: Check GUEST-Forward established exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="GUEST-FWD Accept established"
+          - /ip firewall filter print count-only where comment~"GUEST-FWD Accept established"
       register: guest_established_check
       when: has_guest
 
     - name: Add GUEST-Forward accept established
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Forward action=accept connection-state=established comment="GUEST-FWD Accept established"
-      when: has_guest and (guest_established_check.stdout[0] | int == 0)
+          - /ip firewall filter add chain=GUEST-Forward action=accept connection-state=established comment="GUEST-FWD Accept established"
+      when: has_guest and (guest_established_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0)
 
     # --- related ---
     - name: Check GUEST-Forward related exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="GUEST-FWD Accept related"
+          - /ip firewall filter print count-only where comment~"GUEST-FWD Accept related"
       register: guest_related_check
       when: has_guest
 
     - name: Add GUEST-Forward accept related
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Forward action=accept connection-state=related comment="GUEST-FWD Accept related"
-      when: has_guest and (guest_related_check.stdout[0] | int == 0)
+          - /ip firewall filter add chain=GUEST-Forward action=accept connection-state=related comment="GUEST-FWD Accept related"
+      when: has_guest and (guest_related_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0)
 
     # --- untracked ---
     - name: Check GUEST-Forward untracked exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="GUEST-FWD Accept untracked"
+          - /ip firewall filter print count-only where comment~"GUEST-FWD Accept untracked"
       register: guest_untracked_check
       when: has_guest
 
     - name: Add GUEST-Forward accept untracked
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Forward action=accept connection-state=untracked comment="GUEST-FWD Accept untracked"
-      when: has_guest and (guest_untracked_check.stdout[0] | int == 0)
+          - /ip firewall filter add chain=GUEST-Forward action=accept connection-state=untracked comment="GUEST-FWD Accept untracked"
+      when: has_guest and (guest_untracked_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0)
 
     # --- invalid ---
     - name: Check GUEST-Forward invalid exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="GUEST-FWD Drop invalid"
+          - /ip firewall filter print count-only where comment~"GUEST-FWD Drop invalid"
       register: guest_invalid_check
       when: has_guest
 
     - name: Add GUEST-Forward drop invalid
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Forward action=drop connection-state=invalid comment="GUEST-FWD Drop invalid"
-      when: has_guest and (guest_invalid_check.stdout[0] | int == 0)
+          - /ip firewall filter add chain=GUEST-Forward action=drop connection-state=invalid comment="GUEST-FWD Drop invalid"
+      when: has_guest and (guest_invalid_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0)
 
     # ===== BLACKLIST VPN МАРШРУТЫ =====
 
@@ -127,29 +127,29 @@
     - name: Check GUEST-Forward BlackList_RU exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="GUEST-FWD Allow BlackList_RU VPN"
+          - /ip firewall filter print count-only where comment~"GUEST-FWD Allow BlackList_RU VPN"
       register: guest_bl_ru_check
       when: has_guest and has_blacklist_ru | default(false)
 
     - name: Add GUEST-Forward accept BlackList_RU
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Forward action=accept connection-mark=BlackList_RU comment="GUEST-FWD Allow BlackList_RU VPN"
-      when: has_guest and has_blacklist_ru | default(false) and (guest_bl_ru_check.stdout[0] | int == 0)
+          - /ip firewall filter add chain=GUEST-Forward action=accept connection-mark=BlackList_RU comment="GUEST-FWD Allow BlackList_RU VPN"
+      when: has_guest and has_blacklist_ru | default(false) and (guest_bl_ru_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0)
 
     # --- BlackList_EU ---
     - name: Check GUEST-Forward BlackList_EU exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="GUEST-FWD Allow BlackList_EU VPN"
+          - /ip firewall filter print count-only where comment~"GUEST-FWD Allow BlackList_EU VPN"
       register: guest_bl_eu_check
       when: has_guest and has_blacklist_eu | default(false)
 
     - name: Add GUEST-Forward accept BlackList_EU
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Forward action=accept connection-mark=BlackList_EU comment="GUEST-FWD Allow BlackList_EU VPN"
-      when: has_guest and has_blacklist_eu | default(false) and (guest_bl_eu_check.stdout[0] | int == 0)
+          - /ip firewall filter add chain=GUEST-Forward action=accept connection-mark=BlackList_EU comment="GUEST-FWD Allow BlackList_EU VPN"
+      when: has_guest and has_blacklist_eu | default(false) and (guest_bl_eu_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0)
 
     # ===== БЛОКИРОВКА ЛОКАЛЬНЫХ СЕТЕЙ (RFC1918) =====
 
@@ -157,43 +157,43 @@
     - name: Check GUEST-Forward block 10.x exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="GUEST-FWD Block RFC1918 10.x"
+          - /ip firewall filter print count-only where comment~"GUEST-FWD Block RFC1918 10.x"
       register: guest_block_10_check
       when: has_guest
 
     - name: Add GUEST-Forward block RFC1918 10.x
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Forward action=drop dst-address=10.0.0.0/8 comment="GUEST-FWD Block RFC1918 10.x"
-      when: has_guest and (guest_block_10_check.stdout[0] | int == 0)
+          - /ip firewall filter add chain=GUEST-Forward action=drop dst-address=10.0.0.0/8 comment="GUEST-FWD Block RFC1918 10.x"
+      when: has_guest and (guest_block_10_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0)
 
     # --- 172.16.0.0/12 ---
     - name: Check GUEST-Forward block 172.x exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="GUEST-FWD Block RFC1918 172.x"
+          - /ip firewall filter print count-only where comment~"GUEST-FWD Block RFC1918 172.x"
       register: guest_block_172_check
       when: has_guest
 
     - name: Add GUEST-Forward block RFC1918 172.x
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Forward action=drop dst-address=172.16.0.0/12 comment="GUEST-FWD Block RFC1918 172.x"
-      when: has_guest and (guest_block_172_check.stdout[0] | int == 0)
+          - /ip firewall filter add chain=GUEST-Forward action=drop dst-address=172.16.0.0/12 comment="GUEST-FWD Block RFC1918 172.x"
+      when: has_guest and (guest_block_172_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0)
 
     # --- 192.168.0.0/16 ---
     - name: Check GUEST-Forward block 192.x exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="GUEST-FWD Block RFC1918 192.x"
+          - /ip firewall filter print count-only where comment~"GUEST-FWD Block RFC1918 192.x"
       register: guest_block_192_check
       when: has_guest
 
     - name: Add GUEST-Forward block RFC1918 192.x
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Forward action=drop dst-address=192.168.0.0/16 comment="GUEST-FWD Block RFC1918 192.x"
-      when: has_guest and (guest_block_192_check.stdout[0] | int == 0)
+          - /ip firewall filter add chain=GUEST-Forward action=drop dst-address=192.168.0.0/16 comment="GUEST-FWD Block RFC1918 192.x"
+      when: has_guest and (guest_block_192_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0)
 
     # ===== РАЗРЕШАЕМ ВЫХОД В ИНТЕРНЕТ =====
 
@@ -201,29 +201,29 @@
     - name: Check GUEST-Forward allow WAN exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="GUEST-FWD Allow to WAN"
+          - /ip firewall filter print count-only where comment~"GUEST-FWD Allow to WAN"
       register: guest_wan_check
       when: has_guest
 
     - name: Add GUEST-Forward allow to WAN
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Forward action=accept out-interface-list=WAN comment="GUEST-FWD Allow to WAN"
-      when: has_guest and (guest_wan_check.stdout[0] | int == 0)
+          - /ip firewall filter add chain=GUEST-Forward action=accept out-interface-list=WAN comment="GUEST-FWD Allow to WAN"
+      when: has_guest and (guest_wan_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0)
 
     # --- drop all ---
     - name: Check GUEST-Forward drop all exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="GUEST-FWD Drop all other"
+          - /ip firewall filter print count-only where comment~"GUEST-FWD Drop all other"
       register: guest_drop_check
       when: has_guest
 
     - name: Add GUEST-Forward drop all
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=GUEST-Forward action=drop comment="GUEST-FWD Drop all other"
-      when: has_guest and (guest_drop_check.stdout[0] | int == 0)
+          - /ip firewall filter add chain=GUEST-Forward action=drop comment="GUEST-FWD Drop all other"
+      when: has_guest and (guest_drop_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0)
 
     - name: Show result
       debug:

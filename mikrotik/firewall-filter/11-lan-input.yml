@@ -1,10 +1,6 @@
 # 11-lan-input.yml
 # Правила для chain=LAN-Input
-# Трафик от LAN к роутеру
-#
-# LAN - доверенная сеть, разрешаем всё
-# Сюда попадает трафик от устройств из локальной сети к самому роутеру
-# (например обращение к веб-интерфейсу, DNS запросы к роутеру и т.д.)
+# Трафик от LAN к роутеру - разрешаем всё
 ---
 - name: Configure LAN-Input chain
   hosts: mikrotik
@@ -17,15 +13,15 @@
     - name: Check LAN-Input accept all exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="Accept all from LAN"
+          - /ip firewall filter print count-only where comment~"Accept all from LAN"
       register: lan_accept_check
 
     - name: Add LAN-Input accept all
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=LAN-Input action=accept comment="Accept all from LAN"
-      when: lan_accept_check.stdout[0] | int == 0
+          - /ip firewall filter add chain=LAN-Input action=accept comment="Accept all from LAN"
+      when: lan_accept_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0
 
     - name: Show result
       debug:
-        msg: "LAN-Input chain configured - all traffic from LAN accepted"
+        msg: "LAN-Input chain configured"
