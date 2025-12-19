@@ -1,0 +1,63 @@
+# custom_config.yaml
+# Минимальный конфиг для wiktorbgu/mihomo-mikrotik
+#
+# Образ автоматически:
+# - Читает все .conf из /etc/mihomo/awg/
+# - Генерирует awg.yaml
+# - Добавляет proxy-provider AWG
+#
+# Поэтому proxy-providers.AWG НЕ указываем!
+
+mixed-port: 7890
+external-controller: 0.0.0.0:9090
+external-ui: ui
+
+mode: rule
+log-level: info
+
+# DNS
+dns:
+  enable: true
+  listen: 0.0.0.0:53
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  nameserver:
+    - 1.1.1.1
+    - 8.8.8.8
+
+# TUN режим
+tun:
+  enable: true
+  stack: system
+  auto-route: true
+  auto-detect-interface: true
+
+# proxy-provider AWG создаётся автоматически образом!
+# Если нужны дополнительные провайдеры (VLESS/SRV) — добавь сюда:
+# proxy-providers:
+#   SRV:
+#     type: file
+#     path: /etc/mihomo/srv/proxies.yaml
+#     health-check:
+#       enable: true
+#       url: http://www.gstatic.com/generate_204
+#       interval: 300
+
+# Группы прокси
+proxy-groups:
+  - name: PROXY
+    type: select
+    use:
+      - AWG    # автоматически создан образом из .conf файлов
+
+  - name: AUTO
+    type: url-test
+    use:
+      - AWG
+    url: http://www.gstatic.com/generate_204
+    interval: 300
+
+# Правила
+rules:
+  - GEOIP,RU,DIRECT
+  - MATCH,PROXY

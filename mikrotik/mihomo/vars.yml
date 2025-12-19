@@ -10,7 +10,15 @@ container_gateway: "192.168.254.1"
 docker_bridge: "Bridge-Docker"
 usb_path: "usb1"
 container_image: "wiktorbgu/mihomo-mikrotik:latest"
-container_dns: "1.1.1.1,8.8.8.8,9.9.9.9"
+
+# КРИТИЧНО: DNS = IP роутера на Bridge-Docker
+# НЕ использовать 1.1.1.1/8.8.8.8 — VPN-Input блокирует!
+container_dns: "192.168.254.1"
+
+# CONFIG для mihomo (опционально)
+# Если пусто — образ использует дефолтный конфиг и автогенерацию из .conf
+# Если указан — образ использует этот файл из /etc/mihomo/
+container_config: "custom_config.yaml"
 
 # SMB
 smb_mount_point: "/mnt/mikrotik_smb"
