@@ -1,4 +1,5 @@
 # 02_smb_mount.yml
+# Устанавливает пароль для smbuser и монтирует шару
 ---
 - name: "02: SMB Mount"
   hosts: mikrotik
@@ -6,6 +7,9 @@
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
+    # Пароль для SMB (будет установлен автоматически)
+    smb_user: "smbuser"
+    smb_password: "mihomo123"
   vars_files:
     - vars.yml
 
@@ -21,6 +25,12 @@
         commands:
           - /ip smb set enabled=yes interfaces={{ smb_interface }}
       when: "'enabled: no' in smb_status.stdout[0]"
+
+    # Установить пароль для smbuser
+    - name: Установить пароль SMB пользователя
+      community.routeros.command:
+        commands:
+          - /ip smb users set [find name={{ smb_user }}] password={{ smb_password }} read-only=no
 
     - name: Проверить существование SMB шары
       community.routeros.command:
@@ -42,15 +52,20 @@
       delegate_to: localhost
       become: yes
 
-    - name: Смонтировать SMB
-      ansible.posix.mount:
-        path: "{{ smb_mount_point }}"
-        src: "//{{ ansible_host }}/{{ usb_path }}"
-        fstype: cifs
-        opts: "username={{ ansible_user }},password={{ ansible_password }},vers=1.0"
-        state: mounted
+    - name: Смонтировать SMB (vers=2.0)
+      ansible.builtin.shell: |
+        mount -t cifs "//{{ ansible_host }}/{{ usb_path }}" "{{ smb_mount_point }}" -o username={{ smb_user }},password={{ smb_password }},vers=2.0,nounix,noserverino
       delegate_to: localhost
       become: yes
+      register: mount_v2
+      ignore_errors: yes
+
+    - name: Смонтировать SMB (vers=1.0)
+      ansible.builtin.shell: |
+        mount -t cifs "//{{ ansible_host }}/{{ usb_path }}" "{{ smb_mount_point }}" -o username={{ smb_user }},password={{ smb_password }},vers=1.0,nounix,noserverino
+      delegate_to: localhost
+      become: yes
+      when: mount_v2.rc != 0
 
     - name: Результат
       ansible.builtin.debug:
