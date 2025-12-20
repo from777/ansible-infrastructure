@@ -19,12 +19,12 @@ proxy-groups:
   - name: SELECTOR
     type: select
     use:
-$PROVIDERS_LIST
-  - name: QUIC
-    type: select
-    proxies:
-      - PASS
-      - REJECT
+  $PROVIDERS_LIST
+- name: QUIC
+  type: select
+  proxies:
+    - PASS
+    - REJECT
 
 listeners:
   - name: mixed-in
