@@ -16,26 +16,19 @@ proxy-providers:
   $PROVIDERS_BLOCK
 
 proxy-groups:
-  - name: AUTO
+  - name: SELECTOR
     type: url-test
     url: https://www.gstatic.com/generate_204
     interval: 300
     tolerance: 50
     lazy: false
     use:
-      - AWG
-  - name: SELECTOR
-    type: select
-    proxies:
-      - AUTO
-      - DIRECT
-    use:
-      - AWG
-  - name: QUIC
-    type: select
-    proxies:
-      - PASS
-      - REJECT
+  $PROVIDERS_LIST
+- name: QUIC
+  type: select
+  proxies:
+    - PASS
+    - REJECT
 
 listeners:
   - name: mixed-in
@@ -53,4 +46,4 @@ listeners:
 rules:
   - AND,((NETWORK,udp),(DST-PORT,443)),QUIC
   - GEOIP,RU,DIRECT
-  - MATCH,AUTO
+  - MATCH,SELECTOR
