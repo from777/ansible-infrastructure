@@ -8,3 +8,7 @@ mikrotik:
       ansible_host: 109.174.1.142
       elk_server: 10.200.200.82
       router_ip: 192.168.0.1
+    hap_ax3:
+      ansible_host: 192.168.0.88
+      ansible_user: ansible
+      ansible_password: ansible_pass
