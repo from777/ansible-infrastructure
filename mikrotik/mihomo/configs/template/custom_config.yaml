@@ -1,57 +1,73 @@
 # custom_config.yaml
 # Автопереключение на самый быстрый VPN
 
-mixed-port: 7890
-external-controller: 0.0.0.0:9090
-external-ui: ui
-
-mode: rule
-log-level: info
+external-controller: $EXTERNAL_CONTROLLER_ADDRESS:$UI_PORT
+external-ui: $EXTERNAL_UI_PATH
+external-ui-url: $EXTERNAL_UI_URL
+secret: $UI_SECRET
+unified-delay: true
+log-level: $LOG_LEVEL
+ipv6: $IPV6
 
 dns:
-  enable: true
-  listen: 0.0.0.0:53
-  enhanced-mode: fake-ip
-  fake-ip-range: 198.18.0.1/16
+  enable: $DNS_ENABLE
+  use-system-hosts: $DNS_USE_SYSTEM_HOSTS
   nameserver:
-    - 1.1.1.1
-    - 8.8.8.8
+    - system
 
-tun:
-  enable: true
-  stack: system
-  auto-route: true
-  auto-detect-interface: true
+proxy-providers:
+  $PROVIDERS_BLOCK
 
-# Группы прокси
 proxy-groups:
   # Автовыбор самого быстрого
   - name: AUTO
     type: url-test
-    use:
-      - AWG
-    url: http://www.gstatic.com/generate_204
+    url: https://www.gstatic.com/generate_204
     interval: 300
     tolerance: 50
-
-  # Ручной выбор (если нужен)
-  - name: SELECTOR
-    type: select
-    proxies:
-      - AUTO
-      - DIRECT
     use:
-      - AWG
+  $PROVIDERS_LIST
 
-  # Fallback — если текущий упал, переключится на следующий рабочий
-  - name: FALLBACK
-    type: fallback
-    use:
-      - AWG
-    url: http://www.gstatic.com/generate_204
-    interval: 300
+# Fallback — если текущий упал, переключится на следующий
+- name: FALLBACK
+  type: fallback
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  use:
+  $PROVIDERS_LIST
 
-# Правила
+# Ручной выбор
+- name: SELECTOR
+  type: select
+  proxies:
+    - AUTO
+    - FALLBACK
+    - DIRECT
+  use:
+  $PROVIDERS_LIST
+
+- name: QUIC
+  type: select
+  proxies:
+    - PASS
+    - REJECT
+
+listeners:
+  - name: mixed-in
+    type: mixed
+    port: $MIXED_PORT
+  - name: tun-in
+    type: tun
+    stack: $TUN_STACK
+    auto-detect-interface: $TUN_AUTO_DETECT_INTERFACE
+    auto-route: $TUN_AUTO_ROUTE
+    auto-redirect: $TUN_AUTO_REDIRECT
+    inet4-address:
+      - $TUN_INET4_ADDRESS
+
 rules:
+  - AND,((NETWORK,udp),(DST-PORT,443)),QUIC
   - GEOIP,RU,DIRECT
+  - IN-NAME,tun-in,AUTO
+  - IN-NAME,mixed-in,AUTO
   - MATCH,AUTO
