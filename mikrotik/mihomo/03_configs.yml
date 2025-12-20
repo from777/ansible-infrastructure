@@ -1,92 +1,72 @@
 # 03_configs.yml
-# Копирует конфиги на роутер через SMB
-#
-# Структура configs/:
-#   configs/awg/*.conf         → AWG конфиги
-#   configs/srv/*.yaml         → SRV/VLESS конфиги
-#   configs/template/*.yaml    → custom_config.yaml
 ---
 - name: "03: Configs"
   hosts: mikrotik
   gather_facts: no
-  connection: ansible.netcommon.network_cli
   vars:
-    ansible_network_os: community.routeros.routeros
-  vars_files:
-    - vars.yml
+    smb_path: /mnt/mikrotik_smb/docker_configs/mamuka
+    repo_path: "{{ playbook_dir }}/configs"
 
   tasks:
-    # ===== СОЗДАТЬ ПАПКИ =====
     - name: Создать структуру папок
+      delegate_to: localhost
       ansible.builtin.file:
         path: "{{ item }}"
         state: directory
         mode: '0755'
       loop:
-        - "{{ smb_mount_point }}/docker_configs/{{ container_name }}"
-        - "{{ smb_mount_point }}/docker_configs/{{ container_name }}/awg"
-        - "{{ smb_mount_point }}/docker_configs/{{ container_name }}/srv"
-        - "{{ smb_mount_point }}/docker_configs/{{ container_name }}/template"
-        - "{{ smb_mount_point }}/docker/{{ container_name }}"
-      delegate_to: localhost
-      become: yes
+        - "{{ smb_path }}"
+        - "{{ smb_path }}/awg"
+        - "{{ smb_path }}/srv"
+        - "{{ smb_path }}/template"
 
-    # ===== КОПИРОВАТЬ AWG КОНФИГИ =====
     - name: Найти все AWG конфиги
+      delegate_to: localhost
       ansible.builtin.find:
-        paths: "{{ playbook_dir }}/configs/awg"
+        paths: "{{ repo_path }}/awg"
         patterns: "*.conf"
       register: awg_files
-      delegate_to: localhost
 
-    - name: Копировать AWG конфиги ({{ awg_files.files | length }} файлов)
+    - name: Копировать AWG конфиги
+      delegate_to: localhost
       ansible.builtin.copy:
         src: "{{ item.path }}"
-        dest: "{{ smb_mount_point }}/docker_configs/{{ container_name }}/awg/"
+        dest: "{{ smb_path }}/awg/"
         mode: '0644'
       loop: "{{ awg_files.files }}"
       loop_control:
         label: "{{ item.path | basename }}"
-      delegate_to: localhost
-      become: yes
 
-    # ===== КОПИРОВАТЬ CUSTOM CONFIG В template/ =====
-    - name: Проверить custom_config.yaml
-      ansible.builtin.stat:
-        path: "{{ playbook_dir }}/configs/template/custom_config.yaml"
-      register: custom_config
+    - name: Удалить старый custom_config.yaml
       delegate_to: localhost
+      ansible.builtin.file:
+        path: "{{ smb_path }}/template/custom_config.yaml"
+        state: absent
 
     - name: Копировать custom_config.yaml в template/
-      ansible.builtin.copy:
-        src: "{{ playbook_dir }}/configs/template/custom_config.yaml"
-        dest: "{{ smb_mount_point }}/docker_configs/{{ container_name }}/template/custom_config.yaml"
-        mode: '0644'
-      when: custom_config.stat.exists
       delegate_to: localhost
-      become: yes
+      ansible.builtin.copy:
+        src: "{{ repo_path }}/template/custom_config.yaml"
+        dest: "{{ smb_path }}/template/custom_config.yaml"
+        mode: '0644'
 
-    # ===== КОПИРОВАТЬ SRV КОНФИГИ =====
     - name: Найти SRV конфиги
+      delegate_to: localhost
       ansible.builtin.find:
-        paths: "{{ playbook_dir }}/configs/srv"
+        paths: "{{ repo_path }}/srv"
         patterns: "*.yaml"
       register: srv_files
-      delegate_to: localhost
-      ignore_errors: yes
 
     - name: Копировать SRV конфиги
+      delegate_to: localhost
       ansible.builtin.copy:
         src: "{{ item.path }}"
-        dest: "{{ smb_mount_point }}/docker_configs/{{ container_name }}/srv/"
+        dest: "{{ smb_path }}/srv/"
         mode: '0644'
-      loop: "{{ srv_files.files | default([]) }}"
+      loop: "{{ srv_files.files }}"
       loop_control:
         label: "{{ item.path | basename }}"
-      when: srv_files.files is defined and srv_files.files | length > 0
-      delegate_to: localhost
-      become: yes
 
     - name: Результат
       ansible.builtin.debug:
-        msg: "Скопировано: {{ awg_files.files | length }} AWG, custom_config: {{ custom_config.stat.exists }}, SRV: {{ srv_files.files | default([]) | length }}"
+        msg: "AWG: {{ awg_files.files | length }}, SRV: {{ srv_files.files | length }}"
