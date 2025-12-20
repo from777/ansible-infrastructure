@@ -11,7 +11,7 @@ dns:
   nameserver:
     - system
 proxy-providers:
-  $PROVIDERS_BLOCK
+$PROVIDERS_BLOCK
 proxy-groups:
   - name: GLOBAL
     type: select
@@ -23,12 +23,12 @@ proxy-groups:
     interval: 60
     tolerance: 50
     use:
-  $PROVIDERS_LIST
-- name: QUIC
-  type: select
-  proxies:
-    - PASS
-    - REJECT
+$PROVIDERS_LIST
+  - name: QUIC
+    type: select
+    proxies:
+      - PASS
+      - REJECT
 listeners:
   - name: mixed-in
     type: mixed
