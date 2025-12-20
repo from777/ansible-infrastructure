@@ -14,10 +14,7 @@ proxy-providers:
   $PROVIDERS_BLOCK
 proxy-groups:
   - name: SELECTOR
-    type: url-test
-    url: https://www.gstatic.com/generate_204
-    interval: 300
-    tolerance: 50
+    type: select
     use:
   $PROVIDERS_LIST
 - name: QUIC
