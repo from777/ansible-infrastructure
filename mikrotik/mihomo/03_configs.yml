@@ -1,8 +1,10 @@
 # 03_configs.yml
 # Копирует конфиги на роутер через SMB
 #
-# SMB шара монтируется в smb_mount_point
-# Структура на роутере: usb1/smb_share/docker_configs/container_name/
+# Структура configs/:
+#   configs/awg/*.conf         → AWG конфиги
+#   configs/srv/*.yaml         → SRV/VLESS конфиги
+#   configs/template/*.yaml    → custom_config.yaml
 ---
 - name: "03: Configs"
   hosts: mikrotik
@@ -47,16 +49,16 @@
       delegate_to: localhost
       become: yes
 
-    # ===== КОПИРОВАТЬ CUSTOM CONFIG =====
+    # ===== КОПИРОВАТЬ CUSTOM CONFIG ИЗ template/ =====
     - name: Проверить custom_config.yaml
       ansible.builtin.stat:
-        path: "{{ playbook_dir }}/configs/custom_config.yaml"
+        path: "{{ playbook_dir }}/configs/template/custom_config.yaml"
       register: custom_config
       delegate_to: localhost
 
     - name: Копировать custom_config.yaml
       ansible.builtin.copy:
-        src: "{{ playbook_dir }}/configs/custom_config.yaml"
+        src: "{{ playbook_dir }}/configs/template/custom_config.yaml"
         dest: "{{ smb_mount_point }}/docker_configs/{{ container_name }}/custom_config.yaml"
         mode: '0644'
       when: custom_config.stat.exists
@@ -86,4 +88,4 @@
 
     - name: Результат
       ansible.builtin.debug:
-        msg: "Скопировано: {{ awg_files.files | length }} AWG конфигов, custom_config: {{ custom_config.stat.exists }}"
+        msg: "Скопировано: {{ awg_files.files | length }} AWG, custom_config: {{ custom_config.stat.exists }}, SRV: {{ srv_files.files | default([]) | length }}"

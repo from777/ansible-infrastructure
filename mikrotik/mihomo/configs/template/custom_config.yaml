@@ -1,83 +1,57 @@
+# custom_config.yaml
+# Автопереключение на самый быстрый VPN
+
+mixed-port: 7890
 external-controller: 0.0.0.0:9090
 external-ui: ui
-secret: 
-unified-delay: true
+
+mode: rule
 log-level: info
-ipv6: true
 
 dns:
   enable: true
-  use-system-hosts: true
+  listen: 0.0.0.0:53
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
   nameserver:
-  - system
+    - 1.1.1.1
+    - 8.8.8.8
 
-proxy-providers:
-  AWG:
-    type: file
-    path: /etc/mihomo/awg/proxies.yaml
-    health-check:
-      enable: true
-      url: https://www.gstatic.com/generate_204
-      interval: 60
-      timeout: 5000
-      lazy: false
-      expected-status: 204
-  
-  SRV:
-    type: file
-    path: /etc/mihomo/srv/proxies.yaml
-    health-check:
-      enable: true
-      url: https://www.gstatic.com/generate_204
-      interval: 60
-      timeout: 5000
-      lazy: false
-      expected-status: 204
+tun:
+  enable: true
+  stack: system
+  auto-route: true
+  auto-detect-interface: true
 
+# Группы прокси
 proxy-groups:
-  - name: AWG_BEST
+  # Автовыбор самого быстрого
+  - name: AUTO
     type: url-test
-    url: https://www.gstatic.com/generate_204
-    interval: 60
+    use:
+      - AWG
+    url: http://www.gstatic.com/generate_204
+    interval: 300
     tolerance: 50
+
+  # Ручной выбор (если нужен)
+  - name: SELECTOR
+    type: select
+    proxies:
+      - AUTO
+      - DIRECT
     use:
       - AWG
 
-  - name: SRV_BEST
-    type: url-test
-    url: https://www.gstatic.com/generate_204
-    interval: 60
-    tolerance: 50
-    use:
-      - SRV
-
-  - name: SELECTOR
+  # Fallback — если текущий упал, переключится на следующий рабочий
+  - name: FALLBACK
     type: fallback
-    url: https://www.gstatic.com/generate_204
-    interval: 60
-    proxies:
-      - AWG_BEST
-      - SRV_BEST
+    use:
+      - AWG
+    url: http://www.gstatic.com/generate_204
+    interval: 300
 
-  - name: QUIC
-    type: select
-    proxies:
-      - PASS
-      - REJECT
-
-listeners:
-  - name: mixed-in
-    type: mixed
-    port: 1080
-  - name: tun-in
-    type: tun
-    stack: system
-    auto-detect-interface: true
-    auto-route: true
-    auto-redirect: true
-    inet4-address:
-    - 198.19.0.1/30
-
+# Правила
 rules:
-  - AND,((NETWORK,udp),(DST-PORT,443)),QUIC
-  - MATCH,SELECTOR
+  - GEOIP,RU,DIRECT
+  - MATCH,AUTO
