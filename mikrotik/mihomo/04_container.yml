@@ -1,9 +1,6 @@
 # 04_container.yml
 # Создаёт контейнер на роутере
-#
-# Пути на роутере:
-#   root-dir: usb1/smb_share/docker/container_name
-#   mounts:   usb1/smb_share/docker_configs/container_name → /etc/mihomo
+# IP назначается автоматически (следующий свободный в 192.168.254.0/24)
 ---
 - name: "04: Container"
   hosts: mikrotik
@@ -12,10 +9,36 @@
   vars:
     ansible_network_os: community.routeros.routeros
     smb_base: "usb1/smb_share"
+    container_network: "192.168.254"
   vars_files:
     - vars.yml
 
   tasks:
+    # ===== АВТООПРЕДЕЛЕНИЕ IP =====
+    - name: Получить все veth адреса
+      community.routeros.command:
+        commands:
+          - /interface veth print where address~"{{ container_network }}"
+      register: veth_list
+
+    - name: Определить следующий IP
+      ansible.builtin.set_fact:
+        auto_container_ip: >-
+          {%- set ips = [] -%}
+          {%- for line in veth_list.stdout[0].split('\n') -%}
+            {%- if container_network in line -%}
+              {%- set match = line | regex_search('address=([0-9.]+)/', '\\1') -%}
+              {%- if match -%}
+                {%- set _ = ips.append(match[0].split('.')[-1] | int) -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{ container_network }}.{{ (ips | max | default(1)) + 1 }}
+
+    - name: Показать выбранный IP
+      ansible.builtin.debug:
+        msg: "Контейнер {{ container_name }} получит IP: {{ container_ip | default(auto_container_ip) }}"
+
     # ===== VETH INTERFACE =====
     - name: Проверить veth
       community.routeros.command:
@@ -26,7 +49,7 @@
     - name: Создать veth
       community.routeros.command:
         commands:
-          - /interface veth add name={{ container_name }} address={{ container_ip }}/24 gateway={{ container_gateway }}
+          - /interface veth add name={{ container_name }} address={{ container_ip | default(auto_container_ip) }}/24 gateway={{ container_gateway }}
       when: veth_exists.stdout[0] | int == 0
 
     - name: Проверить veth в bridge
@@ -113,6 +136,6 @@
       ansible.builtin.debug:
         msg: |
           Контейнер: {{ container_name }}
-          IP: {{ container_ip }}
+          IP: {{ container_ip | default(auto_container_ip) }}
           DNS: {{ container_dns }}
-          UI: http://{{ container_ip }}:9090/ui/
+          UI: http://{{ container_ip | default(auto_container_ip) }}:9090/ui/

@@ -4,14 +4,17 @@
 # ПЕРЕМЕННЫЕ КОНТЕЙНЕРА
 # ============================================================
 
-container_name: "test_super_test"
-container_ip: "192.168.254.6"
+container_name: "mamuka"
+
+# IP контейнера (опционально)
+# Если не указан — назначится автоматически следующий свободный
+# container_ip: "192.168.254.6"
+
 container_gateway: "192.168.254.1"
 docker_bridge: "Bridge-Docker"
 container_image: "wiktorbgu/mihomo-mikrotik:latest"
 
 # КРИТИЧНО: DNS = IP роутера на Bridge-Docker
-# НЕ использовать 1.1.1.1/8.8.8.8 — VPN-Input блокирует!
 container_dns: "192.168.254.1"
 
 # CONFIG для mihomo
