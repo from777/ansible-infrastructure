@@ -17,32 +17,18 @@ proxy-providers:
   $PROVIDERS_BLOCK
 
 proxy-groups:
-  - name: AWG_BEST
-    type: url-test
-    url: https://www.gstatic.com/generate_204
-    interval: 300
-    tolerance: 50
-    use:
-      - AWG
-  - name: SRV_BEST
-    type: url-test
-    url: https://www.gstatic.com/generate_204
-    interval: 300
-    tolerance: 50
-    use:
-      - SRV
   - name: SELECTOR
-    type: fallback
+    type: url-test
     url: https://www.gstatic.com/generate_204
     interval: 300
-    proxies:
-      - AWG_BEST
-      - SRV_BEST
-  - name: QUIC
-    type: select
-    proxies:
-      - PASS
-      - REJECT
+    tolerance: 50
+    use:
+  $PROVIDERS_LIST
+- name: QUIC
+  type: select
+  proxies:
+    - PASS
+    - REJECT
 
 listeners:
   - name: mixed-in
