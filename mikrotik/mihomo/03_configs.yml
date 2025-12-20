@@ -26,6 +26,7 @@
         - "{{ smb_mount_point }}/docker_configs/{{ container_name }}"
         - "{{ smb_mount_point }}/docker_configs/{{ container_name }}/awg"
         - "{{ smb_mount_point }}/docker_configs/{{ container_name }}/srv"
+        - "{{ smb_mount_point }}/docker_configs/{{ container_name }}/template"
         - "{{ smb_mount_point }}/docker/{{ container_name }}"
       delegate_to: localhost
       become: yes
@@ -49,17 +50,17 @@
       delegate_to: localhost
       become: yes
 
-    # ===== КОПИРОВАТЬ CUSTOM CONFIG ИЗ template/ =====
+    # ===== КОПИРОВАТЬ CUSTOM CONFIG В template/ =====
     - name: Проверить custom_config.yaml
       ansible.builtin.stat:
         path: "{{ playbook_dir }}/configs/template/custom_config.yaml"
       register: custom_config
       delegate_to: localhost
 
-    - name: Копировать custom_config.yaml
+    - name: Копировать custom_config.yaml в template/
       ansible.builtin.copy:
         src: "{{ playbook_dir }}/configs/template/custom_config.yaml"
-        dest: "{{ smb_mount_point }}/docker_configs/{{ container_name }}/custom_config.yaml"
+        dest: "{{ smb_mount_point }}/docker_configs/{{ container_name }}/template/custom_config.yaml"
         mode: '0644'
       when: custom_config.stat.exists
       delegate_to: localhost
