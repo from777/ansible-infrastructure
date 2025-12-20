@@ -1,6 +1,3 @@
-# custom_config.yaml
-# Автопереключение на самый быстрый VPN
-
 external-controller: $EXTERNAL_CONTROLLER_ADDRESS:$UI_PORT
 external-ui: $EXTERNAL_UI_PATH
 external-ui-url: $EXTERNAL_UI_URL
@@ -19,38 +16,26 @@ proxy-providers:
   $PROVIDERS_BLOCK
 
 proxy-groups:
-  # Автовыбор самого быстрого
   - name: AUTO
     type: url-test
     url: https://www.gstatic.com/generate_204
     interval: 300
     tolerance: 50
+    lazy: false
     use:
-  $PROVIDERS_LIST
-
-# Fallback — если текущий упал, переключится на следующий
-- name: FALLBACK
-  type: fallback
-  url: https://www.gstatic.com/generate_204
-  interval: 300
-  use:
-  $PROVIDERS_LIST
-
-# Ручной выбор
-- name: SELECTOR
-  type: select
-  proxies:
-    - AUTO
-    - FALLBACK
-    - DIRECT
-  use:
-  $PROVIDERS_LIST
-
-- name: QUIC
-  type: select
-  proxies:
-    - PASS
-    - REJECT
+      - AWG
+  - name: SELECTOR
+    type: select
+    proxies:
+      - AUTO
+      - DIRECT
+    use:
+      - AWG
+  - name: QUIC
+    type: select
+    proxies:
+      - PASS
+      - REJECT
 
 listeners:
   - name: mixed-in
@@ -68,6 +53,4 @@ listeners:
 rules:
   - AND,((NETWORK,udp),(DST-PORT,443)),QUIC
   - GEOIP,RU,DIRECT
-  - IN-NAME,tun-in,AUTO
-  - IN-NAME,mixed-in,AUTO
   - MATCH,AUTO
