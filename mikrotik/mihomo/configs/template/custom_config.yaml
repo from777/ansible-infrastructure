@@ -21,12 +21,13 @@ proxy-groups:
     url: https://www.gstatic.com/generate_204
     interval: 300
     tolerance: 50
-    include-all-providers: true
-  - name: QUIC
-    type: select
-    proxies:
-      - PASS
-      - REJECT
+    use:
+  $PROVIDERS_LIST
+- name: QUIC
+  type: select
+  proxies:
+    - PASS
+    - REJECT
 
 listeners:
   - name: mixed-in
