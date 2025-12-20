@@ -1,6 +1,4 @@
 # 02_smb_mount.yml
-# Полная настройка SMB с нуля на чистом роутере
-# RouterOS 7 поддерживает только SMB2.1, SMB3.0, SMB3.1.1
 ---
 - name: "02: SMB Mount"
   hosts: mikrotik
@@ -8,46 +6,22 @@
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
-    smb_user: "smbuser"
-    smb_password: "mihomo123"
     smb_share_name: "usb1"
     smb_share_dir: "usb1/smb_share"
   vars_files:
     - vars.yml
 
   tasks:
-    # ===== SMB СЕРВЕР =====
-    - name: Проверить SMB статус
-      community.routeros.command:
-        commands:
-          - /ip smb print
-      register: smb_status
-
     - name: Включить SMB
       community.routeros.command:
         commands:
           - /ip smb set enabled=yes interfaces={{ smb_interface }}
-      when: "'enabled: no' in smb_status.stdout[0]"
 
-    # ===== SMB ПОЛЬЗОВАТЕЛЬ =====
-    - name: Проверить SMB пользователя
+    - name: Включить guest без read-only
       community.routeros.command:
         commands:
-          - /ip smb users print count-only where name={{ smb_user }}
-      register: smb_user_exists
+          - /ip smb users set [find name="guest"] disabled=no read-only=no
 
-    - name: Создать SMB пользователя
-      community.routeros.command:
-        commands:
-          - /ip smb users add name={{ smb_user }} password={{ smb_password }} read-only=no
-      when: smb_user_exists.stdout[0] | int == 0
-
-    - name: Установить пароль SMB пользователя
-      community.routeros.command:
-        commands:
-          - /ip smb users set [find name={{ smb_user }}] password={{ smb_password }} read-only=no disabled=no
-
-    # ===== ДИРЕКТОРИЯ ДЛЯ ШАРЫ =====
     - name: Проверить директорию для шары
       community.routeros.command:
         commands:
@@ -60,7 +34,6 @@
           - /file add name={{ smb_share_dir }} type=directory
       when: share_dir_exists.stdout[0] | int == 0
 
-    # ===== SMB ШАРА =====
     - name: Проверить SMB шару
       community.routeros.command:
         commands:
@@ -73,12 +46,11 @@
           - /ip smb shares add name={{ smb_share_name }} directory={{ smb_share_dir }}
       when: share_exists.stdout[0] | int == 0
 
-    - name: Настроить SMB шару
+    - name: Настроить SMB шару без valid-users (гостевой доступ)
       community.routeros.command:
         commands:
-          - /ip smb shares set [find name={{ smb_share_name }}] directory={{ smb_share_dir }} valid-users={{ smb_user }}
+          - /ip smb shares set [find name={{ smb_share_name }}] directory={{ smb_share_dir }} valid-users=""
 
-    # ===== МОНТИРОВАНИЕ НА LOCALHOST =====
     - name: Создать точку монтирования
       ansible.builtin.file:
         path: "{{ smb_mount_point }}"
@@ -87,18 +59,22 @@
       delegate_to: localhost
       become: yes
 
-    - name: Проверить не смонтировано ли уже
-      ansible.builtin.shell: mount | grep "{{ smb_mount_point }}" || true
-      delegate_to: localhost
-      register: already_mounted
-      changed_when: false
-
-    - name: Смонтировать SMB
-      ansible.builtin.shell: |
-        mount -t cifs "//{{ ansible_host }}/{{ smb_share_name }}" "{{ smb_mount_point }}" -o username={{ smb_user }},password={{ smb_password }},vers=2.1
+    - name: Размонтировать если смонтировано
+      ansible.builtin.shell: umount "{{ smb_mount_point }}" || true
       delegate_to: localhost
       become: yes
-      when: already_mounted.stdout == ""
+      changed_when: false
+
+    - name: Смонтировать SMB (гостевой доступ)
+      ansible.builtin.shell: |
+        mount -t cifs "//{{ ansible_host }}/{{ smb_share_name }}" "{{ smb_mount_point }}" -o guest,sec=none
+      delegate_to: localhost
+      become: yes
+
+    - name: Проверить монтирование
+      ansible.builtin.shell: ls -la "{{ smb_mount_point }}/docker_configs/"
+      delegate_to: localhost
+      register: mount_check
 
     - name: Результат
       ansible.builtin.debug:
