@@ -11,19 +11,33 @@ dns:
   enable: $DNS_ENABLE
   use-system-hosts: $DNS_USE_SYSTEM_HOSTS
   nameserver:
-  - system
+    - system
 
 proxy-providers:
-$PROVIDERS_BLOCK
+  $PROVIDERS_BLOCK
 
 proxy-groups:
-  - name: SELECTOR
+  - name: AWG_BEST
     type: url-test
     url: https://www.gstatic.com/generate_204
     interval: 300
     tolerance: 50
     use:
-$PROVIDERS_LIST
+      - AWG
+  - name: SRV_BEST
+    type: url-test
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+    use:
+      - SRV
+  - name: SELECTOR
+    type: fallback
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    proxies:
+      - AWG_BEST
+      - SRV_BEST
   - name: QUIC
     type: select
     proxies:
