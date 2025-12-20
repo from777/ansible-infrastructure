@@ -5,19 +5,19 @@ secret: $UI_SECRET
 unified-delay: true
 log-level: $LOG_LEVEL
 ipv6: $IPV6
-
 dns:
   enable: $DNS_ENABLE
   use-system-hosts: $DNS_USE_SYSTEM_HOSTS
   nameserver:
     - system
-
 proxy-providers:
   $PROVIDERS_BLOCK
-
 proxy-groups:
   - name: SELECTOR
-    type: select
+    type: url-test
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
     use:
   $PROVIDERS_LIST
 - name: QUIC
@@ -25,7 +25,6 @@ proxy-groups:
   proxies:
     - PASS
     - REJECT
-
 listeners:
   - name: mixed-in
     type: mixed
@@ -38,7 +37,6 @@ listeners:
     auto-redirect: $TUN_AUTO_REDIRECT
     inet4-address:
       - $TUN_INET4_ADDRESS
-
 rules:
   - AND,((NETWORK,udp),(DST-PORT,443)),QUIC
   - GEOIP,RU,DIRECT
