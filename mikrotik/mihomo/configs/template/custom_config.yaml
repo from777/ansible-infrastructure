@@ -1,3 +1,4 @@
+# custom_config.yaml
 external-controller: $EXTERNAL_CONTROLLER_ADDRESS:$UI_PORT
 external-ui: $EXTERNAL_UI_PATH
 external-ui-url: $EXTERNAL_UI_URL
@@ -10,10 +11,10 @@ dns:
   enable: $DNS_ENABLE
   use-system-hosts: $DNS_USE_SYSTEM_HOSTS
   nameserver:
-    - system
+  - system
 
 proxy-providers:
-  $PROVIDERS_BLOCK
+$PROVIDERS_BLOCK
 
 proxy-groups:
   - name: SELECTOR
@@ -21,14 +22,13 @@ proxy-groups:
     url: https://www.gstatic.com/generate_204
     interval: 300
     tolerance: 50
-    lazy: false
     use:
-  $PROVIDERS_LIST
-- name: QUIC
-  type: select
-  proxies:
-    - PASS
-    - REJECT
+$PROVIDERS_LIST
+  - name: QUIC
+    type: select
+    proxies:
+      - PASS
+      - REJECT
 
 listeners:
   - name: mixed-in
