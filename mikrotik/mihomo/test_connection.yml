@@ -8,10 +8,10 @@
     ansible_network_os: community.routeros.routeros
 
   tasks:
-    - name: Simple identity test
+    - name: Test device-mode command
       community.routeros.command:
         commands:
-          - /system identity print
+          - /system/device-mode/print
       register: result
 
     - debug:
