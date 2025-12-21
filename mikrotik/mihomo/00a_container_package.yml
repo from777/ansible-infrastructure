@@ -1,6 +1,6 @@
-# 00b_container_mode.yml
+# 00a_container_package.yml
 ---
-- name: "00b: Enable container mode"
+- name: "00a: Install container package"
   hosts: mikrotik
   gather_facts: no
   connection: ansible.netcommon.network_cli
@@ -17,62 +17,55 @@
           - /system package print count-only where name=container
       register: pkg_exists
 
-    - name: Fail если пакета нет
-      ansible.builtin.fail:
-        msg: "Сначала запусти 00a_container_package.yml"
-      when: pkg_exists.stdout[0] | int == 0
-
-    - name: Проверить container mode
-      community.routeros.command:
-        commands:
-          - /system/device-mode/print
-      register: device_mode
-
-    - name: Установить факт
-      ansible.builtin.set_fact:
-        container_enabled: "{{ 'container: yes' in device_mode.stdout[0] }}"
-
-    - name: Статус
+    - name: Статус пакета
       ansible.builtin.debug:
-        msg: "Container mode: {{ 'включен' if container_enabled else 'выключен' }}"
+        msg: "Container package: {{ 'установлен' if pkg_exists.stdout[0] | int > 0 else 'отсутствует' }}"
 
-    - name: Включить container mode
+    - name: Установка пакета
       block:
-        - name: "========== ВНИМАНИЕ =========="
-          ansible.builtin.pause:
-            seconds: 5
-            prompt: |
-              Сейчас включится container mode.
-              После команды ВЫДЕРНИ ПИТАНИЕ в течение 5 минут!
-              Enter для продолжения...
-
-        - name: Активировать container mode
+        - name: Скачать пакет container
           community.routeros.command:
             commands:
-              - /system/device-mode/update container=yes
+              - /tool fetch url={{ container_pkg_url }} dst-path=container.npk
+
+        - name: Перезагрузить роутер
+          community.routeros.command:
+            commands:
+              - /system reboot
           ignore_errors: yes
 
-        - name: "========== ВЫДЕРНИ ПИТАНИЕ =========="
-          ansible.builtin.debug:
-            msg: "У тебя 5 минут! После power cycle запусти этот плейбук снова."
+        - name: Ждать выключения
+          ansible.builtin.wait_for:
+            host: "{{ ansible_host }}"
+            port: 22
+            state: stopped
+            timeout: 60
+          delegate_to: localhost
 
-        - name: Завершить
-          ansible.builtin.meta: end_play
-      when: not container_enabled
+        - name: Ждать загрузки
+          ansible.builtin.wait_for:
+            host: "{{ ansible_host }}"
+            port: 22
+            state: started
+            timeout: 180
+          delegate_to: localhost
 
-    - name: Настроить container registry
+        - name: Пауза для инициализации
+          ansible.builtin.pause:
+            seconds: 15
+      when: pkg_exists.stdout[0] | int == 0
+
+    - name: Проверить установку пакета
       community.routeros.command:
         commands:
-          - /container config set registry-url=https://registry-1.docker.io tmpdir=usb1-part1/pull
-
-    - name: Финальная проверка
-      community.routeros.command:
-        commands:
-          - /container config print
-      register: container_config
+          - /system package print count-only where name=container
+      register: pkg_final
 
     - name: Результат
       ansible.builtin.debug:
-        msg: |
-          OK: Container mode активен и настроен
-          {{ container_config.stdout[0] }}
+        msg: "{{ 'OK: Пакет container установлен' if pkg_final.stdout[0] | int > 0 else 'FAILED: Пакет не установлен' }}"
+
+    - name: Fail если пакет не установлен
+      ansible.builtin.fail:
+        msg: "Пакет container не установился"
+      when: pkg_final.stdout[0] | int == 0
