@@ -31,7 +31,7 @@
 
     - name: Установить факт
       ansible.builtin.set_fact:
-        container_enabled: "{{ container_config.rc == 0 }}"
+        container_enabled: "{{ container_config.failed is not defined or not container_config.failed }}"
 
     - name: Статус
       ansible.builtin.debug:
