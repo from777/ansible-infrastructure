@@ -35,10 +35,24 @@
         prompt: "USB будет отформатирован в ext4. Ctrl+C для отмены."
       when: usb_exists and not usb_is_ext4
 
+    - name: Размонтировать USB перед форматированием
+      community.routeros.command:
+        commands:
+          - /disk eject {{ usb_partition }}
+      when: usb_exists and not usb_is_ext4
+      ignore_errors: yes
+
+    - name: Ожидание размонтирования
+      ansible.builtin.pause:
+        seconds: 5
+      when: usb_exists and not usb_is_ext4
+
     - name: Форматировать USB в ext4
       community.routeros.command:
         commands:
-          - /disk format-drive {{ usb_disk }} file-system=ext4 mbr-partition-table=yes
+          - command: /disk format {{ usb_disk }} file-system=ext4 mbr-partition-table=yes
+            prompt: "are you sure?"
+            answer: "y"
       when: usb_exists and not usb_is_ext4
 
     - name: Ожидание форматирования
@@ -86,7 +100,7 @@
     - name: Финальная проверка USB
       community.routeros.command:
         commands:
-          - /disk print where slot~"{{ usb_partition }}"
+          - /disk print detail where slot~"{{ usb_partition }}"
       register: usb_final
 
     - name: Финальная проверка Bridge
@@ -98,5 +112,5 @@
     - name: Результат
       ansible.builtin.debug:
         msg: |
-          USB: {{ usb_partition }} готов
+          USB: {{ usb_final.stdout[0] }}
           Bridge: {{ docker_bridge }} {{ docker_bridge_ip }}
