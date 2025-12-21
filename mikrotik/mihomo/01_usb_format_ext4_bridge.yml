@@ -1,6 +1,6 @@
 # 01_usb_format_ext4_bridge.yml
 ---
-- name: "01: USB format ext4 (WIPES DATA if not ext4) + Bridge-Docker"
+- name: "01: USB format ext4 (WIPES DATA if not ext4) + Bridge-Docker + NAT"
   hosts: mikrotik
   gather_facts: no
   connection: ansible.netcommon.network_cli
@@ -9,6 +9,7 @@
     ansible_command_timeout: 120
     usb_disk: "usb1"
     docker_bridge_ip: "192.168.254.1/24"
+    docker_network: "192.168.254.0/24"
   vars_files:
     - vars.yml
 
@@ -91,7 +92,38 @@
           - /ip address add address={{ docker_bridge_ip }} interface={{ docker_bridge }}
       when: bridge_ip_exists.stdout[0] | int == 0
 
-    # ===== ПРОВЕРКА =====
+    # ===== DNS =====
+    - name: Включить allow-remote-requests для DNS
+      community.routeros.command:
+        commands:
+          - /ip dns set allow-remote-requests=yes
+
+    # ===== NAT =====
+    - name: Проверить NAT masquerade для контейнеров
+      community.routeros.command:
+        commands:
+          - /ip firewall nat print count-only where src-address={{ docker_network }} action=masquerade
+      register: nat_masq_exists
+
+    - name: Добавить NAT masquerade для контейнеров
+      community.routeros.command:
+        commands:
+          - /ip firewall nat add chain=srcnat src-address={{ docker_network }} action=masquerade comment="Containers to WAN"
+      when: nat_masq_exists.stdout[0] | int == 0
+
+    - name: Проверить NAT DNS accept для контейнеров
+      community.routeros.command:
+        commands:
+          - /ip firewall nat print count-only where src-address={{ docker_network }} dst-port=53 action=accept
+      register: nat_dns_exists
+
+    - name: Добавить NAT DNS accept для контейнеров
+      community.routeros.command:
+        commands:
+          - /ip firewall nat add chain=dstnat action=accept protocol=udp src-address={{ docker_network }} dst-port=53 comment="Allow containers DNS direct"
+      when: nat_dns_exists.stdout[0] | int == 0
+
+    # ===== ПРОВЕРКА USB =====
     - name: Проверить что USB примонтирован как disk
       community.routeros.command:
         commands:
@@ -109,6 +141,8 @@
         commands:
           - /disk print detail where slot~"{{ usb_partition }}"
           - /ip address print where interface={{ docker_bridge }}
+          - /ip dns print
+          - /ip firewall nat print where src-address~"192.168.254"
       register: final_check
 
     - name: Результат
@@ -116,3 +150,5 @@
         msg: |
           USB: {{ 'OK (ext4, mounted)' if 'fs=ext4' in final_check.stdout[0] else 'FAILED' }}
           Bridge: {{ docker_bridge }} {{ docker_bridge_ip }}
+          DNS: allow-remote-requests={{ 'yes' if 'allow-remote-requests: yes' in final_check.stdout[2] else 'no' }}
+          NAT: {{ final_check.stdout[3] | length }} rules
