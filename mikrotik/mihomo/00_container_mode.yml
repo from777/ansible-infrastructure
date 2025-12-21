@@ -16,12 +16,7 @@
           - /container/config/set registry-url=https://registry-1.docker.io tmpdir={{ usb_path }}/docker/pull
       ignore_errors: yes
 
-    - name: "!!! ВНИМАНИЕ !!!"
-      fail:
-        msg: "СЕЙЧАС БУДЕТ КОМАНДА device-mode - ПРИГОТОВЬСЯ ВЫДЕРНУТЬ ПИТАНИЕ (5 минут)"
-      ignore_errors: yes
-
-    - name: "ВЫДЕРГИВАЙ ПИТАНИЕ СЕЙЧАС"
+    - name: "========== ВЫДЕРГИВАЙ ПИТАНИЕ СЕЙЧАС (5 минут) =========="
       community.routeros.command:
         commands:
           - /system/device-mode/update container=yes
