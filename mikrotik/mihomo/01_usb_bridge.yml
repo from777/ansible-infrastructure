@@ -51,8 +51,10 @@
       community.routeros.command:
         commands:
           - command: /disk format {{ usb_disk }} file-system=ext4 mbr-partition-table=yes
-            prompt: "All data will be lost, are you sure?"
-            answer: "y"
+            prompt: 'are you sure'
+            answer: 'y'
+            newline: true
+            check_all: true
       when: usb_exists and not usb_is_ext4
 
     - name: Ожидание форматирования
