@@ -78,6 +78,18 @@
       become: yes
       when: cifs_check.rc != 0
 
+    - name: Размонтировать старую шару если есть
+      ansible.builtin.shell: umount "{{ smb_mount_point }}" 2>/dev/null || true
+      delegate_to: localhost
+      become: yes
+      changed_when: false
+
+    - name: Удалить точку монтирования если битая
+      ansible.builtin.shell: rm -rf "{{ smb_mount_point }}" 2>/dev/null || true
+      delegate_to: localhost
+      become: yes
+      changed_when: false
+
     - name: Создать точку монтирования
       ansible.builtin.file:
         path: "{{ smb_mount_point }}"
@@ -86,18 +98,11 @@
       delegate_to: localhost
       become: yes
 
-    - name: Проверить текущее монтирование
-      ansible.builtin.shell: mount | grep "{{ smb_mount_point }}" || true
-      delegate_to: localhost
-      changed_when: false
-      register: mount_status
-
     - name: Смонтировать SMB (гостевой доступ)
       ansible.builtin.shell: |
         mount -t cifs "//{{ ansible_host }}/{{ smb_share_name }}" "{{ smb_mount_point }}" -o guest,sec=none,vers=2.0
       delegate_to: localhost
       become: yes
-      when: smb_mount_point not in mount_status.stdout
 
     # ===== РЕЗУЛЬТАТ =====
     - name: Проверить монтирование
