@@ -14,19 +14,24 @@
       community.routeros.command:
         commands:
           - /container/config/set registry-url=https://registry-1.docker.io tmpdir={{ usb_path }}/docker/pull
+      ignore_errors: yes
 
-    - name: Enable container mode (REQUIRES RESET BUTTON!)
+    - name: "!!! ВНИМАНИЕ - ПРИГОТОВЬСЯ ВЫДЕРНУТЬ ПИТАНИЕ !!!"
+      debug:
+        msg: |
+          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+          СЛЕДУЮЩАЯ КОМАНДА ЗАПУСТИТ device-mode/update
+          У тебя будет 5 МИНУТ чтобы выдернуть питание!
+          НЕ ЖДИ окончания плейбука - выдергивай сразу
+          как увидишь следующую таску в логе!
+          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    - name: ">>> ВЫДЕРГИВАЙ ПИТАНИЕ СЕЙЧАС <<<"
       community.routeros.command:
         commands:
           - /system/device-mode/update container=yes
       ignore_errors: yes
 
-    - name: IMPORTANT
+    - name: Готово
       debug:
-        msg: |
-          ==========================================
-          ТРЕБУЕТСЯ ДЕЙСТВИЕ!
-          В течение 5 минут нажми кнопку RESET
-          (короткое нажатие, не удерживать!)
-          Роутер перезагрузится автоматически.
-          ==========================================
+        msg: "Если выдернул питание вовремя - container: yes"
