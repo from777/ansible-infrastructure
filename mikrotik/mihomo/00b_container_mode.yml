@@ -6,7 +6,7 @@
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
-    ansible_command_timeout: 120
+    ansible_command_timeout: 30
   vars_files:
     - vars.yml
 
@@ -22,15 +22,16 @@
         msg: "Сначала запусти 00a_container_package.yml"
       when: pkg_exists.stdout[0] | int == 0
 
-    - name: Проверить container mode
+    - name: Проверить container config (работает только если mode включен)
       community.routeros.command:
         commands:
-          - /system/device-mode/print
-      register: device_mode
+          - /container config print
+      register: container_config
+      ignore_errors: yes
 
     - name: Установить факт
       ansible.builtin.set_fact:
-        container_enabled: "{{ 'container: yes' in device_mode.stdout[0] }}"
+        container_enabled: "{{ container_config.rc == 0 }}"
 
     - name: Статус
       ansible.builtin.debug:
@@ -69,10 +70,10 @@
       community.routeros.command:
         commands:
           - /container config print
-      register: container_config
+      register: final_config
 
     - name: Результат
       ansible.builtin.debug:
         msg: |
           OK: Container mode активен и настроен
-          {{ container_config.stdout[0] }}
+          {{ final_config.stdout[0] }}
