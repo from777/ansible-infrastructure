@@ -6,13 +6,14 @@
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
+    ansible_command_timeout: 120
     smb_base: "{{ usb_partition }}/smb_share"
     container_network: "192.168.254"
   vars_files:
     - vars.yml
 
   tasks:
-    # ===== ПРОВЕРКА USB =====
+    # ===== ПРОВЕРКИ =====
     - name: Проверить что USB примонтирован
       community.routeros.command:
         commands:
@@ -23,6 +24,48 @@
       ansible.builtin.fail:
         msg: "{{ usb_partition }} не найден!"
       when: "usb_partition not in disk_check.stdout[0]"
+
+    - name: Проверить container registry
+      community.routeros.command:
+        commands:
+          - /container config print
+      register: container_config
+
+    - name: Fail если registry не настроен
+      ansible.builtin.fail:
+        msg: "Container registry не настроен! Сначала запусти 00b_container_mode.yml"
+      when: "'registry-1.docker.io' not in container_config.stdout[0]"
+
+    # ===== УДАЛИТЬ СТАРЫЙ КОНТЕЙНЕР =====
+    - name: Проверить существующий контейнер
+      community.routeros.command:
+        commands:
+          - /container print count-only where name="{{ container_name }}"
+      register: old_container
+
+    - name: Остановить старый контейнер
+      community.routeros.command:
+        commands:
+          - /container stop [find name="{{ container_name }}"]
+      when: old_container.stdout[0] | int > 0
+      ignore_errors: yes
+
+    - name: Пауза для остановки
+      ansible.builtin.pause:
+        seconds: 5
+      when: old_container.stdout[0] | int > 0
+
+    - name: Удалить старый контейнер
+      community.routeros.command:
+        commands:
+          - /container remove [find name="{{ container_name }}"]
+      when: old_container.stdout[0] | int > 0
+      ignore_errors: yes
+
+    - name: Пауза после удаления
+      ansible.builtin.pause:
+        seconds: 3
+      when: old_container.stdout[0] | int > 0
 
     # ===== АВТООПРЕДЕЛЕНИЕ IP =====
     - name: Получить все veth адреса
@@ -112,29 +155,25 @@
         - container_config is not defined or container_config | length == 0
 
     # ===== CONTAINER =====
-    - name: Проверить контейнер
-      community.routeros.command:
-        commands:
-          - /container print count-only where name="{{ container_name }}"
-      register: container_exists
-
     - name: Создать контейнер
       community.routeros.command:
         commands:
           - /container add remote-image={{ container_image }} interface={{ container_name }} root-dir={{ smb_base }}/docker/{{ container_name }} mounts={{ container_name }}_conf envlist={{ container_name }}_env dns={{ container_dns }} logging=yes name="{{ container_name }}" start-on-boot=yes
-      when: container_exists.stdout[0] | int == 0
 
     - name: Ожидание загрузки образа
       ansible.builtin.pause:
-        seconds: 30
-        prompt: "Загрузка образа..."
-      when: container_exists.stdout[0] | int == 0
+        seconds: 60
+        prompt: "Загрузка образа (60 сек)..."
 
     # ===== START =====
     - name: Запустить контейнер
       community.routeros.command:
         commands:
           - /container start [find name="{{ container_name }}"]
+
+    - name: Ожидание запуска
+      ansible.builtin.pause:
+        seconds: 10
 
     - name: Проверить статус
       community.routeros.command:
@@ -149,3 +188,4 @@
           IP: {{ container_ip | default(auto_container_ip) }}
           DNS: {{ container_dns }}
           UI: http://{{ container_ip | default(auto_container_ip) }}:9090/ui/
+          Status: {{ result.stdout[0] }}

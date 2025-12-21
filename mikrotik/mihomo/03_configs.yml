@@ -50,13 +50,20 @@
       loop_control:
         label: "{{ item.path | basename }}"
 
-    - name: Удалить старый custom_config.yaml
+    - name: Удалить старый custom_config.yaml из корня
       delegate_to: localhost
       ansible.builtin.file:
-        path: "{{ smb_path }}/template/custom_config.yaml"
+        path: "{{ smb_path }}/custom_config.yaml"
         state: absent
 
-    - name: Копировать custom_config.yaml в template/
+    - name: Копировать custom_config.yaml в корень
+      delegate_to: localhost
+      ansible.builtin.copy:
+        src: "{{ repo_path }}/template/custom_config.yaml"
+        dest: "{{ smb_path }}/custom_config.yaml"
+        mode: '0644'
+
+    - name: Копировать custom_config.yaml в template/ (бэкап)
       delegate_to: localhost
       ansible.builtin.copy:
         src: "{{ repo_path }}/template/custom_config.yaml"
@@ -82,4 +89,4 @@
 
     - name: Результат
       ansible.builtin.debug:
-        msg: "AWG: {{ awg_files.files | length }}, SRV: {{ srv_files.files | length }}"
+        msg: "AWG: {{ awg_files.files | length }}, SRV: {{ srv_files.files | length }}, Config: custom_config.yaml"
