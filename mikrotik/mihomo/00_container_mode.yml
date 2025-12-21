@@ -10,6 +10,8 @@
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
+    ansible_host_key_checking: false
+    ansible_command_timeout: 60
     usb_path: "usb1"
 
   tasks:
