@@ -29,9 +29,12 @@
               - /tool fetch url={{ container_pkg_url }} dst-path=container.npk
 
         - name: Перезагрузить роутер
-          community.routeros.command:
-            commands:
-              - /system reboot
+          ansible.netcommon.cli_command:
+            command: /system reboot
+            prompt:
+              - "Reboot, yes"
+            answer:
+              - "y"
           ignore_errors: yes
 
         - name: Ждать выключения
