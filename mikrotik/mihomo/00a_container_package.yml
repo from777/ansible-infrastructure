@@ -23,6 +23,12 @@
 
     - name: Установка пакета
       block:
+        - name: Удалить старый файл пакета если есть
+          community.routeros.command:
+            commands:
+              - /file remove container.npk
+          ignore_errors: yes
+
         - name: Скачать пакет container
           community.routeros.command:
             commands:
