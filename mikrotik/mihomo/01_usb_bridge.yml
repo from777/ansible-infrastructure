@@ -20,10 +20,6 @@
           - /disk print detail without-paging
       register: disk_info
 
-    - name: DEBUG disk_info
-      ansible.builtin.debug:
-        var: disk_info
-
     - name: Проверить файловую систему
       ansible.builtin.set_fact:
         usb_is_ext4: "{{ 'fs=ext4' in disk_info.stdout[0] }}"
@@ -43,14 +39,8 @@
       community.routeros.command:
         commands:
           - /disk eject {{ usb_partition }}
-      register: eject_result
       when: usb_exists and not usb_is_ext4
       ignore_errors: yes
-
-    - name: DEBUG eject_result
-      ansible.builtin.debug:
-        var: eject_result
-      when: eject_result is defined
 
     - name: Ожидание размонтирования
       ansible.builtin.pause:
@@ -64,29 +54,7 @@
           - "are you sure"
         answer:
           - "y"
-      register: format_result
       when: usb_exists and not usb_is_ext4
-
-    - name: DEBUG format_result
-      ansible.builtin.debug:
-        var: format_result
-      when: format_result is defined
-
-    - name: Ожидание форматирования
-      ansible.builtin.pause:
-        seconds: 30
-        prompt: "Форматирование..."
-      when: usb_exists and not usb_is_ext4
-
-    - name: Проверка после форматирования
-      community.routeros.command:
-        commands:
-          - /disk print detail where slot~"{{ usb_partition }}"
-      register: disk_after_format
-
-    - name: DEBUG disk_after_format
-      ansible.builtin.debug:
-        var: disk_after_format
 
     - name: Ожидание монтирования
       community.routeros.command:
@@ -94,14 +62,9 @@
           - /disk print where slot~"{{ usb_partition }}"
       register: disk_mounted
       until: "'M' in disk_mounted.stdout[0]"
-      retries: 10
+      retries: 20
       delay: 3
       when: usb_exists and not usb_is_ext4
-
-    - name: DEBUG disk_mounted
-      ansible.builtin.debug:
-        var: disk_mounted
-      when: disk_mounted is defined
 
     # ===== BRIDGE =====
     - name: Проверить Bridge-Docker
@@ -129,20 +92,15 @@
       when: bridge_ip_exists.stdout[0] | int == 0
 
     # ===== РЕЗУЛЬТАТ =====
-    - name: Финальная проверка USB
+    - name: Финальная проверка
       community.routeros.command:
         commands:
           - /disk print detail where slot~"{{ usb_partition }}"
-      register: usb_final
-
-    - name: Финальная проверка Bridge
-      community.routeros.command:
-        commands:
           - /ip address print where interface={{ docker_bridge }}
-      register: bridge_final
+      register: final_check
 
     - name: Результат
       ansible.builtin.debug:
         msg: |
-          USB: {{ usb_final.stdout[0] }}
+          USB: {{ 'OK (ext4, mounted)' if 'fs=ext4' in final_check.stdout[0] else 'FAILED' }}
           Bridge: {{ docker_bridge }} {{ docker_bridge_ip }}
