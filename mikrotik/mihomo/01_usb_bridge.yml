@@ -57,10 +57,13 @@
         seconds: 5
       when: usb_exists and not usb_is_ext4
 
-    - name: Форматировать USB в ext4 (через raw SSH)
-      ansible.builtin.raw: |
-        /disk format {{ usb_disk }} file-system=ext4 mbr-partition-table=yes
-        y
+    - name: Форматировать USB в ext4
+      ansible.netcommon.cli_command:
+        command: /disk format {{ usb_disk }} file-system=ext4 mbr-partition-table=yes
+        prompt:
+          - "are you sure"
+        answer:
+          - "y"
       register: format_result
       when: usb_exists and not usb_is_ext4
 
