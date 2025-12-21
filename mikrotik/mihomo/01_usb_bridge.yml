@@ -1,0 +1,102 @@
+# 01_usb_bridge.yml
+---
+- name: "01: Format USB (ext4) and create Bridge-Docker"
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    ansible_command_timeout: 120
+    usb_disk: "usb1"
+    usb_partition: "usb1-part1"
+    docker_bridge: "Bridge-Docker"
+    docker_bridge_ip: "192.168.254.1/24"
+
+  tasks:
+    # ===== USB =====
+    - name: Получить информацию о дисках
+      community.routeros.command:
+        commands:
+          - /disk print detail without-paging
+      register: disk_info
+
+    - name: Проверить файловую систему
+      ansible.builtin.set_fact:
+        usb_is_ext4: "{{ 'fs=ext4' in disk_info.stdout[0] }}"
+        usb_exists: "{{ usb_disk in disk_info.stdout[0] }}"
+
+    - name: Статус USB
+      ansible.builtin.debug:
+        msg: "USB {{ usb_disk }}: exists={{ usb_exists }}, ext4={{ usb_is_ext4 }}"
+
+    - name: "ФОРМАТИРОВАНИЕ - ДАННЫЕ БУДУТ УДАЛЕНЫ"
+      ansible.builtin.pause:
+        seconds: 10
+        prompt: "USB будет отформатирован в ext4. Ctrl+C для отмены."
+      when: usb_exists and not usb_is_ext4
+
+    - name: Форматировать USB в ext4
+      community.routeros.command:
+        commands:
+          - /disk format-drive {{ usb_disk }} file-system=ext4 mbr-partition-table=yes
+      when: usb_exists and not usb_is_ext4
+
+    - name: Ожидание форматирования
+      ansible.builtin.pause:
+        seconds: 30
+        prompt: "Форматирование..."
+      when: usb_exists and not usb_is_ext4
+
+    - name: Ожидание монтирования
+      community.routeros.command:
+        commands:
+          - /disk print where slot~"{{ usb_partition }}"
+      register: disk_mounted
+      until: "'M' in disk_mounted.stdout[0]"
+      retries: 10
+      delay: 3
+      when: usb_exists and not usb_is_ext4
+
+    # ===== BRIDGE =====
+    - name: Проверить Bridge-Docker
+      community.routeros.command:
+        commands:
+          - /interface bridge print count-only where name={{ docker_bridge }}
+      register: bridge_exists
+
+    - name: Создать Bridge-Docker
+      community.routeros.command:
+        commands:
+          - /interface bridge add name={{ docker_bridge }}
+      when: bridge_exists.stdout[0] | int == 0
+
+    - name: Проверить IP на Bridge-Docker
+      community.routeros.command:
+        commands:
+          - /ip address print count-only where interface={{ docker_bridge }}
+      register: bridge_ip_exists
+
+    - name: Назначить IP на Bridge-Docker
+      community.routeros.command:
+        commands:
+          - /ip address add address={{ docker_bridge_ip }} interface={{ docker_bridge }}
+      when: bridge_ip_exists.stdout[0] | int == 0
+
+    # ===== РЕЗУЛЬТАТ =====
+    - name: Финальная проверка USB
+      community.routeros.command:
+        commands:
+          - /disk print where slot~"{{ usb_partition }}"
+      register: usb_final
+
+    - name: Финальная проверка Bridge
+      community.routeros.command:
+        commands:
+          - /ip address print where interface={{ docker_bridge }}
+      register: bridge_final
+
+    - name: Результат
+      ansible.builtin.debug:
+        msg: |
+          USB: {{ usb_partition }} готов
+          Bridge: {{ docker_bridge }} {{ docker_bridge_ip }}
