@@ -62,6 +62,10 @@
         commands:
           - /ip smb shares set [find name={{ smb_share_name }}] directory={{ smb_share_dir }}
 
+    - name: Пауза для применения настроек SMB
+      ansible.builtin.pause:
+        seconds: 3
+
     # ===== SEMAPHORE: MOUNT =====
     - name: Проверить cifs-utils
       ansible.builtin.command: which mount.cifs
@@ -100,7 +104,7 @@
 
     - name: Смонтировать SMB (гостевой доступ)
       ansible.builtin.shell: |
-        mount -t cifs "//{{ ansible_host }}/{{ smb_share_name }}" "{{ smb_mount_point }}" -o guest,sec=none,vers=2.0
+        mount -t cifs "//{{ ansible_host }}/{{ smb_share_name }}" "{{ smb_mount_point }}" -o guest,sec=none
       delegate_to: localhost
       become: yes
 
