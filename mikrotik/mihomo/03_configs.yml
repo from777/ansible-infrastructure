@@ -4,10 +4,23 @@
   hosts: mikrotik
   gather_facts: no
   vars:
-    smb_path: /mnt/mikrotik_smb/docker_configs/mamuka
+    smb_path: "{{ smb_mount_point }}/docker_configs/{{ container_name }}"
     repo_path: "{{ playbook_dir }}/configs"
+  vars_files:
+    - vars.yml
 
   tasks:
+    - name: Проверить что SMB смонтирован
+      ansible.builtin.stat:
+        path: "{{ smb_mount_point }}"
+      delegate_to: localhost
+      register: mount_stat
+
+    - name: Fail если SMB не смонтирован
+      ansible.builtin.fail:
+        msg: "SMB не смонтирован! Сначала запусти 02_smb_mount.yml"
+      when: not mount_stat.stat.exists
+
     - name: Создать структуру папок
       delegate_to: localhost
       ansible.builtin.file:

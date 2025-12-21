@@ -1,6 +1,4 @@
 # 04_container.yml
-# Создаёт контейнер на роутере
-# IP назначается автоматически (следующий свободный в 192.168.254.0/24)
 ---
 - name: "04: Container"
   hosts: mikrotik
@@ -8,12 +6,24 @@
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
-    smb_base: "usb1/smb_share"
+    smb_base: "{{ usb_partition }}/smb_share"
     container_network: "192.168.254"
   vars_files:
     - vars.yml
 
   tasks:
+    # ===== ПРОВЕРКА USB =====
+    - name: Проверить что USB примонтирован
+      community.routeros.command:
+        commands:
+          - /file print where name={{ usb_partition }} and type=disk
+      register: disk_check
+
+    - name: Fail если флешка не примонтирована
+      ansible.builtin.fail:
+        msg: "{{ usb_partition }} не найден!"
+      when: "usb_partition not in disk_check.stdout[0]"
+
     # ===== АВТООПРЕДЕЛЕНИЕ IP =====
     - name: Получить все veth адреса
       community.routeros.command:

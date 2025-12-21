@@ -1,17 +1,28 @@
 # 02_smb_mount.yml
 ---
-- name: "02: SMB Mount"
+- name: "02: SMB share on router + mount on Semaphore"
   hosts: mikrotik
   gather_facts: no
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
-    smb_share_name: "usb1"
-    smb_share_dir: "usb1/smb_share"
   vars_files:
     - vars.yml
 
   tasks:
+    # ===== ПРОВЕРКА USB =====
+    - name: Проверить что USB примонтирован
+      community.routeros.command:
+        commands:
+          - /file print where name={{ usb_partition }} and type=disk
+      register: disk_check
+
+    - name: Fail если флешка не примонтирована
+      ansible.builtin.fail:
+        msg: "{{ usb_partition }} не найден! Сначала запусти 01_usb_format_ext4_bridge.yml"
+      when: "usb_partition not in disk_check.stdout[0]"
+
+    # ===== ROUTER: SMB =====
     - name: Включить SMB
       community.routeros.command:
         commands:
@@ -46,10 +57,26 @@
           - /ip smb shares add name={{ smb_share_name }} directory={{ smb_share_dir }}
       when: share_exists.stdout[0] | int == 0
 
-    - name: Настроить SMB шару без valid-users (гостевой доступ)
+    - name: Настроить SMB шару (гостевой доступ)
       community.routeros.command:
         commands:
-          - /ip smb shares set [find name={{ smb_share_name }}] directory={{ smb_share_dir }} valid-users=""
+          - /ip smb shares set [find name={{ smb_share_name }}] directory={{ smb_share_dir }}
+
+    # ===== SEMAPHORE: MOUNT =====
+    - name: Проверить cifs-utils
+      ansible.builtin.command: which mount.cifs
+      delegate_to: localhost
+      changed_when: false
+      failed_when: false
+      register: cifs_check
+
+    - name: Установить cifs-utils если нет
+      ansible.builtin.apt:
+        name: cifs-utils
+        state: present
+      delegate_to: localhost
+      become: yes
+      when: cifs_check.rc != 0
 
     - name: Создать точку монтирования
       ansible.builtin.file:
@@ -59,23 +86,29 @@
       delegate_to: localhost
       become: yes
 
-    - name: Размонтировать если смонтировано
-      ansible.builtin.shell: umount "{{ smb_mount_point }}" || true
+    - name: Проверить текущее монтирование
+      ansible.builtin.shell: mount | grep "{{ smb_mount_point }}" || true
       delegate_to: localhost
-      become: yes
       changed_when: false
+      register: mount_status
 
     - name: Смонтировать SMB (гостевой доступ)
       ansible.builtin.shell: |
-        mount -t cifs "//{{ ansible_host }}/{{ smb_share_name }}" "{{ smb_mount_point }}" -o guest,sec=none
+        mount -t cifs "//{{ ansible_host }}/{{ smb_share_name }}" "{{ smb_mount_point }}" -o guest,sec=none,vers=2.0
       delegate_to: localhost
       become: yes
+      when: smb_mount_point not in mount_status.stdout
 
+    # ===== РЕЗУЛЬТАТ =====
     - name: Проверить монтирование
-      ansible.builtin.shell: ls -la "{{ smb_mount_point }}/docker_configs/"
+      ansible.builtin.shell: ls -la "{{ smb_mount_point }}/"
       delegate_to: localhost
       register: mount_check
+      changed_when: false
 
     - name: Результат
       ansible.builtin.debug:
-        msg: "SMB смонтирован: //{{ ansible_host }}/{{ smb_share_name }} → {{ smb_mount_point }}"
+        msg: |
+          SMB: //{{ ansible_host }}/{{ smb_share_name }}
+          Mount: {{ smb_mount_point }}
+          Contents: {{ mount_check.stdout_lines | length }} items

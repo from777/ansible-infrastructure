@@ -8,9 +8,9 @@
     ansible_network_os: community.routeros.routeros
     ansible_command_timeout: 120
     usb_disk: "usb1"
-    usb_partition: "usb1-part1"
-    docker_bridge: "Bridge-Docker"
     docker_bridge_ip: "192.168.254.1/24"
+  vars_files:
+    - vars.yml
 
   tasks:
     # ===== USB =====
@@ -90,6 +90,18 @@
         commands:
           - /ip address add address={{ docker_bridge_ip }} interface={{ docker_bridge }}
       when: bridge_ip_exists.stdout[0] | int == 0
+
+    # ===== ПРОВЕРКА =====
+    - name: Проверить что USB примонтирован как disk
+      community.routeros.command:
+        commands:
+          - /file print where name={{ usb_partition }} and type=disk
+      register: disk_check
+
+    - name: Fail если флешка не примонтирована
+      ansible.builtin.fail:
+        msg: "{{ usb_partition }} не найден или не примонтирован!"
+      when: "usb_partition not in disk_check.stdout[0]"
 
     # ===== РЕЗУЛЬТАТ =====
     - name: Финальная проверка

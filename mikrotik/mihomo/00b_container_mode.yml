@@ -63,7 +63,7 @@
     - name: Настроить container registry
       community.routeros.command:
         commands:
-          - /container config set registry-url=https://registry-1.docker.io tmpdir=usb1-part1/pull
+          - /container config set registry-url=https://registry-1.docker.io tmpdir={{ usb_partition }}/pull
 
     - name: Финальная проверка
       community.routeros.command:
