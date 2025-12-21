@@ -1,0 +1,18 @@
+# mikrotik/mihomo/test_connection.yml
+---
+- name: Test connection
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+
+  tasks:
+    - name: Simple identity test
+      community.routeros.command:
+        commands:
+          - /system identity print
+      register: result
+
+    - debug:
+        msg: "{{ result.stdout_lines }}"
