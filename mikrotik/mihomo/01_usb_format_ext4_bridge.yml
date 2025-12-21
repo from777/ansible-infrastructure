@@ -1,6 +1,6 @@
-# 01_usb_bridge.yml
+# 01_usb_format_ext4_bridge.yml
 ---
-- name: "01: Format USB (ext4) and create Bridge-Docker"
+- name: "01: USB format ext4 (WIPES DATA if not ext4) + Bridge-Docker"
   hosts: mikrotik
   gather_facts: no
   connection: ansible.netcommon.network_cli
