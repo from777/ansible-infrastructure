@@ -1,0 +1,78 @@
+# 00b_container_mode.yml
+---
+- name: "00b: Enable container mode"
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    ansible_command_timeout: 120
+  vars_files:
+    - vars.yml
+
+  tasks:
+    - name: Проверить наличие пакета container
+      community.routeros.command:
+        commands:
+          - /system package print count-only where name=container
+      register: pkg_exists
+
+    - name: Fail если пакета нет
+      ansible.builtin.fail:
+        msg: "Сначала запусти 00a_container_package.yml"
+      when: pkg_exists.stdout[0] | int == 0
+
+    - name: Проверить container mode
+      community.routeros.command:
+        commands:
+          - /system/device-mode/print
+      register: device_mode
+
+    - name: Установить факт
+      ansible.builtin.set_fact:
+        container_enabled: "{{ 'container: yes' in device_mode.stdout[0] }}"
+
+    - name: Статус
+      ansible.builtin.debug:
+        msg: "Container mode: {{ 'включен' if container_enabled else 'выключен' }}"
+
+    - name: Включить container mode
+      block:
+        - name: "========== ВНИМАНИЕ =========="
+          ansible.builtin.pause:
+            seconds: 5
+            prompt: |
+              Сейчас включится container mode.
+              После команды ВЫДЕРНИ ПИТАНИЕ в течение 5 минут!
+              Enter для продолжения...
+
+        - name: Активировать container mode
+          community.routeros.command:
+            commands:
+              - /system/device-mode/update container=yes
+          ignore_errors: yes
+
+        - name: "========== ВЫДЕРНИ ПИТАНИЕ =========="
+          ansible.builtin.debug:
+            msg: "У тебя 5 минут! После power cycle запусти этот плейбук снова."
+
+        - name: Завершить
+          ansible.builtin.meta: end_play
+      when: not container_enabled
+
+    - name: Настроить container registry
+      community.routeros.command:
+        commands:
+          - /container config set registry-url=https://registry-1.docker.io tmpdir=usb1-part1/pull
+
+    - name: Финальная проверка
+      community.routeros.command:
+        commands:
+          - /container config print
+      register: container_config
+
+    - name: Результат
+      ansible.builtin.debug:
+        msg: |
+          OK: Container mode активен и настроен
+          {{ container_config.stdout[0] }}

@@ -1,0 +1,66 @@
+# 00_container_mode.yml
+---
+- name: "00: Container package + mode"
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    ansible_command_timeout: 120
+  vars_files:
+    - vars.yml
+
+  tasks:
+    # ===== ПАКЕТ =====
+    - name: Проверить наличие пакета container
+      community.routeros.command:
+        commands:
+          - /system package print count-only where name=container
+      register: pkg_exists
+
+    - name: Скачать пакет container
+      community.routeros.command:
+        commands:
+          - /tool fetch url={{ container_pkg_url }} dst-path=container.npk
+      when: pkg_exists.stdout[0] | int == 0
+
+    - name: Перезагрузить для установки пакета
+      community.routeros.command:
+        commands:
+          - /system reboot
+      when: pkg_exists.stdout[0] | int == 0
+      ignore_errors: yes
+
+    - name: Ждать перезагрузки
+      ansible.builtin.pause:
+        seconds: 60
+        prompt: "Ожидание перезагрузки роутера..."
+      when: pkg_exists.stdout[0] | int == 0
+
+    # ===== CONTAINER MODE =====
+    - name: Проверить container mode
+      community.routeros.command:
+        commands:
+          - /system/device-mode/print
+      register: device_mode
+      ignore_errors: yes
+
+    - name: Настроить container registry
+      community.routeros.command:
+        commands:
+          - /container config set registry-url=https://registry-1.docker.io tmpdir=usb1-part1/pull
+      when: "'container: yes' in device_mode.stdout[0]"
+      ignore_errors: yes
+
+    - name: Включить container mode
+      block:
+        - name: "========== ВНИМАНИЕ =========="
+          ansible.builtin.debug:
+            msg: "После выполнения следующей команды ВЫДЕРНИ ПИТАНИЕ в течение 5 минут!"
+
+        - name: Активировать container mode
+          community.routeros.command:
+            commands:
+              - /system/device-mode/update container=yes
+          ignore_errors: yes
+      when: "'container: no' in device_mode.stdout[0]"
