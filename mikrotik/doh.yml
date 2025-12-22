@@ -10,6 +10,12 @@
     cacert_url: "https://curl.se/ca/cacert.pem"
 
   tasks:
+    - name: Remove old CA certificates
+      community.routeros.command:
+        commands:
+          - /certificate/remove [find where name~"cacert"]
+      ignore_errors: yes
+
     - name: Download CA certificates bundle
       community.routeros.command:
         commands:
@@ -24,16 +30,16 @@
         commands:
           - /certificate/import file-name=cacert.pem passphrase=""
 
-    - name: Configure DNS with DoH
-      community.routeros.command:
-        commands:
-          - /ip/dns/set servers="" use-doh-server={{ doh_server }} verify-doh-cert=yes allow-remote-requests=yes
-
     - name: Cleanup certificate file
       community.routeros.command:
         commands:
           - /file/remove cacert.pem
       ignore_errors: yes
+
+    - name: Configure DNS with DoH
+      community.routeros.command:
+        commands:
+          - /ip/dns/set servers="" use-doh-server={{ doh_server }} verify-doh-cert=yes allow-remote-requests=yes
 
     - name: Verify configuration
       community.routeros.command:
