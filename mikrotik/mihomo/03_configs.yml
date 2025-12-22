@@ -98,6 +98,15 @@
       register: ui_exists
       delegate_to: localhost
 
+    - name: "03: Установить unzip"
+      ansible.builtin.apt:
+        name: unzip
+        state: present
+        update_cache: yes
+      delegate_to: localhost
+      become: yes
+      when: not ui_exists.stat.exists
+
     - name: "03: Скачать UI архив"
       ansible.builtin.get_url:
         url: "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip"
@@ -145,4 +154,4 @@
           Скопировано файлов: {{ all_files.files | length }}
           AWG: {{ awg_files.files | length }} конфигов
           SRV: {{ srv_files.files | length }} конфигов
-          UI: {{ 'OK' if ui_exists.stat.exists or not ui_exists.stat.exists else 'FAILED' }}
+          UI: {{ 'OK' if ui_exists.stat.exists else 'скачан' }}
