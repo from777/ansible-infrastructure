@@ -1,0 +1,80 @@
+# 01a_usb_format.yml
+---
+- name: "01a: USB format ext4 (WIPES DATA!)"
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    ansible_command_timeout: 120
+    usb_disk: "usb1"
+  vars_files:
+    - vars.yml
+
+  tasks:
+    - name: Получить информацию о дисках
+      community.routeros.command:
+        commands:
+          - /disk print detail without-paging
+      register: disk_info
+
+    - name: Проверить файловую систему
+      ansible.builtin.set_fact:
+        usb_is_ext4: "{{ 'fs=ext4' in disk_info.stdout[0] }}"
+        usb_exists: "{{ usb_disk in disk_info.stdout[0] }}"
+
+    - name: Статус USB
+      ansible.builtin.debug:
+        msg: "USB {{ usb_disk }}: exists={{ usb_exists }}, ext4={{ usb_is_ext4 }}"
+
+    - name: USB уже ext4
+      ansible.builtin.debug:
+        msg: "USB уже отформатирован в ext4. Пропускаю."
+      when: usb_is_ext4
+
+    - name: "ФОРМАТИРОВАНИЕ - ДАННЫЕ БУДУТ УДАЛЕНЫ"
+      ansible.builtin.pause:
+        seconds: 10
+        prompt: "USB будет отформатирован в ext4. Ctrl+C для отмены."
+      when: usb_exists and not usb_is_ext4
+
+    - name: Размонтировать USB
+      community.routeros.command:
+        commands:
+          - /disk eject {{ usb_partition }}
+      when: usb_exists and not usb_is_ext4
+      ignore_errors: yes
+
+    - name: Ожидание размонтирования
+      ansible.builtin.pause:
+        seconds: 5
+      when: usb_exists and not usb_is_ext4
+
+    - name: Форматировать USB в ext4
+      ansible.netcommon.cli_command:
+        command: /disk format {{ usb_disk }} file-system=ext4 mbr-partition-table=yes
+        prompt:
+          - "are you sure"
+        answer:
+          - "y"
+      when: usb_exists and not usb_is_ext4
+
+    - name: Ожидание монтирования
+      community.routeros.command:
+        commands:
+          - /disk print where slot~"{{ usb_partition }}"
+      register: disk_mounted
+      until: "'M' in disk_mounted.stdout[0]"
+      retries: 20
+      delay: 3
+      when: usb_exists and not usb_is_ext4
+
+    - name: Финальная проверка
+      community.routeros.command:
+        commands:
+          - /disk print detail where slot~"{{ usb_partition }}"
+      register: final_check
+
+    - name: Результат
+      ansible.builtin.debug:
+        msg: "USB: {{ 'OK (ext4, mounted)' if 'fs=ext4' in final_check.stdout[0] else 'FAILED' }}"

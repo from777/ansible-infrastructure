@@ -1,0 +1,92 @@
+# 01b_network.yml
+---
+- name: "01b: Bridge-Docker + NAT + DNS"
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    ansible_command_timeout: 30
+    docker_bridge_ip: "192.168.254.1/24"
+    docker_network: "192.168.254.0/24"
+  vars_files:
+    - vars.yml
+
+  tasks:
+    # ===== ПРОВЕРКА USB =====
+    - name: Проверить USB
+      community.routeros.command:
+        commands:
+          - /file print where name={{ usb_partition }} and type=disk
+      register: disk_check
+
+    - name: Fail если USB не примонтирован
+      ansible.builtin.fail:
+        msg: "{{ usb_partition }} не найден! Сначала запусти 01a_usb_format.yml"
+      when: "usb_partition not in disk_check.stdout[0]"
+
+    # ===== BRIDGE =====
+    - name: Проверить Bridge-Docker
+      community.routeros.command:
+        commands:
+          - /interface bridge print count-only where name={{ docker_bridge }}
+      register: bridge_exists
+
+    - name: Создать Bridge-Docker
+      community.routeros.command:
+        commands:
+          - /interface bridge add name={{ docker_bridge }}
+      when: bridge_exists.stdout[0] | int == 0
+
+    - name: Проверить IP на Bridge-Docker
+      community.routeros.command:
+        commands:
+          - /ip address print count-only where interface={{ docker_bridge }}
+      register: bridge_ip_exists
+
+    - name: Назначить IP на Bridge-Docker
+      community.routeros.command:
+        commands:
+          - /ip address add address={{ docker_bridge_ip }} interface={{ docker_bridge }}
+      when: bridge_ip_exists.stdout[0] | int == 0
+
+    # ===== DNS =====
+    - name: Включить allow-remote-requests для DNS
+      community.routeros.command:
+        commands:
+          - /ip dns set allow-remote-requests=yes
+
+    # ===== NAT =====
+    - name: Получить NAT правила
+      community.routeros.command:
+        commands:
+          - /ip firewall nat print
+      register: nat_rules
+
+    - name: Добавить NAT masquerade для контейнеров
+      community.routeros.command:
+        commands:
+          - /ip firewall nat add chain=srcnat src-address={{ docker_network }} action=masquerade comment="Containers to WAN"
+      when: "'Containers to WAN' not in nat_rules.stdout[0]"
+
+    - name: Добавить NAT DNS accept для контейнеров
+      community.routeros.command:
+        commands:
+          - /ip firewall nat add chain=dstnat action=accept protocol=udp src-address={{ docker_network }} dst-port=53 comment="Allow containers DNS direct"
+      when: "'Allow containers DNS direct' not in nat_rules.stdout[0]"
+
+    # ===== РЕЗУЛЬТАТ =====
+    - name: Финальная проверка
+      community.routeros.command:
+        commands:
+          - /ip address print where interface={{ docker_bridge }}
+          - /ip dns print
+          - /ip firewall nat print
+      register: final_check
+
+    - name: Результат
+      ansible.builtin.debug:
+        msg: |
+          Bridge: {{ docker_bridge }} {{ docker_bridge_ip }}
+          DNS: allow-remote-requests={{ 'yes' if 'allow-remote-requests: yes' in final_check.stdout[1] else 'no' }}
+          NAT: {{ final_check.stdout[2] }}
