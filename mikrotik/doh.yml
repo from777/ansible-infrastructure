@@ -1,0 +1,46 @@
+# doh.yml
+---
+- name: Configure DoH DNS
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    doh_server: "https://dns.google/dns-query"
+    cacert_url: "https://curl.se/ca/cacert.pem"
+
+  tasks:
+    - name: Download CA certificates bundle
+      community.routeros.command:
+        commands:
+          - /tool/fetch url={{ cacert_url }} dst-path=cacert.pem
+
+    - name: Wait for download
+      pause:
+        seconds: 5
+
+    - name: Import CA certificates
+      community.routeros.command:
+        commands:
+          - /certificate/import file-name=cacert.pem passphrase=""
+
+    - name: Configure DNS with DoH
+      community.routeros.command:
+        commands:
+          - /ip/dns/set servers="" use-doh-server={{ doh_server }} verify-doh-cert=yes allow-remote-requests=yes
+
+    - name: Cleanup certificate file
+      community.routeros.command:
+        commands:
+          - /file/remove cacert.pem
+      ignore_errors: yes
+
+    - name: Verify configuration
+      community.routeros.command:
+        commands:
+          - /ip/dns/print
+      register: dns_result
+
+    - name: Show result
+      debug:
+        var: dns_result.stdout_lines
