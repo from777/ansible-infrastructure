@@ -6,75 +6,51 @@
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
-    # Сервисы которые отключаем
-    disabled_services:
+    services_disabled:
       - ftp
       - telnet
       - www
       - www-ssl
       - api
       - api-ssl
-    # Сервисы которые ограничиваем по сети
-    restricted_services:
+    services_enabled:
       - ssh
       - winbox
 
   tasks:
-    # ============================================================
-    # ПОЛУЧАЕМ ТЕКУЩЕЕ СОСТОЯНИЕ
-    # ============================================================
-    - name: Get current services state
-      community.routeros.command:
-        commands:
-          - /ip/service/print detail without-paging
-      register: services_output
-
     - name: Build allowed addresses string
       ansible.builtin.set_fact:
         allowed_addresses: "{{ allowed_networks | join(',') }}"
 
-    # ============================================================
-    # ОТКЛЮЧАЕМ НЕНУЖНЫЕ СЕРВИСЫ
-    # ============================================================
-    - name: Disable unnecessary services
+    - name: Disable services
       community.routeros.command:
         commands:
           - /ip/service/disable {{ item }}
-      loop: "{{ disabled_services }}"
-      when: >
-        'name=' ~ item ~ ' ' in services_output.stdout[0] and
-        'disabled=yes' not in (services_output.stdout[0] | regex_search('name=' ~ item ~ '[^\\n]*'))
-      register: disable_result
-      changed_when: disable_result.rc is defined or disable_result.stdout is defined
+      loop: "{{ services_disabled }}"
+      ignore_errors: yes
 
-    # ============================================================
-    # ОГРАНИЧИВАЕМ ДОСТУП К SSH И WINBOX
-    # ============================================================
-    - name: Get SSH current address
-      ansible.builtin.set_fact:
-        ssh_current: "{{ services_output.stdout[0] | regex_search('name=ssh[^\\n]*address=([^\\s]*)','\\1') | default(['']) | first }}"
-
-    - name: Get Winbox current address
-      ansible.builtin.set_fact:
-        winbox_current: "{{ services_output.stdout[0] | regex_search('name=winbox[^\\n]*address=([^\\s]*)','\\1') | default(['']) | first }}"
+    - name: Enable services
+      community.routeros.command:
+        commands:
+          - /ip/service/enable {{ item }}
+      loop: "{{ services_enabled }}"
+      ignore_errors: yes
 
     - name: Set SSH allowed addresses
       community.routeros.command:
         commands:
           - /ip/service/set ssh address={{ allowed_addresses }}
-      when: ssh_current != allowed_addresses
-      register: ssh_result
 
     - name: Set Winbox allowed addresses
       community.routeros.command:
         commands:
           - /ip/service/set winbox address={{ allowed_addresses }}
-      when: winbox_current != allowed_addresses
-      register: winbox_result
 
-    # ============================================================
-    # ИТОГ
-    # ============================================================
-    - name: Show result summary
+    - name: Disable bandwidth-test server
+      community.routeros.command:
+        commands:
+          - /tool/bandwidth-server/set enabled=no
+
+    - name: Show result
       ansible.builtin.debug:
-        msg: "Services configured. Allowed networks: {{ allowed_addresses }}"
+        msg: "Disabled: {{ services_disabled }}. Enabled: {{ services_enabled }}. Allowed: {{ allowed_addresses }}"
