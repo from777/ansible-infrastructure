@@ -15,3 +15,4 @@ mikrotik:
       router_ip: 192.168.88.1
       allowed_networks:
         - 192.168.88.0/24
+        - 192.168.0.0/24
