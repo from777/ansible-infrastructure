@@ -1,33 +1,21 @@
 # firewall-full.yml
 # Главный плейбук - вызывает все остальные в правильном порядке
 #
-# Можно запускать:
-# 1. Этот файл - настроит ВСЁ (удалит старые правила!)
-# 2. Отдельные файлы - настроит только часть (без удаления)
-#
-# Порядок выполнения:
-# 1. 00-safe-access   - защита доступа (ПЕРВЫМ!)
-# 2. 01-cleanup       - удаление старых правил
-# 3. 02-input-jumps   - jump правила для input
-# 4. 03-forward-jumps - jump правила для forward
-# 5. 10-brute-force   - защита от перебора
-# 6. 11-lan-input     - LAN → роутер
-# 7. 12-isp-input     - WAN → роутер
-# 8. 13-guest-input   - GUEST → роутер (если есть)
-# 9. 14-vpn-input     - VPN → роутер (если есть)
-# 10. 20-lan-forward  - LAN → наружу
-# 11. 21-isp-forward  - WAN → внутрь
-# 12. 22-guest-forward - GUEST → наружу (если есть)
-# 13. 23-vpn-forward  - VPN → наружу (если есть)
+# ПРАВИЛЬНЫЙ ПОРЯДОК:
+# 1. Защита доступа (SAFE-ACCESS)
+# 2. Очистка старых правил
+# 3. Правила В цепочках (LAN-Input, ISP-Input и т.д.)
+# 4. Jump правила в эти цепочки
+# 5. Drop all - В САМОМ КОНЦЕ!
 #
 # !!! ВНИМАНИЕ !!!
 # 01-cleanup.yml удаляет ВСЕ старые правила!
-# Если нужно добавить правила БЕЗ удаления - запускай файлы по отдельности
 ---
+# === ЗАЩИТА ===
 - import_playbook: 00-safe-access.yml
 - import_playbook: 01-cleanup.yml
-- import_playbook: 02-input-jumps.yml
-- import_playbook: 03-forward-jumps.yml
+
+# === ПРАВИЛА В ЦЕПОЧКАХ (сначала наполняем цепочки) ===
 - import_playbook: 10-brute-force.yml
 - import_playbook: 11-lan-input.yml
 - import_playbook: 12-isp-input.yml
@@ -37,3 +25,10 @@
 - import_playbook: 21-isp-forward.yml
 - import_playbook: 22-guest-forward.yml
 - import_playbook: 23-vpn-forward.yml
+
+# === JUMP ПРАВИЛА (теперь прыгаем в заполненные цепочки) ===
+- import_playbook: 02-input-jumps.yml
+- import_playbook: 03-forward-jumps.yml
+
+# === DROP ALL В КОНЦЕ ===
+- import_playbook: 99-drop-all.yml

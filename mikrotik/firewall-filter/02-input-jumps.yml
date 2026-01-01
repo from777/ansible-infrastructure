@@ -88,19 +88,6 @@
           - /ip firewall filter add chain=input action=jump jump-target=GUEST-Input in-interface-list=GUEST comment="Jump to GUEST-Input"
       when: has_guest and (guest_input_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0)
 
-    # --- DROP ALL ---
-    - name: Check input drop all exists
-      community.routeros.command:
-        commands:
-          - /ip firewall filter print count-only where comment~"Drop all other to router"
-      register: drop_all_check
-
-    - name: Add input drop all
-      community.routeros.command:
-        commands:
-          - /ip firewall filter add chain=input action=drop log=yes log-prefix="INPUT-DROP:" comment="Drop all other to router"
-      when: drop_all_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0
-
     - name: Show result
       debug:
         msg: "Input jumps configured (GUEST: {{ has_guest }}, VPN: {{ has_vpn }})"

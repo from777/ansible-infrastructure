@@ -88,19 +88,6 @@
           - /ip firewall filter add chain=forward action=jump jump-target=GUEST-Forward in-interface-list=GUEST comment="Jump to GUEST-Forward"
       when: has_guest and (guest_forward_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0)
 
-    # --- DROP ALL ---
-    - name: Check forward drop all exists
-      community.routeros.command:
-        commands:
-          - /ip firewall filter print count-only where comment~"Drop all other forward"
-      register: drop_all_check
-
-    - name: Add forward drop all
-      community.routeros.command:
-        commands:
-          - /ip firewall filter add chain=forward action=drop comment="Drop all other forward"
-      when: drop_all_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int == 0
-
     - name: Show result
       debug:
         msg: "Forward jumps configured (GUEST: {{ has_guest }}, VPN: {{ has_vpn }})"
