@@ -29,13 +29,27 @@
       debug:
         msg: "Safe rule exists: {{ safe_rule_exists }}"
 
-    # Добавляем правило если нет
-    - name: Add safe access rule at the top
+    # Добавляем правило если нет (без place-before, потом переместим)
+    - name: Add safe access rule
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=input action=accept src-address={{ safe_ip }} comment=SAFE-ACCESS place-before=0
+          - /ip/firewall/filter/add chain=input action=accept src-address={{ safe_ip }} comment=SAFE-ACCESS
       register: add_result
       when: not safe_rule_exists
+
+    # Показываем что вернула команда add
+    - name: Debug add result
+      debug:
+        msg: "Add command returned: {{ add_result.stdout | default('nothing') }}"
+      when: not safe_rule_exists
+
+    # Перемещаем правило в начало
+    - name: Move safe rule to top
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/move [find src-address~"{{ safe_ip }}" chain=input] 0
+      when: not safe_rule_exists
+      ignore_errors: yes
 
     # Проверяем что правило реально добавилось
     - name: Verify rule was added
