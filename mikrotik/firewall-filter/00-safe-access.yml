@@ -12,29 +12,50 @@
     safe_ip: "212.20.46.209"
 
   tasks:
-    # Проверяем есть ли уже защитное правило (ищем по IP, не по комментарию)
-    - name: Check if safe access rule exists
+    # Получаем все input правила
+    - name: Get all input accept rules
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where src-address={{ safe_ip }} action=accept chain=input
-      register: safe_rule_count
+          - /ip/firewall/filter/print where chain=input action=accept
+      register: input_rules
 
-    # Извлекаем число из вывода
+    # Проверяем есть ли наш IP в выводе
     - name: Set rule exists flag
       set_fact:
-        safe_rule_exists: "{{ (safe_rule_count.stdout[0] | default('0') | regex_search('[0-9]+') | default('0') | int) > 0 }}"
+        safe_rule_exists: "{{ safe_ip in input_rules.stdout[0] }}"
 
-    # Debug - показать результат проверки
+    # Debug
     - name: Debug safe rule check
       debug:
-        msg: "Safe rule exists: {{ safe_rule_exists }} (raw: {{ safe_rule_count.stdout[0] | default('empty') }})"
+        msg: "Safe rule exists: {{ safe_rule_exists }}"
 
-    # Добавляем правило В НАЧАЛО списка если его нет
+    # Добавляем правило если нет
     - name: Add safe access rule at the top
       community.routeros.command:
         commands:
           - /ip/firewall/filter/add chain=input action=accept src-address={{ safe_ip }} comment=SAFE-ACCESS place-before=0
+      register: add_result
       when: not safe_rule_exists
+
+    # Проверяем что правило реально добавилось
+    - name: Verify rule was added
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print where chain=input action=accept
+      register: verify_rules
+      when: not safe_rule_exists
+
+    - name: Debug verify
+      debug:
+        msg: "After add: {{ verify_rules.stdout[0] | default('skipped') }}"
+      when: not safe_rule_exists
+
+    - name: Fail if rule not added
+      fail:
+        msg: "CRITICAL: Failed to add safe access rule! Check RouterOS manually!"
+      when:
+        - not safe_rule_exists
+        - safe_ip not in (verify_rules.stdout[0] | default(''))
 
     # Итоговое сообщение
     - name: Show result

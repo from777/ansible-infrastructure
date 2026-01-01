@@ -16,22 +16,22 @@
     safe_ip: "212.20.46.209"
 
   tasks:
-    # Проверяем что SAFE-ACCESS правило существует (по IP)
-    - name: Check SAFE-ACCESS exists before cleanup
+    # Получаем все input accept правила
+    - name: Get all input accept rules for check
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where src-address={{ safe_ip }} action=accept chain=input
+          - /ip/firewall/filter/print where chain=input action=accept
       register: safe_check
 
-    # Debug - показать что вернул RouterOS
+    # Debug
     - name: Debug safe check output
       debug:
-        msg: "Raw output: '{{ safe_check.stdout[0] | default('empty') }}'"
+        msg: "Input accept rules: '{{ safe_check.stdout[0] }}'"
 
-    # Извлекаем число
+    # Проверяем есть ли наш IP в выводе
     - name: Set safe exists flag
       set_fact:
-        safe_exists: "{{ (safe_check.stdout[0] | default('0') | regex_search('[0-9]+') | default('0') | int) > 0 }}"
+        safe_exists: "{{ safe_ip in safe_check.stdout[0] }}"
 
     # Прерываем если нет SAFE-ACCESS
     - name: Fail if no SAFE-ACCESS
@@ -39,25 +39,45 @@
         msg: "SAFE-ACCESS rule for {{ safe_ip }} not found! Run 00-safe-access.yml first!"
       when: not safe_exists
 
-    # Показываем сколько правил будет удалено (все кроме правила с safe_ip)
-    - name: Count rules to remove
+    # Получаем ID безопасного правила
+    - name: Get safe rule ID
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where src-address!={{ safe_ip }}
-      register: rules_count
+          - /ip/firewall/filter/print where src-address~"{{ safe_ip }}"
+      register: safe_rule_info
 
-    - name: Show rules count
+    - name: Debug safe rule info
       debug:
-        msg: "Rules to remove: {{ rules_count.stdout[0] | default('0') }}"
+        msg: "Safe rule: {{ safe_rule_info.stdout[0] }}"
 
-    # Удаляем ВСЕ правила кроме SAFE-ACCESS (по IP)
-    - name: Remove all rules except SAFE-ACCESS
+    # Извлекаем номер правила (первое число в строке это индекс)
+    - name: Extract safe rule index
+      set_fact:
+        safe_rule_idx: "{{ safe_rule_info.stdout[0] | regex_search('^\\s*(\\d+)', '\\1') | first | default('-1') }}"
+
+    - name: Debug safe rule index
+      debug:
+        msg: "Safe rule index: {{ safe_rule_idx }}"
+
+    # Удаляем все правила кроме безопасного
+    - name: Remove all rules except safe (by comment regex)
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/remove [find src-address!={{ safe_ip }}]
+          - /ip/firewall/filter/remove [find where src-address!~"{{ safe_ip }}"]
       ignore_errors: yes
+      register: remove_result
 
-    # Итоговое сообщение
-    - name: Show result
+    - name: Debug remove result
       debug:
-        msg: "Old rules removed. Only SAFE-ACCESS remains."
+        msg: "Remove result: {{ remove_result.stdout | default('no output') }}"
+
+    # Проверяем что осталось
+    - name: Verify remaining rules
+      community.routeros.command:
+        commands:
+          - /ip/firewall/filter/print
+      register: remaining_rules
+
+    - name: Show remaining rules
+      debug:
+        msg: "Remaining rules:\n{{ remaining_rules.stdout[0] }}"

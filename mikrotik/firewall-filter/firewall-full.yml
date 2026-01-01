@@ -25,15 +25,6 @@
 # Если нужно добавить правила БЕЗ удаления - запускай файлы по отдельности
 ---
 - import_playbook: 00-safe-access.yml
-
-- name: Wait for RouterOS to sync
-  hosts: mikrotik
-  gather_facts: no
-  tasks:
-    - name: Pause for sync
-      pause:
-        seconds: 3
-
 - import_playbook: 01-cleanup.yml
 - import_playbook: 02-input-jumps.yml
 - import_playbook: 03-forward-jumps.yml
