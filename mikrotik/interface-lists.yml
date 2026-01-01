@@ -1,0 +1,22 @@
+# interface-lists.yml
+---
+- name: Configure MikroTik interface lists
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    interface_lists:
+      - WAN
+      - LAN
+      - VPN-OUT
+      - GUEST
+      - LAN_and_GUEST
+
+  tasks:
+    - name: Create interface lists
+      community.routeros.command:
+        commands:
+          - /interface/list/add name={{ item }}
+      loop: "{{ interface_lists }}"
+      ignore_errors: yes
