@@ -39,37 +39,12 @@
         msg: "SAFE-ACCESS rule for {{ safe_ip }} not found! Run 00-safe-access.yml first!"
       when: not safe_exists
 
-    # Получаем ID безопасного правила
-    - name: Get safe rule ID
+    # Удаляем все правила где src-address НЕ наш IP
+    - name: Remove all rules except safe
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print where src-address~"{{ safe_ip }}"
-      register: safe_rule_info
-
-    - name: Debug safe rule info
-      debug:
-        msg: "Safe rule: {{ safe_rule_info.stdout[0] }}"
-
-    # Извлекаем номер правила (первое число в строке это индекс)
-    - name: Extract safe rule index
-      set_fact:
-        safe_rule_idx: "{{ safe_rule_info.stdout[0] | regex_search('^\\s*(\\d+)', '\\1') | first | default('-1') }}"
-
-    - name: Debug safe rule index
-      debug:
-        msg: "Safe rule index: {{ safe_rule_idx }}"
-
-    # Удаляем все правила кроме безопасного
-    - name: Remove all rules except safe (by comment regex)
-      community.routeros.command:
-        commands:
-          - /ip/firewall/filter/remove [find where src-address!~"{{ safe_ip }}"]
+          - /ip/firewall/filter/remove [find src-address!="{{ safe_ip }}"]
       ignore_errors: yes
-      register: remove_result
-
-    - name: Debug remove result
-      debug:
-        msg: "Remove result: {{ remove_result.stdout | default('no output') }}"
 
     # Проверяем что осталось
     - name: Verify remaining rules
@@ -80,4 +55,4 @@
 
     - name: Show remaining rules
       debug:
-        msg: "Remaining rules:\n{{ remaining_rules.stdout[0] }}"
+        msg: "Remaining:\n{{ remaining_rules.stdout[0] }}"
