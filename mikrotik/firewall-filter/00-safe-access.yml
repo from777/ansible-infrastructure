@@ -12,28 +12,28 @@
     safe_ip: "212.20.46.209"
 
   tasks:
-    # Проверяем есть ли уже защитное правило
+    # Проверяем есть ли уже защитное правило (ищем по IP, не по комментарию)
     - name: Check if safe access rule exists
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where src-address="{{ safe_ip }}" action=accept chain=input comment="SAFE-ACCESS"
+          - /ip/firewall/filter/print count-only where src-address={{ safe_ip }} action=accept chain=input
       register: safe_rule_count
 
-    # Извлекаем число из вывода и сохраняем в переменную
+    # Извлекаем число из вывода
     - name: Set rule exists flag
       set_fact:
-        safe_rule_exists: "{{ safe_rule_count.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 0 }}"
+        safe_rule_exists: "{{ (safe_rule_count.stdout[0] | default('0') | regex_search('[0-9]+') | default('0') | int) > 0 }}"
 
     # Debug - показать результат проверки
     - name: Debug safe rule check
       debug:
-        msg: "Safe rule exists: {{ safe_rule_exists }}"
+        msg: "Safe rule exists: {{ safe_rule_exists }} (raw: {{ safe_rule_count.stdout[0] | default('empty') }})"
 
     # Добавляем правило В НАЧАЛО списка если его нет
     - name: Add safe access rule at the top
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/add chain=input action=accept src-address="{{ safe_ip }}" comment="SAFE-ACCESS" place-before=0
+          - /ip/firewall/filter/add chain=input action=accept src-address={{ safe_ip }} comment=SAFE-ACCESS place-before=0
       when: not safe_rule_exists
 
     # Итоговое сообщение

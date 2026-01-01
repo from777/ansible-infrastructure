@@ -12,47 +12,49 @@
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
+    # Должен совпадать с safe_ip в 00-safe-access.yml
+    safe_ip: "212.20.46.209"
 
   tasks:
-    # Проверяем что SAFE-ACCESS правило существует
+    # Проверяем что SAFE-ACCESS правило существует (по IP)
     - name: Check SAFE-ACCESS exists before cleanup
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print where comment~"SAFE-ACCESS"
+          - /ip/firewall/filter/print count-only where src-address={{ safe_ip }} action=accept chain=input
       register: safe_check
 
     # Debug - показать что вернул RouterOS
     - name: Debug safe check output
       debug:
-        msg: "Raw output: '{{ safe_check.stdout[0] }}'"
+        msg: "Raw output: '{{ safe_check.stdout[0] | default('empty') }}'"
 
-    # Проверяем есть ли в выводе что-то кроме пустой строки
+    # Извлекаем число
     - name: Set safe exists flag
       set_fact:
-        safe_exists: "{{ safe_check.stdout[0] | trim | length > 0 }}"
+        safe_exists: "{{ (safe_check.stdout[0] | default('0') | regex_search('[0-9]+') | default('0') | int) > 0 }}"
 
     # Прерываем если нет SAFE-ACCESS
     - name: Fail if no SAFE-ACCESS
       fail:
-        msg: "SAFE-ACCESS rule not found! Run 00-safe-access.yml first!"
+        msg: "SAFE-ACCESS rule for {{ safe_ip }} not found! Run 00-safe-access.yml first!"
       when: not safe_exists
 
-    # Показываем сколько правил будет удалено
+    # Показываем сколько правил будет удалено (все кроме правила с safe_ip)
     - name: Count rules to remove
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment!="SAFE-ACCESS"
+          - /ip/firewall/filter/print count-only where src-address!={{ safe_ip }}
       register: rules_count
 
     - name: Show rules count
       debug:
-        msg: "Rules to remove: {{ rules_count.stdout[0] }}"
+        msg: "Rules to remove: {{ rules_count.stdout[0] | default('0') }}"
 
-    # Удаляем ВСЕ правила кроме SAFE-ACCESS
+    # Удаляем ВСЕ правила кроме SAFE-ACCESS (по IP)
     - name: Remove all rules except SAFE-ACCESS
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/remove [find comment!="SAFE-ACCESS"]
+          - /ip/firewall/filter/remove [find src-address!={{ safe_ip }}]
       ignore_errors: yes
 
     # Итоговое сообщение
