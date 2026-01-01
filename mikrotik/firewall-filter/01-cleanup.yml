@@ -18,13 +18,18 @@
     - name: Check SAFE-ACCESS exists before cleanup
       community.routeros.command:
         commands:
-          - /ip/firewall/filter/print count-only where comment="SAFE-ACCESS"
+          - /ip/firewall/filter/print where comment~"SAFE-ACCESS"
       register: safe_check
 
-    # Извлекаем число из вывода
+    # Debug - показать что вернул RouterOS
+    - name: Debug safe check output
+      debug:
+        msg: "Raw output: '{{ safe_check.stdout[0] }}'"
+
+    # Проверяем есть ли в выводе что-то кроме пустой строки
     - name: Set safe exists flag
       set_fact:
-        safe_exists: "{{ safe_check.stdout[0] | regex_search('([0-9]+)\\s*$') | int > 0 }}"
+        safe_exists: "{{ safe_check.stdout[0] | trim | length > 0 }}"
 
     # Прерываем если нет SAFE-ACCESS
     - name: Fail if no SAFE-ACCESS
