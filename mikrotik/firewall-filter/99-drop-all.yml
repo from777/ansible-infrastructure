@@ -1,0 +1,41 @@
+# 99-drop-all.yml
+# Финальные drop правила - ВЫПОЛНЯЕТСЯ ПОСЛЕДНИМ!
+# Блокирует весь трафик который не попал под предыдущие правила
+---
+- name: Add final drop rules
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+
+  tasks:
+    # === DROP ALL INPUT ===
+    - name: Check input drop all exists
+      community.routeros.command:
+        commands:
+          - /ip firewall filter print count-only where comment~"Drop all other to router"
+      register: input_drop_check
+
+    - name: Add input drop all
+      community.routeros.command:
+        commands:
+          - /ip firewall filter add chain=input action=drop log=yes log-prefix="INPUT-DROP:" comment="Drop all other to router"
+      when: (input_drop_check.stdout[0] | regex_search('[0-9]+') | int) == 0
+
+    # === DROP ALL FORWARD ===
+    - name: Check forward drop all exists
+      community.routeros.command:
+        commands:
+          - /ip firewall filter print count-only where comment~"Drop all other forward"
+      register: forward_drop_check
+
+    - name: Add forward drop all
+      community.routeros.command:
+        commands:
+          - /ip firewall filter add chain=forward action=drop log=yes log-prefix="FORWARD-DROP:" comment="Drop all other forward"
+      when: (forward_drop_check.stdout[0] | regex_search('[0-9]+') | int) == 0
+
+    - name: Show result
+      debug:
+        msg: "Final drop rules added. Firewall configuration complete!"
