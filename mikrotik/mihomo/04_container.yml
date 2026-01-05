@@ -115,17 +115,16 @@
       when: veth_in_bridge.stdout[0] | int == 0
 
     # ===== MOUNT =====
-    - name: Проверить mount
+    - name: Удалить старый mount (пересоздаём с правильным путём)
       community.routeros.command:
         commands:
-          - /container mounts print count-only where name={{ container_name }}_conf
-      register: mount_exists
+          - /container mounts remove [find name={{ container_name }}_conf]
+      ignore_errors: yes
 
-    - name: Создать mount
+    - name: Создать mount с правильным путём
       community.routeros.command:
         commands:
           - /container mounts add name={{ container_name }}_conf src={{ smb_base }}/docker_configs/{{ container_name }} dst=/etc/mihomo
-      when: mount_exists.stdout[0] | int == 0
 
     # ===== ENVLIST =====
     - name: Удалить старый envlist
