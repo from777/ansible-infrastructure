@@ -36,36 +36,26 @@
         msg: "Container registry не настроен! Сначала запусти 00b_container_mode.yml"
       when: "'registry-1.docker.io' not in container_config.stdout[0]"
 
-    # ===== УДАЛИТЬ СТАРЫЙ КОНТЕЙНЕР =====
-    - name: Проверить существующий контейнер
-      community.routeros.command:
-        commands:
-          - /container print count-only where name="{{ container_name }}"
-      register: old_container
-
-    - name: Остановить старый контейнер
+    # ===== УДАЛИТЬ СТАРЫЙ КОНТЕЙНЕР (ВСЕГДА) =====
+    - name: Остановить старый контейнер (если есть)
       community.routeros.command:
         commands:
           - /container stop [find name="{{ container_name }}"]
-      when: old_container.stdout[0] | int > 0
       ignore_errors: yes
 
     - name: Пауза для остановки
       ansible.builtin.pause:
         seconds: 5
-      when: old_container.stdout[0] | int > 0
 
-    - name: Удалить старый контейнер
+    - name: Удалить старый контейнер (если есть)
       community.routeros.command:
         commands:
           - /container remove [find name="{{ container_name }}"]
-      when: old_container.stdout[0] | int > 0
       ignore_errors: yes
 
     - name: Пауза после удаления
       ansible.builtin.pause:
         seconds: 3
-      when: old_container.stdout[0] | int > 0
 
     # ===== АВТООПРЕДЕЛЕНИЕ IP =====
     - name: Получить все veth адреса
