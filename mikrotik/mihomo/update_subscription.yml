@@ -1,0 +1,92 @@
+# update_subscription.yml
+# Быстрое обновление списка прокси без пересоздания контейнера
+#
+# Использование:
+#   ansible-playbook update_subscription.yml -i inventory.yml
+#
+# С другим URL:
+#   ansible-playbook update_subscription.yml -i inventory.yml -e subscription_url="https://другой-url.com/proxies.txt"
+#
+# С локальным файлом (игнорировать URL):
+#   ansible-playbook update_subscription.yml -i inventory.yml -e subscription_url=""
+#
+# После обновления mihomo автоматом перечитает proxies.yaml через health-check
+---
+- name: "Update proxy subscription"
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    smb_path: "{{ smb_mount_point }}/docker_configs/{{ container_name }}"
+    repo_path: "{{ playbook_dir }}/configs"
+  vars_files:
+    - vars.yml
+
+  tasks:
+    # ===== ПРОВЕРКА SMB =====
+    - name: Проверить что SMB смонтирован
+      ansible.builtin.stat:
+        path: "{{ smb_mount_point }}"
+      register: smb_mounted
+      delegate_to: localhost
+
+    - name: Fail если SMB не смонтирован
+      ansible.builtin.fail:
+        msg: "SMB не смонтирован! Сначала запусти 02_smb_mount.yml"
+      when: not smb_mounted.stat.exists
+
+    # ===== СКАЧИВАНИЕ =====
+    - name: Скачать прокси по URL
+      ansible.builtin.get_url:
+        url: "{{ subscription_url }}"
+        dest: "/tmp/subscription_proxies.txt"
+        timeout: 60
+        force: yes
+      delegate_to: localhost
+      when: subscription_url is defined and subscription_url | length > 0
+
+    - name: Использовать локальный файл
+      ansible.builtin.copy:
+        src: "{{ repo_path }}/vless/proxies.txt"
+        dest: "/tmp/subscription_proxies.txt"
+      delegate_to: localhost
+      when: subscription_url is not defined or subscription_url | length == 0
+
+    # ===== ПАРСИНГ =====
+    - name: Парсить VLESS/VMess URL
+      ansible.builtin.command:
+        cmd: >
+          python3 {{ playbook_dir }}/scripts/parse_proxy_urls.py
+          /tmp/subscription_proxies.txt
+          {{ smb_path }}/srv/proxies.yaml
+      delegate_to: localhost
+      register: parse_result
+      changed_when: true
+
+    - name: Удалить временный файл
+      ansible.builtin.file:
+        path: /tmp/subscription_proxies.txt
+        state: absent
+      delegate_to: localhost
+
+    # ===== РЕЗУЛЬТАТ =====
+    - name: Посчитать прокси
+      ansible.builtin.shell: |
+        grep -c "^  - name:" {{ smb_path }}/srv/proxies.yaml || echo "0"
+      delegate_to: localhost
+      register: proxy_count
+      changed_when: false
+
+    - name: Результат
+      ansible.builtin.debug:
+        msg: |
+          ============================================
+          Источник: {{ subscription_url if (subscription_url is defined and subscription_url | length > 0) else 'Локальный файл' }}
+          Прокси загружено: {{ proxy_count.stdout }}
+
+          mihomo перечитает файл автоматически через 60 сек
+          или перезапусти контейнер вручную:
+          /container stop [find name="{{ container_name }}"]
+          /container start [find name="{{ container_name }}"]
+          ============================================

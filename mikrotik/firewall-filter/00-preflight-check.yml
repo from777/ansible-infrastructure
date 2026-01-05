@@ -1,0 +1,90 @@
+# 00-preflight-check.yml
+# Проверяет что всё готово перед настройкой firewall
+# Если что-то не так — падает с понятной ошибкой
+---
+- name: Preflight checks before firewall setup
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+
+  tasks:
+    # === Проверка interface lists ===
+    - name: Check WAN interface list exists
+      community.routeros.command:
+        commands:
+          - /interface list print count-only where name=WAN
+      register: wan_list_check
+
+    - name: Check LAN interface list exists
+      community.routeros.command:
+        commands:
+          - /interface list print count-only where name=LAN
+      register: lan_list_check
+
+    - name: Fail if WAN list missing
+      fail:
+        msg: |
+          ОШИБКА: Interface list WAN не существует!
+
+          Создай его командой:
+          /interface list add name=WAN
+
+          Или запусти: ansible-playbook mikrotik/interface-lists.yml -l {{ inventory_hostname }}
+      when: (wan_list_check.stdout[0] | regex_search('[0-9]+') | int) == 0
+
+    - name: Fail if LAN list missing
+      fail:
+        msg: |
+          ОШИБКА: Interface list LAN не существует!
+
+          Создай его командой:
+          /interface list add name=LAN
+
+          Или запусти: ansible-playbook mikrotik/interface-lists.yml -l {{ inventory_hostname }}
+      when: (lan_list_check.stdout[0] | regex_search('[0-9]+') | int) == 0
+
+    # === Проверка members в списках ===
+    - name: Check WAN list has members
+      community.routeros.command:
+        commands:
+          - /interface list member print count-only where list=WAN
+      register: wan_members_check
+
+    - name: Check LAN list has members
+      community.routeros.command:
+        commands:
+          - /interface list member print count-only where list=LAN
+      register: lan_members_check
+
+    - name: Fail if WAN list is empty
+      fail:
+        msg: |
+          ОШИБКА: Interface list WAN пустой (нет интерфейсов)!
+
+          Добавь WAN интерфейс в список:
+          /interface list member add list=WAN interface=ether1
+
+          (замени ether1 на свой WAN интерфейс)
+      when: (wan_members_check.stdout[0] | regex_search('[0-9]+') | int) == 0
+
+    - name: Fail if LAN list is empty
+      fail:
+        msg: |
+          ОШИБКА: Interface list LAN пустой (нет интерфейсов)!
+
+          Добавь LAN интерфейс в список:
+          /interface list member add list=LAN interface=bridge
+
+          (замени bridge на свой LAN интерфейс)
+      when: (lan_members_check.stdout[0] | regex_search('[0-9]+') | int) == 0
+
+    # === Всё ОК ===
+    - name: Show success
+      debug:
+        msg: |
+          Preflight checks PASSED!
+          - WAN list: OK (has members)
+          - LAN list: OK (has members)
+          Proceeding with firewall setup...

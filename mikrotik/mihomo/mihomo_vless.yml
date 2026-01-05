@@ -1,0 +1,25 @@
+# mihomo_vless.yml
+# Альтернатива mihomo_all.yml для режима VLESS/VMess
+#
+# Использование:
+#   ansible-playbook mihomo_vless.yml -i inventory.yml
+#
+# Особенности:
+# - Парсит configs/vless/proxies.txt
+# - Генерирует proxies.yaml из vless:// и vmess:// URL
+# - Использует url-test для автовыбора лучшего прокси
+# - Fallback переключается на другой при отказе
+---
+- name: "01b: Network (Bridge + NAT + DNS)"
+  ansible.builtin.import_playbook: 01b_network.yml
+
+- name: "02: SMB mount"
+  ansible.builtin.import_playbook: 02_smb_mount.yml
+
+- name: "03: VLESS Configs"
+  ansible.builtin.import_playbook: 03_configs_vless.yml
+
+- name: "04: Container"
+  ansible.builtin.import_playbook: 04_container.yml
+  vars:
+    container_config: "custom_config_vless.yaml"

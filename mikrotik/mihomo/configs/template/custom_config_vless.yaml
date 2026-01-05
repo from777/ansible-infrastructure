@@ -1,0 +1,78 @@
+# custom_config_vless.yaml
+# Конфиг для VLESS/VMess прокси с автоматическим выбором лучшего
+#
+# Особенности:
+# - url-test выбирает самый быстрый прокси
+# - fallback переключается на следующий если текущий умер
+# - health-check каждые 60 секунд
+
+mixed-port: 7890
+external-controller: 0.0.0.0:9090
+external-ui: ui
+
+mode: rule
+log-level: info
+
+# DNS
+dns:
+  enable: true
+  listen: 0.0.0.0:53
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  nameserver:
+    - 1.1.1.1
+    - 8.8.8.8
+
+# TUN режим
+tun:
+  enable: true
+  stack: system
+  auto-route: true
+  auto-detect-interface: true
+
+# Proxy Provider для VLESS/VMess
+proxy-providers:
+  VLESS:
+    type: file
+    path: /etc/mihomo/srv/proxies.yaml
+    health-check:
+      enable: true
+      url: http://www.gstatic.com/generate_204
+      interval: 60
+      timeout: 5000
+      lazy: false
+
+# Группы прокси
+proxy-groups:
+  # Ручной выбор
+  - name: PROXY
+    type: select
+    proxies:
+      - AUTO
+      - FALLBACK
+    use:
+      - VLESS
+
+  # Автовыбор лучшего по задержке (url-test)
+  - name: AUTO
+    type: url-test
+    use:
+      - VLESS
+    url: http://www.gstatic.com/generate_204
+    interval: 60
+    tolerance: 100
+    lazy: false
+
+  # Fallback - переключается на следующий при отказе
+  - name: FALLBACK
+    type: fallback
+    use:
+      - VLESS
+    url: http://www.gstatic.com/generate_204
+    interval: 60
+    lazy: false
+
+# Правила
+rules:
+  - GEOIP,RU,DIRECT
+  - MATCH,PROXY

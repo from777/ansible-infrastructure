@@ -1,0 +1,179 @@
+# 03_configs_vless.yml
+# Плейбук для VLESS/VMess режима
+# Парсит proxies.txt и генерирует proxies.yaml для mihomo
+---
+- name: "03: Copy VLESS configs to container"
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    smb_path: "{{ smb_mount_point }}/docker_configs/{{ container_name }}"
+    repo_path: "{{ playbook_dir }}/configs"
+    # Используем VLESS конфиг вместо обычного
+    container_config: "custom_config_vless.yaml"
+  vars_files:
+    - vars.yml
+
+  tasks:
+    # ===== ПРОВЕРКА SMB =====
+    - name: "03: Проверить что SMB смонтирован"
+      ansible.builtin.stat:
+        path: "{{ smb_mount_point }}"
+      register: smb_mounted
+      delegate_to: localhost
+
+    - name: "03: Fail если SMB не смонтирован"
+      ansible.builtin.fail:
+        msg: "SMB не смонтирован! Сначала запусти 02_smb_mount.yml"
+      when: not smb_mounted.stat.exists
+
+    # ===== СТРУКТУРА ПАПОК =====
+    - name: "03: Создать структуру папок"
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ smb_path }}"
+        - "{{ smb_path }}/srv"
+        - "{{ smb_path }}/template"
+        - "{{ smb_path }}/ui"
+      delegate_to: localhost
+
+    # ===== СКАЧИВАНИЕ / ЧТЕНИЕ ПРОКСИ =====
+    - name: "03: Скачать прокси по URL"
+      ansible.builtin.get_url:
+        url: "{{ subscription_url }}"
+        dest: "/tmp/subscription_proxies.txt"
+        timeout: 60
+        force: yes
+      delegate_to: localhost
+      when: subscription_url is defined and subscription_url | length > 0
+      register: download_result
+
+    - name: "03: Проверить локальный proxies.txt"
+      ansible.builtin.stat:
+        path: "{{ repo_path }}/vless/proxies.txt"
+      register: proxies_txt
+      delegate_to: localhost
+      when: subscription_url is not defined or subscription_url | length == 0
+
+    - name: "03: Fail если нет ни URL ни локального файла"
+      ansible.builtin.fail:
+        msg: |
+          Не задан subscription_url и не найден configs/vless/proxies.txt!
+          Либо задай subscription_url в vars.yml, либо создай локальный файл.
+      when:
+        - (subscription_url is not defined or subscription_url | length == 0)
+        - not proxies_txt.stat.exists
+
+    - name: "03: Определить источник прокси"
+      ansible.builtin.set_fact:
+        proxy_source: "{{ '/tmp/subscription_proxies.txt' if (subscription_url is defined and subscription_url | length > 0) else repo_path + '/vless/proxies.txt' }}"
+
+    - name: "03: Показать источник"
+      ansible.builtin.debug:
+        msg: "Источник прокси: {{ 'URL: ' + subscription_url if (subscription_url is defined and subscription_url | length > 0) else 'Локальный файл' }}"
+
+    # ===== ПАРСИНГ VLESS/VMESS URL =====
+    - name: "03: Парсить VLESS/VMess URL"
+      ansible.builtin.command:
+        cmd: >
+          python3 {{ playbook_dir }}/scripts/parse_proxy_urls.py
+          {{ proxy_source }}
+          {{ smb_path }}/srv/proxies.yaml
+      delegate_to: localhost
+      register: parse_result
+      changed_when: true
+
+    - name: "03: Результат парсинга"
+      ansible.builtin.debug:
+        msg: "{{ parse_result.stdout }}"
+
+    - name: "03: Удалить временный файл"
+      ansible.builtin.file:
+        path: /tmp/subscription_proxies.txt
+        state: absent
+      delegate_to: localhost
+      when: subscription_url is defined and subscription_url | length > 0
+
+    # ===== CUSTOM CONFIG =====
+    - name: "03: Копировать custom_config_vless.yaml"
+      ansible.builtin.copy:
+        src: "{{ repo_path }}/template/custom_config_vless.yaml"
+        dest: "{{ smb_path }}/custom_config_vless.yaml"
+        mode: '0644'
+      delegate_to: localhost
+
+    - name: "03: Копировать в template"
+      ansible.builtin.copy:
+        src: "{{ repo_path }}/template/custom_config_vless.yaml"
+        dest: "{{ smb_path }}/template/custom_config_vless.yaml"
+        mode: '0644'
+      delegate_to: localhost
+
+    # ===== UI =====
+    - name: "03: Проверить UI"
+      ansible.builtin.stat:
+        path: "{{ smb_path }}/ui/index.html"
+      register: ui_exists
+      delegate_to: localhost
+
+    - name: "03: Установить unzip"
+      ansible.builtin.apt:
+        name: unzip
+        state: present
+        update_cache: yes
+      delegate_to: localhost
+      become: yes
+      when: not ui_exists.stat.exists
+
+    - name: "03: Скачать UI архив"
+      ansible.builtin.get_url:
+        url: "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip"
+        dest: "/tmp/ui.zip"
+        timeout: 120
+      delegate_to: localhost
+      when: not ui_exists.stat.exists
+
+    - name: "03: Распаковать UI"
+      ansible.builtin.unarchive:
+        src: "/tmp/ui.zip"
+        dest: "/tmp/"
+        remote_src: yes
+      delegate_to: localhost
+      when: not ui_exists.stat.exists
+
+    - name: "03: Копировать UI"
+      ansible.builtin.shell: |
+        cp -r /tmp/metacubexd-gh-pages/* "{{ smb_path }}/ui/"
+      delegate_to: localhost
+      when: not ui_exists.stat.exists
+
+    - name: "03: Удалить временные файлы"
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/ui.zip
+        - /tmp/metacubexd-gh-pages
+      delegate_to: localhost
+      when: not ui_exists.stat.exists
+
+    # ===== РЕЗУЛЬТАТ =====
+    - name: "03: Показать сгенерированные прокси"
+      ansible.builtin.command:
+        cmd: head -50 {{ smb_path }}/srv/proxies.yaml
+      delegate_to: localhost
+      register: proxies_preview
+      changed_when: false
+
+    - name: "03: Результат"
+      ansible.builtin.debug:
+        msg: |
+          CONFIG: {{ container_config }}
+          Proxies preview:
+          {{ proxies_preview.stdout }}
+
+          Для применения запусти 04_container.yml
