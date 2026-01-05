@@ -14,9 +14,11 @@
   hosts: mikrotik
   gather_facts: no
   tasks:
-    - name: Set container_config for VLESS mode
+    - name: Set variables for VLESS mode
       ansible.builtin.set_fact:
         container_config: "custom_config_vless.yaml"
+        # Базовый образ mihomo без AWG логики
+        container_image: "metacubex/mihomo:latest"
 
 - name: "01b: Network (Bridge + NAT + DNS)"
   ansible.builtin.import_playbook: 01b_network.yml
