@@ -57,23 +57,29 @@
           - /ip dns set allow-remote-requests=yes
 
     # ===== NAT =====
-    - name: Получить NAT правила
+    - name: Проверить NAT masquerade для контейнеров
       community.routeros.command:
         commands:
-          - /ip firewall nat print
-      register: nat_rules
+          - /ip firewall nat print count-only where comment="Containers to WAN"
+      register: nat_masq_exists
 
     - name: Добавить NAT masquerade для контейнеров
       community.routeros.command:
         commands:
           - /ip firewall nat add chain=srcnat src-address={{ docker_network }} action=masquerade comment="Containers to WAN"
-      when: "'Containers to WAN' not in nat_rules.stdout[0]"
+      when: nat_masq_exists.stdout[0] | int == 0
+
+    - name: Проверить NAT DNS accept для контейнеров
+      community.routeros.command:
+        commands:
+          - /ip firewall nat print count-only where comment="Allow containers DNS direct"
+      register: nat_dns_exists
 
     - name: Добавить NAT DNS accept для контейнеров
       community.routeros.command:
         commands:
           - /ip firewall nat add chain=dstnat action=accept protocol=udp src-address={{ docker_network }} dst-port=53 comment="Allow containers DNS direct"
-      when: "'Allow containers DNS direct' not in nat_rules.stdout[0]"
+      when: nat_dns_exists.stdout[0] | int == 0
 
     # ===== РЕЗУЛЬТАТ =====
     - name: Финальная проверка
@@ -81,12 +87,12 @@
         commands:
           - /ip address print where interface={{ docker_bridge }}
           - /ip dns print
-          - /ip firewall nat print
       register: final_check
 
     - name: Результат
       ansible.builtin.debug:
         msg: |
           Bridge: {{ docker_bridge }} {{ docker_bridge_ip }}
-          DNS: allow-remote-requests={{ 'yes' if 'allow-remote-requests: yes' in final_check.stdout[1] else 'no' }}
-          NAT: {{ final_check.stdout[2] }}
+          DNS: {{ final_check.stdout[1] }}
+          NAT masquerade: {{ 'exists' if nat_masq_exists.stdout[0] | int > 0 or nat_masq_exists is changed else 'added' }}
+          NAT DNS: {{ 'exists' if nat_dns_exists.stdout[0] | int > 0 or nat_dns_exists is changed else 'added' }}
