@@ -42,9 +42,15 @@ def parse_vless_url(url):
 
     if ':' in server_port:
         server, port = server_port.rsplit(':', 1)
+        # Убираем мусор из порта (иногда бывает "443/" или "443,")
+        port = ''.join(c for c in port if c.isdigit())
     else:
         server = server_port
         port = '443'
+
+    # Проверка валидности
+    if not port or not server:
+        return None
 
     # Получаем параметры
     network = params.get('type', ['tcp'])[0]
@@ -192,10 +198,14 @@ def main():
                 continue
 
             proxy = None
-            if line.startswith('vless://'):
-                proxy = parse_vless_url(line)
-            elif line.startswith('vmess://'):
-                proxy = parse_vmess_url(line)
+            try:
+                if line.startswith('vless://'):
+                    proxy = parse_vless_url(line)
+                elif line.startswith('vmess://'):
+                    proxy = parse_vmess_url(line)
+            except Exception as e:
+                print(f"Warning: failed to parse: {line[:50]}... ({e})", file=sys.stderr)
+                continue
 
             if proxy:
                 # Уникализируем имена
