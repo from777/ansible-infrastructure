@@ -10,6 +10,14 @@
 # - Использует url-test для автовыбора лучшего прокси
 # - Fallback переключается на другой при отказе
 ---
+- name: "Set VLESS config"
+  hosts: mikrotik
+  gather_facts: no
+  tasks:
+    - name: Set container_config for VLESS mode
+      ansible.builtin.set_fact:
+        container_config: "custom_config_vless.yaml"
+
 - name: "01b: Network (Bridge + NAT + DNS)"
   ansible.builtin.import_playbook: 01b_network.yml
 
@@ -21,5 +29,3 @@
 
 - name: "04: Container"
   ansible.builtin.import_playbook: 04_container.yml
-  vars:
-    container_config: "custom_config_vless.yaml"

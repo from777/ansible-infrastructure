@@ -23,7 +23,8 @@ container_image: "wiktorbgu/mihomo-mikrotik:latest"
 container_dns: "192.168.254.1"
 
 # CONFIG для mihomo
-container_config: "custom_config.yaml"
+# НЕ ЗАДАВАТЬ ЗДЕСЬ! Передаётся через mihomo_all.yml или mihomo_vless.yml
+# container_config: определяется в основном плейбуке
 
 # SMB
 smb_mount_point: "/mnt/mikrotik_smb"
