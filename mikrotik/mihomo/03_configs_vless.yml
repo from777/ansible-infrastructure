@@ -29,6 +29,13 @@
         msg: "SMB не смонтирован! Сначала запусти 02_smb_mount.yml"
       when: not smb_mounted.stat.exists
 
+    # ===== УДАЛИТЬ AWG КОНФИГИ (чтобы образ не создавал AWG провайдер) =====
+    - name: "03: Удалить папку awg (отключаем AWG режим)"
+      ansible.builtin.file:
+        path: "{{ smb_path }}/awg"
+        state: absent
+      delegate_to: localhost
+
     # ===== СТРУКТУРА ПАПОК =====
     - name: "03: Создать структуру папок"
       ansible.builtin.file:
