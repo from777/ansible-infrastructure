@@ -1,4 +1,4 @@
-# 2025-12-13 13:55:16 by RouterOS 7.20.2
+# 2026-01-05 22:02:58 by RouterOS 7.20.6
 # software id = E05L-801M
 #
 # model = RB5009UPr+S+
@@ -36,6 +36,10 @@ add dst=/etc/mihomo name=MIHOMO_CONFIG src=\
     usb1/docker_configs/mihomo_mikrotik
 add dst=/etc/mihomo/awg name=proton_wg_conf src=\
     usb1/docker_configs/mihomo_mikrotik/proton
+add dst=/etc/mihomo name=test_manual_conf src=usb1/docker_configs/test_manual
+add dst=/etc/mihomo name=test_super_test_conf src=\
+    usb1/smb_share/docker_configs/test_super_test
+add dst=/etc/mihomo name=mamuka_conf src=usb1/smb_share/docker_configs/mamuka
 /disk
 add parent=usb1 partition-number=1 partition-offset=1048576 partition-size=\
     2000397795328 type=partition
@@ -93,7 +97,7 @@ add address-pool=dhcp interface=bridge1 lease-script=":if (\$leaseBound =1) do\
     \n}" lease-time=3d10m name=defconf
 add address-pool=guest-pool interface=vlan100-guest name=guest-dhcp
 /ip smb users
-set [ find default=yes ] disabled=yes
+set [ find default=yes ] read-only=no
 add name=smbuser
 /ppp profile
 set *FFFFFFFE local-address=dhcp remote-address=dhcp
@@ -110,6 +114,8 @@ add disabled=yes instance=default-v3 name=backbone-v3
 /routing table
 add fib name=BlackList_EU
 add fib name=BlackList_RU
+add fib name=RDP-Server
+add fib name=vpn-all-table
 /snmp community
 set [ find default=yes ] addresses=192.168.0.14/32 authentication-protocol=\
     SHA1 security=private
@@ -122,20 +128,19 @@ add name=ssh-rdp policy="ssh,!local,!telnet,!ftp,!reboot,!read,!write,!policy,\
 /certificate settings
 set builtin-trust-anchors=not-trusted
 /container
-add dns=1.1.1.1,8.8.8.8,9.9.9.9 envlists=MIHOMO interface=MIHOMO mounts=\
-    MIHOMO_AWG name=mihomo-mikrotik remote-image=\
-    registry-1.docker.io/wiktorbgu/mihomo-mikrotik root-dir=\
+add dns=192.168.254.1 envlists=MIHOMO interface=MIHOMO mounts=MIHOMO_CONFIG \
+    name=MIHOMO remote-image=wiktorbgu/mihomo-mikrotik:latest root-dir=\
     usb1/docker/mihomo-mikrotik workdir=/
-add dns=1.1.1.1,8.8.8.8,9.9.9.9 envlists=MIHOMO2 interface=MIHOMO2 name=\
-    mihomo-mikrotik-2 remote-image=\
-    registry-1.docker.io/wiktorbgu/mihomo-mikrotik root-dir=\
+add dns=192.168.254.1 envlists=MIHOMO2 interface=MIHOMO2 name=\
+    mihomo-mikrotik-2 remote-image=wiktorbgu/mihomo-mikrotik:latest root-dir=\
     usb1/docker/mihomo2 workdir=/
-add dns=1.1.1.1,8.8.8.8,9.9.9.9 envlists=Germany interface=MIHOMO3 mounts=\
-    proton_wg_conf name=mihomo-mikrotik:latest remote-image=\
+add dns=192.168.254.1 envlists=Germany interface=MIHOMO3 mounts=\
+    proton_wg_conf name="Proton Only" remote-image=\
     wiktorbgu/mihomo-mikrotik:latest root-dir=usb1/docker/mihomo3 workdir=/
 /container config
 set registry-url=https://registry-1.docker.io tmpdir=/usb1/docker/pull
 /container envs
+add key=CONFIG list=Germany value=custom_config.yaml
 add key=SRV1 list=Germany value="trojan://BxceQaOe@58.152.30.175:443\?security\
     =tls&sni=58.152.30.175&allowInsecure=1&type=tcp&headerType=none#t.me/v2Lin\
     e | Free | 3097 | Hong Kong"
@@ -144,10 +149,14 @@ add key=SRV1 list=MIHOMO value="vless://b5f4e3a2-9c8d-4f7a-8e6b-1a3d5c7b9f2e@1\
     76.9.141.234:2054\?encryption=none&flow=xtls-rprx-vision&security=reality&\
     sni=www.google.com&fp=chrome&pbk=j92tntLc26sEHfL85mkRJCcrjq9PSbDPzhcYnniM8\
     ys&sid=a1b2c3d4e5f6&type=tcp&headerType=none#RealityGoogle"
+add key=CONFIG list=MIHOMO2 value=custom.yaml
 add key=SRV1 list=MIHOMO2 value="vless://b5f4e3a2-9c8d-4f7a-8e6b-1a3d5c7b9f2e@\
     176.9.141.234:2054\?encryption=none&flow=xtls-rprx-vision&security=reality\
     &sni=www.google.com&fp=chrome&pbk=j92tntLc26sEHfL85mkRJCcrjq9PSbDPzhcYnniM\
     8ys&sid=a1b2c3d4e5f6&type=tcp&headerType=none#RealityGoogle"
+add key=CONFIG list=mamuka_env value=custom_config.yaml
+add key=CONFIG list=test_manual_env value=custom_config.yaml
+add key=CONFIG list=test_super_test_env value=custom_config.yaml
 /ip smb
 set enabled=yes
 /interface bridge port
@@ -170,8 +179,14 @@ add bridge=bridge1 hw=no interface=sfp-sfpplus1 internal-path-cost=10 \
 add bridge=Bridge-Docker interface=MIHOMO
 add bridge=Bridge-Docker interface=MIHOMO2
 add bridge=Bridge-Docker interface=MIHOMO3
+add bridge=Bridge-Docker interface=*22
+add bridge=Bridge-Docker interface=*23
+add bridge=Bridge-Docker interface=*24
+add bridge=Bridge-Docker interface=*25
 /ip firewall connection tracking
 set enabled=yes
+/ipv6 settings
+set accept-router-advertisements=no disable-ipv6=yes
 /interface bridge vlan
 add bridge=bridge1 tagged=ether8,bridge1 vlan-ids=100
 /interface l2tp-server server
@@ -490,6 +505,8 @@ add address=192.168.0.78 client-id=\
 add address=192.168.0.82 client-id=\
     ff:29:af:36:66:0:1:0:1:30:c1:38:3:0:c:29:af:36:66 comment=ELK \
     mac-address=00:0C:29:AF:36:66 server=defconf
+add address=192.168.0.103 client-id=1:0:7d:3b:2c:63:54 comment="Samsung s95f" \
+    mac-address=00:7D:3B:2C:63:54 server=defconf
 /ip dhcp-server network
 add address=192.168.0.0/24 dns-server=192.168.0.1 gateway=192.168.0.1 \
     netmask=24 ntp-server=192.168.0.1
@@ -592,10 +609,24 @@ add address-list=BlackList_RU comment=YouTube forward-to=Google regexp=youtu \
     type=FWD
 add address-list=BlackList_RU comment=YouTube forward-to=Google \
     match-subdomain=yes name=ytimg.com type=FWD
+add address-list=BlackList_RU comment=YouTube2 forward-to=Google \
+    match-subdomain=yes name=nhacoviet.org type=FWD
+add address-list=BlackList_RU comment=YouTube2 forward-to=Google \
+    match-subdomain=yes name=gstatic.com type=FWD
+add address-list=BlackList_RU comment=YouTube2 forward-to=Google \
+    match-subdomain=yes name=googleusercontent.com type=FWD
 add address-list=BlackList_RU comment=YouTube forward-to=Google \
     match-subdomain=yes name=youtu.be type=FWD
-add address-list=BlackList_RU comment=YouTube disabled=yes forward-to=Google \
+add address-list=BlackList_RU comment=YouTube forward-to=Google \
     match-subdomain=yes name=google.com type=FWD
+add address-list=BlackList_RU comment=YouTube forward-to=Google \
+    match-subdomain=yes name=googleapis.com type=FWD
+add address-list=BlackList_RU comment=YouTube forward-to=Google \
+    match-subdomain=yes name=gvt1.com type=FWD
+add address-list=BlackList_RU comment=YouTube forward-to=Google \
+    match-subdomain=yes name=gvt2.com type=FWD
+add address-list=BlackList_RU comment=YouTube forward-to=Google \
+    match-subdomain=yes name=widevine.com type=FWD
 add address-list=BlackList_RU comment=YouTube forward-to=Google \
     match-subdomain=yes name=youtu type=FWD
 add address-list=BlackList_RU comment=YouTube forward-to=Google \
@@ -1540,6 +1571,8 @@ add address-list=BlackList_EU comment=Intel disabled=yes forward-to=Google \
     match-subdomain=yes name=oneapi.com type=FWD
 add address-list=BlackList_EU comment=Intel forward-to=Google \
     match-subdomain=yes name=coomer.su type=FWD
+add address-list=BlackList_EU comment=Intel forward-to=Google \
+    match-subdomain=yes name=coomer.st type=FWD
 add address=160.79.104.1 address-list=BlackList_EU comment=AI disabled=yes \
     match-subdomain=yes name=anthropic.com type=A
 add address-list=BlackList_EU comment=Intel disabled=yes forward-to=Google \
@@ -1832,6 +1865,34 @@ add address-list=BlackList_EU comment=yahoo.com forward-to=Google \
     match-subdomain=yes name=elastic.co type=FWD
 add address-list=BlackList_EU comment=yahoo.com forward-to=Google \
     match-subdomain=yes name=broadcom.com type=FWD
+add address-list=BlackList_EU comment=megachange.ru forward-to=Google \
+    match-subdomain=yes name=megachange.ru type=FWD
+add address-list=BlackList_EU comment=bitkovskiy.io forward-to=Google \
+    match-subdomain=yes name=bitkovskiy.io type=FWD
+add address-list=BlackList_EU comment=microsoft.com forward-to=Google \
+    match-subdomain=yes name=microsoft.com type=FWD
+add address-list=BlackList_EU comment=nnm-club-me.ru forward-to=Google \
+    match-subdomain=yes name=nnm-club-me.ru type=FWD
+add address-list=BlackList_EU comment=claude.com forward-to=Google \
+    match-subdomain=yes name=claude.com type=FWD
+add address-list=BlackList_EU comment=justproxy.biz forward-to=Google \
+    match-subdomain=yes name=justproxy.biz type=FWD
+add address-list=BlackList_EU comment=ntfy.sh forward-to=Google \
+    match-subdomain=yes name=ntfy.sh type=FWD
+add address-list=BlackList_EU comment=terraform.io forward-to=Google \
+    match-subdomain=yes name=terraform.io type=FWD
+add address-list=BlackList_EU comment=redd.it forward-to=Google \
+    match-subdomain=yes name=redd.it type=FWD
+add address-list=BlackList_EU comment=redditstatic.com forward-to=Google \
+    match-subdomain=yes name=redditstatic.com type=FWD
+add address-list=BlackList_EU comment=reddit.com forward-to=Google \
+    match-subdomain=yes name=reddit.com type=FWD
+add address-list=BlackList_EU comment=xhamster.com forward-to=Google \
+    match-subdomain=yes name=xhamster.com type=FWD
+add address-list=BlackList_EU comment=redditmedia.com forward-to=Google \
+    match-subdomain=yes name=redditmedia.com type=FWD
+add address-list=BlackList_EU comment=redgifs.com forward-to=Google \
+    match-subdomain=yes name=redgifs.com type=FWD
 add address=198.18.1.1 disabled=yes name=2ip.ru ttl=1h type=A
 add address=198.18.1.1 disabled=yes name=leader.ru ttl=1h type=A
 add address=160.79.104.10 address-list=BlackList_EU disabled=yes name=\
@@ -2182,19 +2243,6 @@ add action=drop chain=GUEST-Forward comment="GUEST-FWD Block RFC1918 192.x" \
 add action=accept chain=GUEST-Forward comment="GUEST-FWD Allow to WAN" \
     out-interface-list=WAN
 add action=drop chain=GUEST-Forward comment="GUEST-FWD Drop all other"
-add action=accept chain=GUEST-Input comment="GUEST Accept established" \
-    connection-state=established
-add action=accept chain=GUEST-Input comment="GUEST Accept related" \
-    connection-state=related
-add action=accept chain=GUEST-Input comment="GUEST Accept untracked" \
-    connection-state=untracked
-add action=drop chain=GUEST-Input comment="GUEST Drop invalid" \
-    connection-state=invalid
-add action=accept chain=GUEST-Input comment="GUEST Allow DNS" dst-port=53 \
-    protocol=udp
-add action=accept chain=GUEST-Input comment="GUEST Allow DHCP" dst-port=67 \
-    protocol=udp
-add action=drop chain=GUEST-Input comment="GUEST Drop all other"
 add action=accept chain=VPN-Input comment="VPN Accept established" \
     connection-state=established
 add action=accept chain=VPN-Input comment="VPN Accept related" \
@@ -2203,6 +2251,8 @@ add action=accept chain=VPN-Input comment="VPN Accept untracked" \
     connection-state=untracked
 add action=drop chain=VPN-Input comment="VPN Drop invalid" connection-state=\
     invalid
+add action=accept chain=VPN-Input comment="Allow containers DNS to router" \
+    dst-port=53 protocol=udp src-address=192.168.254.0/24
 add action=drop chain=VPN-Input comment="VPN Drop all other"
 add action=accept chain=VPN-Forward comment="VPN-FWD Accept established" \
     connection-state=established
@@ -2216,6 +2266,19 @@ add action=accept chain=VPN-Forward comment="VPN-FWD Allow new to WAN" \
     connection-state=new out-interface-list=WAN
 add action=drop chain=VPN-Forward comment="VPN-FWD Drop new (disabled)" \
     disabled=yes
+add action=accept chain=GUEST-Input comment="GUEST Accept established" \
+    connection-state=established
+add action=accept chain=GUEST-Input comment="GUEST Accept related" \
+    connection-state=related
+add action=accept chain=GUEST-Input comment="GUEST Accept untracked" \
+    connection-state=untracked
+add action=drop chain=GUEST-Input comment="GUEST Drop invalid" \
+    connection-state=invalid
+add action=accept chain=GUEST-Input comment="GUEST Allow DNS" dst-port=53 \
+    protocol=udp
+add action=accept chain=GUEST-Input comment="GUEST Allow DHCP" dst-port=67 \
+    protocol=udp
+add action=drop chain=GUEST-Input comment="GUEST Drop all other"
 /ip firewall mangle
 add action=accept chain=prerouting comment=\
     "Skip NETMAP from BlackList marking" dst-address=10.200.200.0/24 \
@@ -2230,6 +2293,10 @@ add action=change-mss chain=postrouting new-mss=clamp-to-pmtu protocol=tcp \
 add action=mark-connection chain=prerouting connection-mark=no-mark \
     dst-address-list=BlackList_EU in-interface-list=LAN_and_GUEST \
     new-connection-mark=BlackList_EU
+add action=mark-routing chain=prerouting comment="VPN-ALL: mark traffic" \
+    disabled=yes dst-address=!192.168.0.1 in-interface-list=LAN_and_GUEST \
+    new-routing-mark=vpn-all-table passthrough=no src-address=\
+    !192.168.254.0/24
 add action=mark-routing chain=prerouting comment=\
     "Route BlackList_EU via mihomo" connection-mark=BlackList_EU \
     in-interface-list=LAN_and_GUEST new-routing-mark=BlackList_EU \
@@ -2253,6 +2320,13 @@ add action=change-mss chain=forward comment="MSS fix from WG_Home" \
 add action=change-mss chain=forward comment="MSS fix to WG_Home" new-mss=1300 \
     out-interface=WG_Home protocol=tcp tcp-flags=syn
 add action=passthrough chain=prerouting
+add action=mark-routing chain=prerouting comment=\
+    "RDP to 176.9.141.234 via MIHOMO3" disabled=yes dst-address=176.9.141.234 \
+    in-interface-list=LAN_and_GUEST new-routing-mark=RDP-Server passthrough=\
+    no src-address=!192.168.254.0/24
+add action=change-mss chain=forward comment="MSS fix for RDP server" \
+    disabled=yes dst-address=176.9.141.234 new-mss=1300 protocol=tcp \
+    tcp-flags=syn
 /ip firewall nat
 add action=masquerade chain=srcnat comment="WG to video server hairpin" \
     dst-address=192.168.0.243 log-prefix=SRC-NAT: src-address=10.101.101.0/24
@@ -2260,12 +2334,14 @@ add action=src-nat chain=srcnat out-interface=pppoe-out1 to-addresses=\
     212.20.46.209
 add action=src-nat chain=srcnat comment="NAT for mihomo" out-interface=\
     Bridge-Docker to-addresses=192.168.254.1
-add action=masquerade chain=srcnat comment="Hairpin NAT for 82" dst-address=\
-    192.168.0.82 src-address=192.168.0.0/24
-add action=masquerade chain=srcnat comment="Hairpin NAT for video server" \
+add action=masquerade chain=srcnat comment="Hairpin NAT for 192.168.0.71" \
+    dst-address=192.168.0.71 src-address=192.168.0.0/24
+add action=masquerade chain=srcnat comment="Hairpin NAT for 192.168.0.243" \
     dst-address=192.168.0.243 log-prefix="NAT " src-address=192.168.0.0/24
-add action=masquerade chain=srcnat comment="Hairpin NAT for 71" dst-address=\
-    192.168.0.71 src-address=192.168.0.0/24
+add action=masquerade chain=srcnat comment="Hairpin NAT for 192.168.0.82" \
+    dst-address=192.168.0.82 src-address=192.168.0.0/24
+add action=accept chain=dstnat comment="Allow containers DNS direct" \
+    dst-port=53 protocol=udp src-address=192.168.254.0/24
 add action=redirect chain=dstnat dst-address-type=!local dst-port=53 \
     in-interface-list=!WAN protocol=udp src-address-type=!local
 add action=dst-nat chain=dstnat disabled=yes dst-port=8080 protocol=tcp \
@@ -2303,8 +2379,13 @@ set [ find default=yes ] dh-group=modp1024 dpd-interval=2m \
 add disabled=no distance=1 dst-address=0.0.0.0/0 gateway=192.168.254.4 \
     routing-table=BlackList_EU scope=30 suppress-hw-offload=no target-scope=\
     10
-add distance=1 dst-address=0.0.0.0/0 gateway=192.168.254.3 routing-table=\
-    BlackList_RU
+add disabled=no distance=1 dst-address=0.0.0.0/0 gateway=192.168.254.3 \
+    routing-table=BlackList_RU scope=30 suppress-hw-offload=no target-scope=\
+    10
+add disabled=yes distance=1 dst-address=0.0.0.0/0 gateway=192.168.254.5 \
+    routing-table=RDP-Server scope=30 suppress-hw-offload=no target-scope=10
+add disabled=yes distance=1 dst-address=0.0.0.0/0 gateway=192.168.254.3 \
+    routing-table=vpn-all-table
 /ip service
 set ftp disabled=yes
 set ssh address=192.168.0.0/24
@@ -2314,7 +2395,8 @@ set winbox address=192.168.0.0/24
 set api disabled=yes
 /ip smb shares
 set [ find default=yes ] directory=/pub
-add directory=/usb1 name=usb1
+add directory=usb1/smb_share name=usb1
+add directory=usb1/docker_configs name=docker_configs
 /ip ssh
 set always-allow-password-login=yes forwarding-enabled=local
 /ipv6 firewall address-list
@@ -2392,6 +2474,7 @@ add
 /routing rule
 add action=lookup disabled=yes routing-mark=*406 table=*406
 add action=lookup disabled=yes routing-mark=*404 table=*404
+add action=lookup disabled=yes routing-mark=vpn-all-table table=vpn-all-table
 /snmp
 set enabled=yes engine-id-suffix=D4:CA:6D:0D:FD:28 trap-generators=interfaces \
     trap-target=192.168.0.14 trap-version=3
@@ -2415,8 +2498,8 @@ set enabled=yes
 add address=0.ru.pool.ntp.org
 add address=1.ru.pool.ntp.org
 add address=2.ru.pool.ntp.org
-add address=3.ru.pool.ntp.org
 add address=pool.ntp.org
+add address=3.ru.pool.ntp.org
 /system scheduler
 add disabled=yes interval=1d name="Backup And Update" on-event=\
     "/system script run BackupAndUpdate;" policy=\
