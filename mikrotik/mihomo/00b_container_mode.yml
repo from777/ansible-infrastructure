@@ -6,7 +6,7 @@
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
-    ansible_command_timeout: 30
+    ansible_command_timeout: 120
   vars_files:
     - vars.yml
 

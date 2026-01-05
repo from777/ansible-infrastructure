@@ -8,6 +8,7 @@
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
+    ansible_command_timeout: 120
     smb_path: "{{ smb_mount_point }}/docker_configs/{{ container_name }}"
     repo_path: "{{ playbook_dir }}/configs"
     # Используем VLESS конфиг вместо обычного
