@@ -5,6 +5,16 @@
 # ============================================================
 
 container_name: "mamuka"
+
+# ============================================================
+# VLESS/VMESS SUBSCRIPTION
+# ============================================================
+# URL для скачивания списка прокси (vless://, vmess://)
+# Оставь пустым чтобы использовать локальный configs/vless/proxies.txt
+subscription_url: "https://raw.githubusercontent.com/miladtahanian/multi-proxy-config-fetcher/refs/heads/main/configs/proxy_configs.txt"
+
+# Или переопредели при запуске:
+# ansible-playbook mihomo_vless.yml -e subscription_url="https://другой-url.com/proxies.txt"
 container_gateway: "192.168.254.1"
 docker_bridge: "Bridge-Docker"
 container_image: "wiktorbgu/mihomo-mikrotik:latest"

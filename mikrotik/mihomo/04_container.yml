@@ -131,18 +131,17 @@
       when: mount_exists.stdout[0] | int == 0
 
     # ===== ENVLIST =====
-    - name: Проверить envlist
+    - name: Удалить старый envlist
       community.routeros.command:
         commands:
-          - /container envs print count-only where list={{ container_name }}_env
-      register: env_exists
+          - /container envs remove [find list={{ container_name }}_env]
+      ignore_errors: yes
 
     - name: Создать envlist с CONFIG
       community.routeros.command:
         commands:
           - /container envs add list={{ container_name }}_env key=CONFIG value={{ container_config }}
       when:
-        - env_exists.stdout[0] | int == 0
         - container_config is defined
         - container_config | length > 0
 
@@ -151,7 +150,6 @@
         commands:
           - /container envs add list={{ container_name }}_env key=TZ value=Europe/Moscow
       when:
-        - env_exists.stdout[0] | int == 0
         - container_config is not defined or container_config | length == 0
 
     # ===== CONTAINER =====

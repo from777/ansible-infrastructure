@@ -2,32 +2,95 @@
 
 Плейбуки для настройки firewall на MikroTik роутерах.
 
+---
+
+## ПЕРЕД ЗАПУСКОМ (ОБЯЗАТЕЛЬНО!)
+
+### 1. Создай interface lists
+
+```bash
+ansible-playbook mikrotik/interface-lists.yml -l <router>
+```
+
+Или в Semaphore: шаблон `interface-lists`
+
+### 2. Добавь интерфейсы в списки (НА РОУТЕРЕ!)
+
+```
+/interface list member add list=WAN interface=ether1
+/interface list member add list=LAN interface=bridge
+```
+
+**Замени `ether1` и `bridge` на свои интерфейсы!**
+
+### 3. Проверь что списки НЕ пустые
+
+```
+/interface list member print
+```
+
+Должно быть:
+```
+# LIST      INTERFACE
+0 WAN       ether1
+1 LAN       bridge
+```
+
+**Если пусто — firewall заблокирует всё!**
+
+### 4. Проверь safe_ip
+
+В `00-safe-access.yml` переменная `safe_ip` = твой внешний IP.
+Проверь свой IP: https://2ip.ru
+
+---
+
+## ВОССТАНОВЛЕНИЕ ДОСТУПА
+
+Если заблокировался:
+
+1. Зайди через Winbox по MAC или по локальной сети
+2. Удали блокирующее правило:
+```
+/ip firewall filter remove [find comment="Drop all other to router"]
+```
+3. Проверь `/interface list member print`
+4. Добавь интерфейсы в списки
+5. Запусти `99-drop-all.yml` отдельно
+
+---
+
 ## Структура файлов
 
 ```
 firewall-full.yml       — главный, вызывает все по порядку
 
-0x — подготовка и структура
-00-safe-access.yml      — защита доступа с IP 212.20.46.209
-01-cleanup.yml          — удаляет ВСЕ старые правила
-02-input-jumps.yml      — jump правила для chain=input
-03-forward-jumps.yml    — jump правила для chain=forward
+=== ПОРЯДОК ВЫПОЛНЕНИЯ ===
 
-1x — Input chains (трафик К роутеру)
-10-brute-force.yml      — защита от перебора паролей
-11-lan-input.yml        — LAN → роутер
-12-isp-input.yml        — WAN → роутер
-13-guest-input.yml      — GUEST → роутер (пропустит если нет GUEST)
-14-vpn-input.yml        — VPN → роутер (пропустит если нет VPN-OUT)
+1. Защита и очистка
+   00-safe-access.yml   — защита доступа с твоего IP
+   01-cleanup.yml       — удаляет ВСЕ старые правила
 
-2x — Forward chains (трафик ЧЕРЕЗ роутер)
-20-lan-forward.yml      — LAN → наружу
-21-isp-forward.yml      — WAN → внутрь
-22-guest-forward.yml    — GUEST → наружу (пропустит если нет GUEST)
-23-vpn-forward.yml      — VPN → наружу (пропустит если нет VPN-OUT)
+2. Правила В цепочках (сначала наполняем цепочки!)
+   10-brute-force.yml   — защита от перебора паролей
+   11-lan-input.yml     — LAN → роутер
+   12-isp-input.yml     — WAN → роутер
+   13-guest-input.yml   — GUEST → роутер
+   14-vpn-input.yml     — VPN → роутер
+   20-lan-forward.yml   — LAN → наружу
+   21-isp-forward.yml   — WAN → внутрь
+   22-guest-forward.yml — GUEST → наружу
+   23-vpn-forward.yml   — VPN → наружу
 
-Кастомные правила (для конкретных роутеров)
-Mik_mom_firewall_custom_rules.yml — RDP к серверу 242 через WireGuard
+3. Jump правила (прыгаем в заполненные цепочки)
+   02-input-jumps.yml   — jump правила для chain=input
+   03-forward-jumps.yml — jump правила для chain=forward
+
+4. Финальные drop (В САМОМ КОНЦЕ!)
+   99-drop-all.yml      — drop all для input и forward
+
+=== КАСТОМНЫЕ ===
+Mik_mom_firewall_custom_rules.yml — RDP к серверу 242
 ```
 
 ## Как запускать
@@ -112,3 +175,18 @@ Limit: Mik_mom
 ```
 
 Перенумеровывать остальные файлы не нужно.
+
+---
+
+## CHECKLIST (перед запуском)
+
+```
+[ ] Interface list WAN создан
+[ ] Interface list LAN создан
+[ ] Интерфейс WAN добавлен в список WAN (/interface list member)
+[ ] Интерфейс LAN добавлен в список LAN (/interface list member)
+[ ] safe_ip в 00-safe-access.yml = мой внешний IP
+[ ] Запущен firewall-full.yml
+[ ] Проверен доступ из LAN
+[ ] Проверен доступ с внешнего IP
+```

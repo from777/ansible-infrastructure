@@ -11,6 +11,9 @@
 # !!! ВНИМАНИЕ !!!
 # 01-cleanup.yml удаляет ВСЕ старые правила!
 ---
+# === ПРОВЕРКА ГОТОВНОСТИ ===
+- import_playbook: 00-preflight-check.yml
+
 # === ЗАЩИТА ===
 - import_playbook: 00-safe-access.yml
 - import_playbook: 01-cleanup.yml
