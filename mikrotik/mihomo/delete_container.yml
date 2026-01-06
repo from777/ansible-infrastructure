@@ -76,7 +76,21 @@
         seconds: 3
       when: container_exists.stdout[0] | int > 0
 
-    # ===== УДАЛЕНИЕ VETH (автоматом удалится из bridge) =====
+    # ===== УДАЛЕНИЕ ПОРТА ИЗ BRIDGE (СНАЧАЛА!) =====
+    - name: Проверить существует ли порт в bridge
+      community.routeros.command:
+        commands:
+          - /interface bridge port print count-only where interface="{{ container_name }}"
+      register: bridge_port_exists
+
+    - name: Удалить порт из bridge
+      community.routeros.command:
+        commands:
+          - /interface bridge port remove [find interface="{{ container_name }}"]
+      when: bridge_port_exists.stdout[0] | int > 0
+      ignore_errors: yes
+
+    # ===== УДАЛЕНИЕ VETH =====
     - name: Проверить существует ли veth
       community.routeros.command:
         commands:
@@ -144,10 +158,11 @@
     - name: Результат
       ansible.builtin.debug:
         msg: |
-          ✅ Контейнер {{ container_name }} полностью удалён!
+          Контейнер {{ container_name }} полностью удалён!
 
           Удалено:
           - Контейнер: {{ 'да' if container_exists.stdout[0] | int > 0 else 'не существовал' }}
+          - Bridge port: {{ 'да' if bridge_port_exists.stdout[0] | int > 0 else 'не существовал' }}
           - veth: {{ 'да' if veth_exists.stdout[0] | int > 0 else 'не существовал' }}
           - mount: {{ 'да' if mount_exists.stdout[0] | int > 0 else 'не существовал' }}
           - envlist: {{ 'да' if envlist_exists.stdout[0] | int > 0 else 'не существовал' }}
