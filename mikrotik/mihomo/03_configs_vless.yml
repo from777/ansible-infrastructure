@@ -176,6 +176,56 @@
       delegate_to: localhost
       when: not ui_exists.stat.exists
 
+    # ===== ГЕОБАЗА (geoip.metadb) =====
+    - name: "03: Проверить geoip.metadb в целевой папке"
+      ansible.builtin.stat:
+        path: "{{ smb_path }}/geoip.metadb"
+      register: geoip_target
+      delegate_to: localhost
+
+    - name: "03: Найти существующую геобазу в других контейнерах"
+      ansible.builtin.find:
+        paths: "{{ smb_mount_point }}/docker_configs"
+        patterns: "geoip.metadb"
+        recurse: yes
+        file_type: file
+      register: existing_geoip
+      delegate_to: localhost
+      when: not geoip_target.stat.exists
+
+    - name: "03: Копировать геобазу из существующего контейнера"
+      ansible.builtin.copy:
+        src: "{{ existing_geoip.files[0].path }}"
+        dest: "{{ smb_path }}/geoip.metadb"
+        mode: '0644'
+        remote_src: yes
+      delegate_to: localhost
+      when:
+        - not geoip_target.stat.exists
+        - existing_geoip.files | length > 0
+
+    - name: "03: Скачать геобазу если нет нигде"
+      ansible.builtin.get_url:
+        url: "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb"
+        dest: "{{ smb_path }}/geoip.metadb"
+        timeout: 120
+        mode: '0644'
+      delegate_to: localhost
+      when:
+        - not geoip_target.stat.exists
+        - (existing_geoip.files | default([])) | length == 0
+
+    - name: "03: Статус геобазы"
+      ansible.builtin.debug:
+        msg: >-
+          {% if geoip_target.stat.exists %}
+          Геобаза уже есть
+          {% elif (existing_geoip.files | default([])) | length > 0 %}
+          Геобаза скопирована из {{ existing_geoip.files[0].path }}
+          {% else %}
+          Геобаза скачана с GitHub
+          {% endif %}
+
     # ===== РЕЗУЛЬТАТ =====
     - name: "03: Показать сгенерированные прокси"
       ansible.builtin.command:
