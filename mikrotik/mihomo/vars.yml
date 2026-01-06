@@ -4,15 +4,15 @@
 # ПЕРЕМЕННЫЕ КОНТЕЙНЕРА
 # ============================================================
 
-container_name: "mamuka"
+container_name: "Vless"
 
 # ============================================================
 # VLESS/VMESS SUBSCRIPTION
 # ============================================================
 # URL для скачивания списка прокси (vless://, vmess://)
 # Оставь пустым чтобы использовать локальный configs/vless/proxies.txt
-# subscription_url: "https://raw.githubusercontent.com/miladtahanian/multi-proxy-config-fetcher/refs/heads/main/configs/proxy_configs.txt"
-subscription_url: "https://raw.githubusercontent.com/bywarm/whitelists-vpns-etc/refs/heads/main/whitelists1-4pda.txt"
+subscription_url: "https://raw.githubusercontent.com/miladtahanian/multi-proxy-config-fetcher/refs/heads/main/configs/proxy_configs.txt"
+# subscription_url: "https://raw.githubusercontent.com/bywarm/whitelists-vpns-etc/refs/heads/main/whitelists1-4pda.txt"
 # Или переопредели при запуске:
 # ansible-playbook mihomo_vless.yml -e subscription_url="https://другой-url.com/proxies.txt"
 container_gateway: "192.168.254.1"
