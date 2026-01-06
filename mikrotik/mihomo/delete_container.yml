@@ -4,10 +4,10 @@
 # Использование:
 #   ansible-playbook delete_container.yml -e container_name="vless"
 #
-# Порядок удаления (критически важен для MikroTik!):
-# 1. Остановить контейнер (освободить veth)
-# 2. Удалить контейнер (полностью освободить veth)
-# 3. Удалить порт из bridge (veth свободен, имя сохранено)
+# Проверенный порядок удаления:
+# 1. Остановить контейнер
+# 2. Удалить контейнер
+# 3. Удалить порт из bridge
 # 4. Удалить veth интерфейс
 # 5. Удалить mount, envlist, папки
 ---
@@ -26,113 +26,92 @@
     # ===== ВАЛИДАЦИЯ =====
     - name: Проверить что container_name задан
       ansible.builtin.fail:
-        msg: |
-          container_name не задан!
-          Использование: ansible-playbook delete_container.yml -e container_name="имя"
+        msg: "container_name не задан! Использование: ansible-playbook delete_container.yml -e container_name=имя"
       when: container_name is not defined or container_name | length == 0
 
-    - name: Показать что будет удалено
+    - name: Показать container_name
       ansible.builtin.debug:
-        msg: |
-          УДАЛЕНИЕ КОНТЕЙНЕРА: {{ container_name }}
-
-          Будет удалено:
-          - Контейнер: {{ container_name }}
-          - Порт в bridge: {{ container_name }}
-          - Интерфейс veth: {{ container_name }}
-          - Mount: {{ container_name }}_conf
-          - Envlist: {{ container_name }}_env
-          - Папки на SMB
+        msg: "Удаляем контейнер: [{{ container_name }}]"
 
     # ===== ШАГ 1: ОСТАНОВИТЬ КОНТЕЙНЕР =====
-    - name: "1.1 Проверить существует ли контейнер"
+    - name: "1. Остановить контейнер"
       community.routeros.command:
         commands:
-          - /container print count-only where name="{{ container_name }}"
-      register: container_exists
-
-    - name: "1.2 Остановить контейнер"
-      community.routeros.command:
-        commands:
-          - /container stop [find name="{{ container_name }}"]
-      when: container_exists.stdout[0] | int > 0
+          - "/container stop [find name={{ container_name }}]"
+      register: stop_result
       ignore_errors: yes
 
-    - name: "1.3 Ожидание остановки контейнера"
+    - name: "1.1 Результат остановки"
+      ansible.builtin.debug:
+        var: stop_result
+
+    - name: "1.2 Пауза 10 сек"
       ansible.builtin.pause:
         seconds: 10
-        prompt: "Ожидание полной остановки контейнера..."
-      when: container_exists.stdout[0] | int > 0
 
     # ===== ШАГ 2: УДАЛИТЬ КОНТЕЙНЕР =====
-    - name: "2.1 Удалить контейнер"
+    - name: "2. Удалить контейнер"
       community.routeros.command:
         commands:
-          - /container remove [find name="{{ container_name }}"]
-      when: container_exists.stdout[0] | int > 0
+          - "/container remove [find name={{ container_name }}]"
+      register: remove_container_result
       ignore_errors: yes
 
-    - name: "2.2 Ожидание удаления контейнера"
+    - name: "2.1 Результат удаления контейнера"
+      ansible.builtin.debug:
+        var: remove_container_result
+
+    - name: "2.2 Пауза 5 сек"
       ansible.builtin.pause:
         seconds: 5
-        prompt: "Ожидание удаления контейнера..."
-      when: container_exists.stdout[0] | int > 0
 
     # ===== ШАГ 3: УДАЛИТЬ ПОРТ ИЗ BRIDGE =====
-    - name: "3.1 Проверить существует ли порт в bridge"
+    - name: "3. Удалить порт из bridge"
       community.routeros.command:
         commands:
-          - /interface bridge port print count-only where interface="{{ container_name }}"
-      register: bridge_port_exists
-
-    - name: "3.2 Удалить порт из bridge"
-      community.routeros.command:
-        commands:
-          - /interface bridge port remove [find interface="{{ container_name }}"]
-      when: bridge_port_exists.stdout[0] | int > 0
+          - "/interface bridge port remove [find interface={{ container_name }}]"
+      register: remove_port_result
       ignore_errors: yes
+
+    - name: "3.1 Результат удаления порта"
+      ansible.builtin.debug:
+        var: remove_port_result
 
     # ===== ШАГ 4: УДАЛИТЬ VETH =====
-    - name: "4.1 Проверить существует ли veth"
+    - name: "4. Удалить veth"
       community.routeros.command:
         commands:
-          - /interface veth print count-only where name="{{ container_name }}"
-      register: veth_exists
-
-    - name: "4.2 Удалить veth интерфейс"
-      community.routeros.command:
-        commands:
-          - /interface veth remove [find name="{{ container_name }}"]
-      when: veth_exists.stdout[0] | int > 0
+          - "/interface veth remove [find name={{ container_name }}]"
+      register: remove_veth_result
       ignore_errors: yes
+
+    - name: "4.1 Результат удаления veth"
+      ansible.builtin.debug:
+        var: remove_veth_result
 
     # ===== ШАГ 5: УДАЛИТЬ MOUNT =====
-    - name: "5.1 Проверить существует ли mount"
+    - name: "5. Удалить mount"
       community.routeros.command:
         commands:
-          - /container mounts print count-only where name="{{ container_name }}_conf"
-      register: mount_exists
-
-    - name: "5.2 Удалить mount"
-      community.routeros.command:
-        commands:
-          - /container mounts remove [find name="{{ container_name }}_conf"]
-      when: mount_exists.stdout[0] | int > 0
+          - "/container mounts remove [find name={{ container_name }}_conf]"
+      register: remove_mount_result
       ignore_errors: yes
+
+    - name: "5.1 Результат удаления mount"
+      ansible.builtin.debug:
+        var: remove_mount_result
 
     # ===== ШАГ 6: УДАЛИТЬ ENVLIST =====
-    - name: "6.1 Проверить существует ли envlist"
+    - name: "6. Удалить envlist"
       community.routeros.command:
         commands:
-          - /container envs print count-only where list="{{ container_name }}_env"
-      register: envlist_exists
-
-    - name: "6.2 Удалить envlist"
-      community.routeros.command:
-        commands:
-          - /container envs remove [find list="{{ container_name }}_env"]
-      when: envlist_exists.stdout[0] | int > 0
+          - "/container envs remove [find list={{ container_name }}_env]"
+      register: remove_env_result
       ignore_errors: yes
+
+    - name: "6.1 Результат удаления envlist"
+      ansible.builtin.debug:
+        var: remove_env_result
 
     # ===== ШАГ 7: УДАЛИТЬ ПАПКИ НА SMB =====
     - name: "7.1 Удалить папку конфигов"
@@ -142,7 +121,7 @@
       delegate_to: localhost
       ignore_errors: yes
 
-    - name: "7.2 Удалить папку root-dir контейнера"
+    - name: "7.2 Удалить папку root-dir"
       ansible.builtin.file:
         path: "{{ smb_mount_point }}/docker/{{ container_name }}"
         state: absent
@@ -150,30 +129,38 @@
       ignore_errors: yes
 
     # ===== ШАГ 8: ОЧИСТКА UNKNOWN ПОРТОВ =====
-    - name: "8.1 Найти unknown порты в Bridge-Docker"
+    - name: "8. Удалить unknown порты из Bridge-Docker"
       community.routeros.command:
         commands:
-          - /interface bridge port print count-only where interface~"unknown" and bridge="{{ docker_bridge }}"
-      register: unknown_ports
-
-    - name: "8.2 Удалить unknown порты из Bridge-Docker"
-      community.routeros.command:
-        commands:
-          - /interface bridge port remove [find interface~"unknown" and bridge="{{ docker_bridge }}"]
-      when: unknown_ports.stdout[0] | int > 0
+          - "/interface bridge port remove [find interface~unknown and bridge={{ docker_bridge }}]"
+      register: remove_unknown_result
       ignore_errors: yes
 
-    # ===== РЕЗУЛЬТАТ =====
-    - name: Результат
+    - name: "8.1 Результат очистки unknown"
       ansible.builtin.debug:
-        msg: |
-          Контейнер {{ container_name }} удалён!
+        var: remove_unknown_result
 
-          Статус:
-          - Контейнер: {{ 'удалён' if container_exists.stdout[0] | int > 0 else 'не существовал' }}
-          - Bridge port: {{ 'удалён' if bridge_port_exists.stdout[0] | int > 0 else 'не существовал' }}
-          - veth: {{ 'удалён' if veth_exists.stdout[0] | int > 0 else 'не существовал' }}
-          - mount: {{ 'удалён' if mount_exists.stdout[0] | int > 0 else 'не существовал' }}
-          - envlist: {{ 'удалён' if envlist_exists.stdout[0] | int > 0 else 'не существовал' }}
-          - Unknown ports: {{ unknown_ports.stdout[0] | int }} очищено
-          - Папки на SMB: удалены
+    # ===== ФИНАЛЬНАЯ ПРОВЕРКА =====
+    - name: "9. Проверить bridge ports"
+      community.routeros.command:
+        commands:
+          - "/interface bridge port print where bridge={{ docker_bridge }}"
+      register: final_ports
+
+    - name: "9.1 Текущие порты в bridge"
+      ansible.builtin.debug:
+        var: final_ports.stdout
+
+    - name: "10. Проверить veth интерфейсы"
+      community.routeros.command:
+        commands:
+          - "/interface veth print"
+      register: final_veth
+
+    - name: "10.1 Текущие veth"
+      ansible.builtin.debug:
+        var: final_veth.stdout
+
+    - name: "ГОТОВО"
+      ansible.builtin.debug:
+        msg: "Удаление {{ container_name }} завершено. Проверь вывод выше на ошибки."
