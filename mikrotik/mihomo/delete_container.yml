@@ -44,13 +44,42 @@
           - Папка конфигов: {{ smb_base }}/docker_configs/{{ container_name }}
           - Папка root-dir: {{ smb_base }}/docker/{{ container_name }}
 
-    # ===== ОСТАНОВКА КОНТЕЙНЕРА =====
+    # ===== ПРОВЕРКИ =====
     - name: Проверить существует ли контейнер
       community.routeros.command:
         commands:
           - /container print count-only where name="{{ container_name }}"
       register: container_exists
 
+    - name: Проверить существует ли порт в bridge
+      community.routeros.command:
+        commands:
+          - /interface bridge port print count-only where interface="{{ container_name }}"
+      register: bridge_port_exists
+
+    - name: Проверить существует ли veth
+      community.routeros.command:
+        commands:
+          - /interface veth print count-only where name="{{ container_name }}"
+      register: veth_exists
+
+    # ===== 1. УДАЛЕНИЕ ПОРТА ИЗ BRIDGE (САМОЕ ПЕРВОЕ!) =====
+    - name: Удалить порт из bridge
+      community.routeros.command:
+        commands:
+          - /interface bridge port remove [find interface="{{ container_name }}"]
+      when: bridge_port_exists.stdout[0] | int > 0
+      ignore_errors: yes
+
+    # ===== 2. УДАЛЕНИЕ VETH =====
+    - name: Удалить veth интерфейс
+      community.routeros.command:
+        commands:
+          - /interface veth remove [find name="{{ container_name }}"]
+      when: veth_exists.stdout[0] | int > 0
+      ignore_errors: yes
+
+    # ===== 3. ОСТАНОВКА КОНТЕЙНЕРА =====
     - name: Остановить контейнер
       community.routeros.command:
         commands:
@@ -63,35 +92,7 @@
         seconds: 5
       when: container_exists.stdout[0] | int > 0
 
-    # ===== УДАЛЕНИЕ ПОРТА ИЗ BRIDGE (ДО удаления контейнера!) =====
-    - name: Проверить существует ли порт в bridge
-      community.routeros.command:
-        commands:
-          - /interface bridge port print count-only where interface="{{ container_name }}"
-      register: bridge_port_exists
-
-    - name: Удалить порт из bridge
-      community.routeros.command:
-        commands:
-          - /interface bridge port remove [find interface="{{ container_name }}"]
-      when: bridge_port_exists.stdout[0] | int > 0
-      ignore_errors: yes
-
-    # ===== УДАЛЕНИЕ VETH (ДО удаления контейнера!) =====
-    - name: Проверить существует ли veth
-      community.routeros.command:
-        commands:
-          - /interface veth print count-only where name="{{ container_name }}"
-      register: veth_exists
-
-    - name: Удалить veth интерфейс
-      community.routeros.command:
-        commands:
-          - /interface veth remove [find name="{{ container_name }}"]
-      when: veth_exists.stdout[0] | int > 0
-      ignore_errors: yes
-
-    # ===== УДАЛЕНИЕ КОНТЕЙНЕРА =====
+    # ===== 4. УДАЛЕНИЕ КОНТЕЙНЕРА =====
     - name: Удалить контейнер
       community.routeros.command:
         commands:
@@ -147,6 +148,20 @@
       delegate_to: localhost
       ignore_errors: yes
 
+    # ===== ОЧИСТКА UNKNOWN ПОРТОВ =====
+    - name: Найти unknown порты в Bridge-Docker
+      community.routeros.command:
+        commands:
+          - /interface bridge port print count-only where interface~"unknown" and bridge="{{ docker_bridge }}"
+      register: unknown_ports
+
+    - name: Удалить unknown порты из Bridge-Docker
+      community.routeros.command:
+        commands:
+          - /interface bridge port remove [find interface~"unknown" and bridge="{{ docker_bridge }}"]
+      when: unknown_ports.stdout[0] | int > 0
+      ignore_errors: yes
+
     # ===== РЕЗУЛЬТАТ =====
     - name: Проверить что контейнер удалён
       community.routeros.command:
@@ -166,4 +181,5 @@
           - veth: {{ 'да' if veth_exists.stdout[0] | int > 0 else 'не существовал' }}
           - mount: {{ 'да' if mount_exists.stdout[0] | int > 0 else 'не существовал' }}
           - envlist: {{ 'да' if envlist_exists.stdout[0] | int > 0 else 'не существовал' }}
+          - Unknown ports: {{ unknown_ports.stdout[0] | int }} удалено
           - Папки на SMB: удалены
