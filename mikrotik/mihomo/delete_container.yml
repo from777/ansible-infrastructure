@@ -1,0 +1,154 @@
+# delete_container.yml
+# Полное удаление контейнера со всеми зависимостями
+#
+# Использование:
+#   ansible-playbook delete_container.yml -e container_name="vless"
+#
+# Удаляет:
+# - Контейнер
+# - veth интерфейс (автоматом удаляется из bridge)
+# - mount
+# - envlist
+# - Папки конфигов и root-dir на SMB
+---
+- name: "Delete container completely"
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    ansible_command_timeout: 120
+    smb_base: "{{ usb_partition }}/smb_share"
+  vars_files:
+    - vars.yml
+
+  tasks:
+    # ===== ВАЛИДАЦИЯ =====
+    - name: Проверить что container_name задан
+      ansible.builtin.fail:
+        msg: |
+          container_name не задан!
+          Использование: ansible-playbook delete_container.yml -e container_name="имя"
+      when: container_name is not defined or container_name | length == 0
+
+    - name: Показать что будет удалено
+      ansible.builtin.debug:
+        msg: |
+          ⚠️  УДАЛЕНИЕ КОНТЕЙНЕРА: {{ container_name }}
+
+          Будет удалено:
+          - Контейнер: {{ container_name }}
+          - Интерфейс veth: {{ container_name }}
+          - Mount: {{ container_name }}_conf
+          - Envlist: {{ container_name }}_env
+          - Папка конфигов: {{ smb_base }}/docker_configs/{{ container_name }}
+          - Папка root-dir: {{ smb_base }}/docker/{{ container_name }}
+
+    # ===== ОСТАНОВКА КОНТЕЙНЕРА =====
+    - name: Проверить существует ли контейнер
+      community.routeros.command:
+        commands:
+          - /container print count-only where name="{{ container_name }}"
+      register: container_exists
+
+    - name: Остановить контейнер
+      community.routeros.command:
+        commands:
+          - /container stop [find name="{{ container_name }}"]
+      when: container_exists.stdout[0] | int > 0
+      ignore_errors: yes
+
+    - name: Пауза для остановки
+      ansible.builtin.pause:
+        seconds: 5
+      when: container_exists.stdout[0] | int > 0
+
+    # ===== УДАЛЕНИЕ КОНТЕЙНЕРА =====
+    - name: Удалить контейнер
+      community.routeros.command:
+        commands:
+          - /container remove [find name="{{ container_name }}"]
+      when: container_exists.stdout[0] | int > 0
+      ignore_errors: yes
+
+    - name: Пауза после удаления контейнера
+      ansible.builtin.pause:
+        seconds: 3
+      when: container_exists.stdout[0] | int > 0
+
+    # ===== УДАЛЕНИЕ VETH (автоматом удалится из bridge) =====
+    - name: Проверить существует ли veth
+      community.routeros.command:
+        commands:
+          - /interface veth print count-only where name="{{ container_name }}"
+      register: veth_exists
+
+    - name: Удалить veth интерфейс
+      community.routeros.command:
+        commands:
+          - /interface veth remove [find name="{{ container_name }}"]
+      when: veth_exists.stdout[0] | int > 0
+      ignore_errors: yes
+
+    # ===== УДАЛЕНИЕ MOUNT =====
+    - name: Проверить существует ли mount
+      community.routeros.command:
+        commands:
+          - /container mounts print count-only where name="{{ container_name }}_conf"
+      register: mount_exists
+
+    - name: Удалить mount
+      community.routeros.command:
+        commands:
+          - /container mounts remove [find name="{{ container_name }}_conf"]
+      when: mount_exists.stdout[0] | int > 0
+      ignore_errors: yes
+
+    # ===== УДАЛЕНИЕ ENVLIST =====
+    - name: Проверить существует ли envlist
+      community.routeros.command:
+        commands:
+          - /container envs print count-only where list="{{ container_name }}_env"
+      register: envlist_exists
+
+    - name: Удалить envlist
+      community.routeros.command:
+        commands:
+          - /container envs remove [find list="{{ container_name }}_env"]
+      when: envlist_exists.stdout[0] | int > 0
+      ignore_errors: yes
+
+    # ===== УДАЛЕНИЕ ПАПОК НА SMB =====
+    - name: Удалить папку конфигов
+      ansible.builtin.file:
+        path: "{{ smb_mount_point }}/docker_configs/{{ container_name }}"
+        state: absent
+      delegate_to: localhost
+      ignore_errors: yes
+
+    - name: Удалить папку root-dir контейнера
+      ansible.builtin.file:
+        path: "{{ smb_mount_point }}/docker/{{ container_name }}"
+        state: absent
+      delegate_to: localhost
+      ignore_errors: yes
+
+    # ===== РЕЗУЛЬТАТ =====
+    - name: Проверить что контейнер удалён
+      community.routeros.command:
+        commands:
+          - /container print where name="{{ container_name }}"
+      register: final_check
+      ignore_errors: yes
+
+    - name: Результат
+      ansible.builtin.debug:
+        msg: |
+          ✅ Контейнер {{ container_name }} полностью удалён!
+
+          Удалено:
+          - Контейнер: {{ 'да' if container_exists.stdout[0] | int > 0 else 'не существовал' }}
+          - veth: {{ 'да' if veth_exists.stdout[0] | int > 0 else 'не существовал' }}
+          - mount: {{ 'да' if mount_exists.stdout[0] | int > 0 else 'не существовал' }}
+          - envlist: {{ 'да' if envlist_exists.stdout[0] | int > 0 else 'не существовал' }}
+          - Папки на SMB: удалены
