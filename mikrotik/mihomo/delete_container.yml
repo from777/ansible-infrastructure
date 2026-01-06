@@ -4,12 +4,12 @@
 # Использование:
 #   ansible-playbook delete_container.yml -e container_name="vless"
 #
-# Удаляет:
-# - Контейнер
-# - veth интерфейс (автоматом удаляется из bridge)
-# - mount
-# - envlist
-# - Папки конфигов и root-dir на SMB
+# Порядок удаления (критически важен для MikroTik!):
+# 1. Остановить контейнер (освободить veth)
+# 2. Удалить контейнер (полностью освободить veth)
+# 3. Удалить порт из bridge (veth свободен, имя сохранено)
+# 4. Удалить veth интерфейс
+# 5. Удалить mount, envlist, папки
 ---
 - name: "Delete container completely"
   hosts: mikrotik
@@ -34,128 +34,129 @@
     - name: Показать что будет удалено
       ansible.builtin.debug:
         msg: |
-          ⚠️  УДАЛЕНИЕ КОНТЕЙНЕРА: {{ container_name }}
+          УДАЛЕНИЕ КОНТЕЙНЕРА: {{ container_name }}
 
           Будет удалено:
           - Контейнер: {{ container_name }}
+          - Порт в bridge: {{ container_name }}
           - Интерфейс veth: {{ container_name }}
           - Mount: {{ container_name }}_conf
           - Envlist: {{ container_name }}_env
-          - Папка конфигов: {{ smb_base }}/docker_configs/{{ container_name }}
-          - Папка root-dir: {{ smb_base }}/docker/{{ container_name }}
+          - Папки на SMB
 
-    # ===== ПРОВЕРКИ =====
-    - name: Проверить существует ли контейнер
+    # ===== ШАГ 1: ОСТАНОВИТЬ КОНТЕЙНЕР =====
+    - name: "1.1 Проверить существует ли контейнер"
       community.routeros.command:
         commands:
           - /container print count-only where name="{{ container_name }}"
       register: container_exists
 
-    - name: Проверить существует ли порт в bridge
-      community.routeros.command:
-        commands:
-          - /interface bridge port print count-only where interface="{{ container_name }}"
-      register: bridge_port_exists
-
-    - name: Проверить существует ли veth
-      community.routeros.command:
-        commands:
-          - /interface veth print count-only where name="{{ container_name }}"
-      register: veth_exists
-
-    # ===== 1. УДАЛЕНИЕ ПОРТА ИЗ BRIDGE (САМОЕ ПЕРВОЕ!) =====
-    - name: Удалить порт из bridge
-      community.routeros.command:
-        commands:
-          - /interface bridge port remove [find interface="{{ container_name }}"]
-      when: bridge_port_exists.stdout[0] | int > 0
-      ignore_errors: yes
-
-    # ===== 2. УДАЛЕНИЕ VETH =====
-    - name: Удалить veth интерфейс
-      community.routeros.command:
-        commands:
-          - /interface veth remove [find name="{{ container_name }}"]
-      when: veth_exists.stdout[0] | int > 0
-      ignore_errors: yes
-
-    # ===== 3. ОСТАНОВКА КОНТЕЙНЕРА =====
-    - name: Остановить контейнер
+    - name: "1.2 Остановить контейнер"
       community.routeros.command:
         commands:
           - /container stop [find name="{{ container_name }}"]
       when: container_exists.stdout[0] | int > 0
       ignore_errors: yes
 
-    - name: Пауза для остановки
+    - name: "1.3 Ожидание остановки контейнера"
       ansible.builtin.pause:
-        seconds: 5
+        seconds: 10
+        prompt: "Ожидание полной остановки контейнера..."
       when: container_exists.stdout[0] | int > 0
 
-    # ===== 4. УДАЛЕНИЕ КОНТЕЙНЕРА =====
-    - name: Удалить контейнер
+    # ===== ШАГ 2: УДАЛИТЬ КОНТЕЙНЕР =====
+    - name: "2.1 Удалить контейнер"
       community.routeros.command:
         commands:
           - /container remove [find name="{{ container_name }}"]
       when: container_exists.stdout[0] | int > 0
       ignore_errors: yes
 
-    - name: Пауза после удаления контейнера
+    - name: "2.2 Ожидание удаления контейнера"
       ansible.builtin.pause:
-        seconds: 3
+        seconds: 5
+        prompt: "Ожидание удаления контейнера..."
       when: container_exists.stdout[0] | int > 0
 
-    # ===== УДАЛЕНИЕ MOUNT =====
-    - name: Проверить существует ли mount
+    # ===== ШАГ 3: УДАЛИТЬ ПОРТ ИЗ BRIDGE =====
+    - name: "3.1 Проверить существует ли порт в bridge"
+      community.routeros.command:
+        commands:
+          - /interface bridge port print count-only where interface="{{ container_name }}"
+      register: bridge_port_exists
+
+    - name: "3.2 Удалить порт из bridge"
+      community.routeros.command:
+        commands:
+          - /interface bridge port remove [find interface="{{ container_name }}"]
+      when: bridge_port_exists.stdout[0] | int > 0
+      ignore_errors: yes
+
+    # ===== ШАГ 4: УДАЛИТЬ VETH =====
+    - name: "4.1 Проверить существует ли veth"
+      community.routeros.command:
+        commands:
+          - /interface veth print count-only where name="{{ container_name }}"
+      register: veth_exists
+
+    - name: "4.2 Удалить veth интерфейс"
+      community.routeros.command:
+        commands:
+          - /interface veth remove [find name="{{ container_name }}"]
+      when: veth_exists.stdout[0] | int > 0
+      ignore_errors: yes
+
+    # ===== ШАГ 5: УДАЛИТЬ MOUNT =====
+    - name: "5.1 Проверить существует ли mount"
       community.routeros.command:
         commands:
           - /container mounts print count-only where name="{{ container_name }}_conf"
       register: mount_exists
 
-    - name: Удалить mount
+    - name: "5.2 Удалить mount"
       community.routeros.command:
         commands:
           - /container mounts remove [find name="{{ container_name }}_conf"]
       when: mount_exists.stdout[0] | int > 0
       ignore_errors: yes
 
-    # ===== УДАЛЕНИЕ ENVLIST =====
-    - name: Проверить существует ли envlist
+    # ===== ШАГ 6: УДАЛИТЬ ENVLIST =====
+    - name: "6.1 Проверить существует ли envlist"
       community.routeros.command:
         commands:
           - /container envs print count-only where list="{{ container_name }}_env"
       register: envlist_exists
 
-    - name: Удалить envlist
+    - name: "6.2 Удалить envlist"
       community.routeros.command:
         commands:
           - /container envs remove [find list="{{ container_name }}_env"]
       when: envlist_exists.stdout[0] | int > 0
       ignore_errors: yes
 
-    # ===== УДАЛЕНИЕ ПАПОК НА SMB =====
-    - name: Удалить папку конфигов
+    # ===== ШАГ 7: УДАЛИТЬ ПАПКИ НА SMB =====
+    - name: "7.1 Удалить папку конфигов"
       ansible.builtin.file:
         path: "{{ smb_mount_point }}/docker_configs/{{ container_name }}"
         state: absent
       delegate_to: localhost
       ignore_errors: yes
 
-    - name: Удалить папку root-dir контейнера
+    - name: "7.2 Удалить папку root-dir контейнера"
       ansible.builtin.file:
         path: "{{ smb_mount_point }}/docker/{{ container_name }}"
         state: absent
       delegate_to: localhost
       ignore_errors: yes
 
-    # ===== ОЧИСТКА UNKNOWN ПОРТОВ =====
-    - name: Найти unknown порты в Bridge-Docker
+    # ===== ШАГ 8: ОЧИСТКА UNKNOWN ПОРТОВ =====
+    - name: "8.1 Найти unknown порты в Bridge-Docker"
       community.routeros.command:
         commands:
           - /interface bridge port print count-only where interface~"unknown" and bridge="{{ docker_bridge }}"
       register: unknown_ports
 
-    - name: Удалить unknown порты из Bridge-Docker
+    - name: "8.2 Удалить unknown порты из Bridge-Docker"
       community.routeros.command:
         commands:
           - /interface bridge port remove [find interface~"unknown" and bridge="{{ docker_bridge }}"]
@@ -163,23 +164,16 @@
       ignore_errors: yes
 
     # ===== РЕЗУЛЬТАТ =====
-    - name: Проверить что контейнер удалён
-      community.routeros.command:
-        commands:
-          - /container print where name="{{ container_name }}"
-      register: final_check
-      ignore_errors: yes
-
     - name: Результат
       ansible.builtin.debug:
         msg: |
-          Контейнер {{ container_name }} полностью удалён!
+          Контейнер {{ container_name }} удалён!
 
-          Удалено:
-          - Контейнер: {{ 'да' if container_exists.stdout[0] | int > 0 else 'не существовал' }}
-          - Bridge port: {{ 'да' if bridge_port_exists.stdout[0] | int > 0 else 'не существовал' }}
-          - veth: {{ 'да' if veth_exists.stdout[0] | int > 0 else 'не существовал' }}
-          - mount: {{ 'да' if mount_exists.stdout[0] | int > 0 else 'не существовал' }}
-          - envlist: {{ 'да' if envlist_exists.stdout[0] | int > 0 else 'не существовал' }}
-          - Unknown ports: {{ unknown_ports.stdout[0] | int }} удалено
+          Статус:
+          - Контейнер: {{ 'удалён' if container_exists.stdout[0] | int > 0 else 'не существовал' }}
+          - Bridge port: {{ 'удалён' if bridge_port_exists.stdout[0] | int > 0 else 'не существовал' }}
+          - veth: {{ 'удалён' if veth_exists.stdout[0] | int > 0 else 'не существовал' }}
+          - mount: {{ 'удалён' if mount_exists.stdout[0] | int > 0 else 'не существовал' }}
+          - envlist: {{ 'удалён' if envlist_exists.stdout[0] | int > 0 else 'не существовал' }}
+          - Unknown ports: {{ unknown_ports.stdout[0] | int }} очищено
           - Папки на SMB: удалены
