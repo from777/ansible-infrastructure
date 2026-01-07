@@ -1,0 +1,22 @@
+# test-telegram.yml
+# Тест отправки в Telegram - удалить после проверки
+---
+- name: Test Telegram notification
+  hosts: localhost
+  gather_facts: no
+  connection: local
+
+  tasks:
+    - name: Send test message to Telegram
+      ansible.builtin.uri:
+        url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
+        method: POST
+        body_format: json
+        body:
+          chat_id: "{{ telegram_chat_id }}"
+          text: "✅ Тест из Ansible/Semaphore\n\nЕсли видишь это - интеграция работает!"
+      register: telegram_result
+
+    - name: Show result
+      ansible.builtin.debug:
+        var: telegram_result.status

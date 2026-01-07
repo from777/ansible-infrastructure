@@ -1,0 +1,39 @@
+# security-monitor.yml
+# Мониторинг безопасности - проверка что SOCKS не включен
+# Запускать по расписанию в Semaphore (каждые 15-30 мин)
+---
+- name: Security monitoring - SOCKS proxy check
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    # telegram_bot_token и telegram_chat_id задаются в Semaphore Variable Groups
+
+  tasks:
+    - name: Get SOCKS status
+      community.routeros.command:
+        commands:
+          - /ip socks print
+      register: socks_status
+
+    - name: Set alert flag
+      ansible.builtin.set_fact:
+        socks_enabled: "{{ 'enabled: yes' in socks_status.stdout[0] }}"
+
+    - name: Send Telegram alert if SOCKS enabled
+      ansible.builtin.uri:
+        url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
+        method: POST
+        body_format: json
+        body:
+          chat_id: "{{ telegram_chat_id }}"
+          text: "🚨 ALERT: SOCKS proxy ENABLED!\n\nRouter: {{ inventory_hostname }}\nHost: {{ ansible_host }}\n\nOutput:\n{{ socks_status.stdout[0] }}"
+          parse_mode: "HTML"
+      delegate_to: localhost
+      when: socks_enabled
+
+    - name: Fail if SOCKS enabled
+      ansible.builtin.fail:
+        msg: "SOCKS proxy enabled on {{ inventory_hostname }}"
+      when: socks_enabled
