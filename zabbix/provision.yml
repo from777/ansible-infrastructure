@@ -1,0 +1,136 @@
+# provision.yml
+---
+- name: Install Zabbix Server with PostgreSQL
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Install prerequisites
+      apt:
+        name:
+          - gnupg
+          - wget
+          - acl
+          - python3-psycopg2
+        state: present
+        update_cache: yes
+
+    - name: Download Zabbix repo package
+      get_url:
+        url: "https://repo.zabbix.com/zabbix/{{ zabbix_version }}/debian/pool/main/z/zabbix-release/zabbix-release_latest_{{ zabbix_version }}+debian12_all.deb"
+        dest: /tmp/zabbix-release.deb
+
+    - name: Install Zabbix repo
+      apt:
+        deb: /tmp/zabbix-release.deb
+        state: present
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install PostgreSQL
+      apt:
+        name:
+          - postgresql
+          - postgresql-contrib
+        state: present
+
+    - name: Start PostgreSQL
+      service:
+        name: postgresql
+        state: started
+        enabled: yes
+
+    - name: Create database user
+      become_user: postgres
+      postgresql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_password }}"
+        state: present
+
+    - name: Create database
+      become_user: postgres
+      postgresql_db:
+        name: "{{ db_name }}"
+        owner: "{{ db_user }}"
+        encoding: UTF-8
+        state: present
+
+    - name: Install Zabbix packages
+      apt:
+        name:
+          - zabbix-server-pgsql
+          - zabbix-frontend-php
+          - zabbix-nginx-conf
+          - zabbix-sql-scripts
+          - zabbix-agent
+        state: present
+
+    - name: Check if database is initialized
+      become_user: postgres
+      postgresql_query:
+        db: "{{ db_name }}"
+        query: "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public'"
+      register: db_tables
+
+    - name: Import initial schema
+      shell: |
+        zcat /usr/share/zabbix-sql-scripts/postgresql/server.sql.gz | sudo -u {{ db_user }} psql {{ db_name }}
+      when: db_tables.query_result[0].count | int == 0
+
+    - name: Configure Zabbix server database password
+      lineinfile:
+        path: /etc/zabbix/zabbix_server.conf
+        regexp: "^#?\\s*DBPassword="
+        line: "DBPassword={{ db_password }}"
+      notify: Restart Zabbix server
+
+    - name: Configure Nginx listen port
+      lineinfile:
+        path: /etc/zabbix/nginx.conf
+        regexp: "^\\s*#?\\s*listen"
+        line: "        listen 80;"
+      notify: Restart Nginx
+
+    - name: Configure Nginx server name
+      lineinfile:
+        path: /etc/zabbix/nginx.conf
+        regexp: "^\\s*#?\\s*server_name"
+        line: "        server_name zabbix;"
+      notify: Restart Nginx
+
+    - name: Remove default nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Restart Nginx
+
+    - name: Enable Zabbix nginx config
+      file:
+        src: /etc/zabbix/nginx.conf
+        dest: /etc/nginx/sites-enabled/zabbix.conf
+        state: link
+      notify: Restart Nginx
+
+    - name: Start and enable services
+      service:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop:
+        - zabbix-server
+        - zabbix-agent
+        - nginx
+        - php8.2-fpm
+
+  handlers:
+    - name: Restart Zabbix server
+      service:
+        name: zabbix-server
+        state: restarted
+
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted
