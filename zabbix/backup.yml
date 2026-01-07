@@ -1,4 +1,4 @@
-# backup.yml
+вон # backup.yml
 ---
 - name: Backup Zabbix PostgreSQL database
   hosts: all
