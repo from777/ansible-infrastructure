@@ -4,6 +4,13 @@
   hosts: all
   become: yes
 
+  vars:
+    zabbix_version: "7.0"
+    db_name: zabbix
+    db_user: zabbix
+    db_password: "zabbix_secure_pass_123"
+    zabbix_timezone: "Europe/Moscow"
+
   tasks:
     - name: Install prerequisites
       apt:
@@ -12,13 +19,20 @@
           - wget
           - acl
           - python3-psycopg2
+          - locales
         state: present
         update_cache: yes
+
+    - name: Generate ru_RU.UTF-8 locale
+      locale_gen:
+        name: ru_RU.UTF-8
+        state: present
 
     - name: Download Zabbix repo package
       get_url:
         url: "https://repo.zabbix.com/zabbix/{{ zabbix_version }}/debian/pool/main/z/zabbix-release/zabbix-release_latest_{{ zabbix_version }}+debian12_all.deb"
         dest: /tmp/zabbix-release.deb
+        timeout: 60
 
     - name: Install Zabbix repo
       apt:
@@ -65,6 +79,7 @@
           - zabbix-nginx-conf
           - zabbix-sql-scripts
           - zabbix-agent
+          - php-pgsql
         state: present
 
     - name: Check if database is initialized
@@ -112,6 +127,36 @@
         dest: /etc/nginx/sites-enabled/zabbix.conf
         state: link
       notify: Restart Nginx
+
+    - name: Create Zabbix web config (skip setup wizard)
+      copy:
+        dest: /etc/zabbix/web/zabbix.conf.php
+        owner: www-data
+        group: www-data
+        mode: "0600"
+        content: |
+          <?php
+          $DB['TYPE'] = 'POSTGRESQL';
+          $DB['SERVER'] = 'localhost';
+          $DB['PORT'] = '0';
+          $DB['DATABASE'] = '{{ db_name }}';
+          $DB['USER'] = '{{ db_user }}';
+          $DB['PASSWORD'] = '{{ db_password }}';
+          $DB['SCHEMA'] = '';
+          $DB['ENCRYPTION'] = false;
+          $DB['KEY_FILE'] = '';
+          $DB['CERT_FILE'] = '';
+          $DB['CA_FILE'] = '';
+          $DB['VERIFY_HOST'] = false;
+          $DB['CIPHER_LIST'] = '';
+          $DB['VAULT_URL'] = '';
+          $DB['VAULT_DB_PATH'] = '';
+          $DB['VAULT_TOKEN'] = '';
+          $DB['DOUBLE_IEEE754'] = true;
+          $ZBX_SERVER = 'localhost';
+          $ZBX_SERVER_PORT = '10051';
+          $ZBX_SERVER_NAME = 'Zabbix';
+          $IMAGE_FORMAT_DEFAULT = IMAGE_FORMAT_PNG;
 
     - name: Start and enable services
       service:

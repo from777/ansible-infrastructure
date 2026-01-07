@@ -7,6 +7,7 @@
   vars:
     backup_dir: /var/backups/zabbix
     backup_retention_days: 7
+    db_name: zabbix
 
   tasks:
     - name: Create backup directory
