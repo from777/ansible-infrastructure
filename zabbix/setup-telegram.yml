@@ -1,0 +1,165 @@
+# setup-telegram.yml
+# Настройка Telegram в Zabbix + тестовое сообщение
+---
+- name: Setup Telegram integration in Zabbix
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - group_vars/all.yml
+  vars:
+    zabbix_url: "http://192.168.0.68/api_jsonrpc.php"
+    zabbix_user: "Admin"
+    zabbix_password: "zabbix"
+
+  tasks:
+    # 1. Получить токен авторизации
+    - name: Login to Zabbix API
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "user.login"
+          params:
+            username: "{{ zabbix_user }}"
+            password: "{{ zabbix_password }}"
+          id: 1
+      register: zabbix_auth
+
+    - name: Set auth token
+      ansible.builtin.set_fact:
+        auth_token: "{{ zabbix_auth.json.result }}"
+
+    # 2. Найти Telegram media type (если есть)
+    - name: Get existing media types
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "mediatype.get"
+          params:
+            filter:
+              name: "Telegram"
+          auth: "{{ auth_token }}"
+          id: 2
+      register: existing_mediatype
+
+    # 3. Создать Telegram media type если не существует
+    - name: Create Telegram media type
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "mediatype.create"
+          params:
+            name: "Telegram"
+            type: 4
+            parameters:
+              - name: "bot_token"
+                value: "{{ tg_token }}"
+              - name: "chat_id"
+                value: "{ALERT.SENDTO}"
+              - name: "message"
+                value: "{ALERT.MESSAGE}"
+              - name: "subject"
+                value: "{ALERT.SUBJECT}"
+            script: |
+              var params = JSON.parse(value),
+                  req = new HttpRequest(),
+                  response;
+              req.addHeader('Content-Type: application/json');
+              response = req.post(
+                  'https://api.telegram.org/bot' + params.bot_token + '/sendMessage',
+                  JSON.stringify({
+                      chat_id: params.chat_id,
+                      text: params.subject + '\n' + params.message,
+                      parse_mode: 'HTML'
+                  })
+              );
+              if (req.getStatus() !== 200) {
+                  throw 'Response: ' + response;
+              }
+              return response;
+            message_templates:
+              - eventsource: 0
+                recovery: 0
+                subject: "🚨 Problem: {EVENT.NAME}"
+                message: "Host: {HOST.NAME}\nProblem: {EVENT.NAME}\nSeverity: {EVENT.SEVERITY}\nTime: {EVENT.TIME} {EVENT.DATE}"
+              - eventsource: 0
+                recovery: 1
+                subject: "✅ Resolved: {EVENT.NAME}"
+                message: "Host: {HOST.NAME}\nProblem: {EVENT.NAME}\nResolved at: {EVENT.RECOVERY.TIME} {EVENT.RECOVERY.DATE}"
+          auth: "{{ auth_token }}"
+          id: 3
+      when: existing_mediatype.json.result | length == 0
+      register: created_mediatype
+
+    - name: Get Telegram media type ID
+      ansible.builtin.set_fact:
+        telegram_mediatypeid: "{{ existing_mediatype.json.result[0].mediatypeid if existing_mediatype.json.result | length > 0 else created_mediatype.json.result.mediatypeids[0] }}"
+
+    # 4. Получить Admin user ID
+    - name: Get Admin user
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "user.get"
+          params:
+            filter:
+              username: "Admin"
+            selectMedias: "extend"
+          auth: "{{ auth_token }}"
+          id: 4
+      register: admin_user
+
+    - name: Set Admin user ID
+      ansible.builtin.set_fact:
+        admin_userid: "{{ admin_user.json.result[0].userid }}"
+        admin_has_telegram: "{{ admin_user.json.result[0].medias | selectattr('mediatypeid', 'equalto', telegram_mediatypeid) | list | length > 0 }}"
+
+    # 5. Добавить Telegram media к Admin
+    - name: Add Telegram media to Admin user
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "user.update"
+          params:
+            userid: "{{ admin_userid }}"
+            medias:
+              - mediatypeid: "{{ telegram_mediatypeid }}"
+                sendto: "{{ tg_chat_id }}"
+                active: 0
+                severity: 63
+                period: "1-7,00:00-24:00"
+          auth: "{{ auth_token }}"
+          id: 5
+      when: not admin_has_telegram
+
+    # 6. Отправить тестовое сообщение напрямую через Telegram API
+    - name: Send test message via Telegram
+      ansible.builtin.uri:
+        url: "https://api.telegram.org/bot{{ tg_token }}/sendMessage"
+        method: POST
+        body_format: json
+        body:
+          chat_id: "{{ tg_chat_id }}"
+          text: "✅ Zabbix Telegram интеграция настроена!\n\nСервер: 192.168.0.68\nВремя: {{ now() }}"
+      register: telegram_test
+
+    - name: Result
+      ansible.builtin.debug:
+        msg:
+          - "Telegram media type ID: {{ telegram_mediatypeid }}"
+          - "Admin user ID: {{ admin_userid }}"
+          - "Test message sent: {{ telegram_test.status == 200 }}"
