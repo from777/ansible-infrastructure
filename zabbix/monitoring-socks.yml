@@ -94,16 +94,27 @@
           id: 4
       when: template_check.json.result | length == 0
       register: template_created
+      ignore_errors: yes
 
-    - name: Set template ID (existing)
-      ansible.builtin.set_fact:
-        template_id: "{{ template_check.json.result[0].templateid }}"
-      when: template_check.json.result | length > 0
+    # Re-query template to get ID (works for both new and existing)
+    - name: Get template ID
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "template.get"
+          params:
+            filter:
+              host: "{{ template_name }}"
+          auth: "{{ auth }}"
+          id: 5
+      register: template_final
 
-    - name: Set template ID (new)
+    - name: Set template ID
       ansible.builtin.set_fact:
-        template_id: "{{ template_created.json.result.templateids[0] }}"
-      when: template_check.json.result | length == 0
+        template_id: "{{ template_final.json.result[0].templateid }}"
 
     # Create Item
     - name: Check if item exists

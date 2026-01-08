@@ -1,4 +1,11 @@
 # inventory.yml - общий inventory для всех плейбуков
+#
+# Zabbix monitoring flags:
+#   zabbix_monitor: true/false  -> setup-mikrotik-hosts.yml (добавляет/не добавляет хост в Zabbix)
+#   monitor_socks: true/false   -> monitoring-socks.yml (линкует/отлинковывает template SOCKS)
+#   monitor_users: true/false   -> monitoring-users.yml (линкует/отлинковывает template Users)
+#
+# При изменении любого флага запустить соответствующий playbook!
 ---
 mikrotik:
   hosts:
@@ -6,7 +13,7 @@ mikrotik:
       ansible_host: 192.168.0.1
       elk_server: 192.168.0.82
       router_ip: 192.168.0.1
-      # Zabbix monitoring flags
+      # Zabbix monitoring flags (см. комментарий вверху)
       zabbix_monitor: true
       monitor_socks: true
       monitor_users: true
