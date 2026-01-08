@@ -1,0 +1,187 @@
+# monitoring-socks.yml
+# Создаёт template для мониторинга SOCKS и привязывает к хостам
+# Запускать: после setup-mikrotik-hosts.yml
+---
+- name: Collect hosts for SOCKS monitoring
+  hosts: mikrotik
+  gather_facts: no
+  tasks:
+    - name: Add to SOCKS monitoring list
+      ansible.builtin.set_fact:
+        socks_hosts: "{{ socks_hosts | default([]) + [inventory_hostname] }}"
+      delegate_to: localhost
+      when: monitor_socks | default(false)
+
+- name: Setup SOCKS monitoring in Zabbix
+  hosts: zabbix
+  gather_facts: no
+  connection: local
+  vars:
+    zabbix_url: "http://{{ ansible_host }}/api_jsonrpc.php"
+    zabbix_user: "Admin"
+    zabbix_password: "zabbix"
+    template_name: "Template MikroTik SOCKS"
+
+  tasks:
+    - name: Login to Zabbix API
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "user.login"
+          params:
+            username: "{{ zabbix_user }}"
+            password: "{{ zabbix_password }}"
+          id: 1
+      register: zabbix_auth
+
+    - name: Set auth token
+      ansible.builtin.set_fact:
+        auth: "{{ zabbix_auth.json.result }}"
+
+    # Get host group ID
+    - name: Get MikroTik host group
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "hostgroup.get"
+          params:
+            filter:
+              name: "MikroTik"
+          auth: "{{ auth }}"
+          id: 2
+      register: hostgroup
+
+    - name: Set host group ID
+      ansible.builtin.set_fact:
+        hostgroup_id: "{{ hostgroup.json.result[0].groupid }}"
+
+    # Create Template
+    - name: Check if template exists
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "template.get"
+          params:
+            filter:
+              host: "{{ template_name }}"
+          auth: "{{ auth }}"
+          id: 3
+      register: template_check
+
+    - name: Create template
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "template.create"
+          params:
+            host: "{{ template_name }}"
+            name: "{{ template_name }}"
+            groups:
+              - groupid: "{{ hostgroup_id }}"
+          auth: "{{ auth }}"
+          id: 4
+      when: template_check.json.result | length == 0
+      register: template_created
+
+    - name: Set template ID
+      ansible.builtin.set_fact:
+        template_id: "{{ template_check.json.result[0].templateid if template_check.json.result | length > 0 else template_created.json.result.templateids[0] }}"
+
+    # Create Item
+    - name: Check if item exists
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "item.get"
+          params:
+            templateids: "{{ template_id }}"
+            filter:
+              key_: "ssh.run[socks_check]"
+          auth: "{{ auth }}"
+          id: 5
+      register: item_check
+
+    - name: Create SSH item for SOCKS check
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "item.create"
+          params:
+            name: "SOCKS Proxy Status"
+            key_: "ssh.run[socks_check]"
+            hostid: "{{ template_id }}"
+            type: 13
+            value_type: 4
+            params: "/ip socks print"
+            username: "{$MIKROTIK_USER}"
+            password: "{$MIKROTIK_PASS}"
+            delay: "5m"
+            authtype: 0
+          auth: "{{ auth }}"
+          id: 6
+      when: item_check.json.result | length == 0
+
+    # Create Trigger
+    - name: Check if trigger exists
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "trigger.get"
+          params:
+            templateids: "{{ template_id }}"
+            filter:
+              description: "SOCKS proxy enabled on {HOST.NAME}"
+          auth: "{{ auth }}"
+          id: 7
+      register: trigger_check
+
+    - name: Create trigger
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "trigger.create"
+          params:
+            description: "SOCKS proxy enabled on {HOST.NAME}"
+            expression: "find(/{{ template_name }}/ssh.run[socks_check],#1,\"like\",\"enabled: yes\")=1"
+            priority: 4
+            manual_close: 1
+          auth: "{{ auth }}"
+          id: 8
+      when: trigger_check.json.result | length == 0
+
+    # Link template to hosts
+    - name: Link template to hosts with monitor_socks=true
+      ansible.builtin.include_tasks: tasks/link-template-to-host.yml
+      loop: "{{ hostvars['localhost'].socks_hosts | default([]) }}"
+      loop_control:
+        loop_var: host_name
+      vars:
+        target_template_id: "{{ template_id }}"
+
+    - name: Done
+      ansible.builtin.debug:
+        msg: "SOCKS monitoring template linked to: {{ hostvars['localhost'].socks_hosts | default([]) }}"

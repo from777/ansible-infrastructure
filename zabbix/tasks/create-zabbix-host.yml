@@ -1,0 +1,52 @@
+# tasks/create-zabbix-host.yml
+# Создаёт один хост в Zabbix если не существует
+---
+- name: "Check if host {{ mikrotik_host.name }} exists"
+  ansible.builtin.uri:
+    url: "{{ zabbix_url }}"
+    method: POST
+    body_format: json
+    body:
+      jsonrpc: "2.0"
+      method: "host.get"
+      params:
+        filter:
+          host: "{{ mikrotik_host.name }}"
+      auth: "{{ auth }}"
+      id: 10
+  register: host_check
+
+- name: "Create host {{ mikrotik_host.name }}"
+  ansible.builtin.uri:
+    url: "{{ zabbix_url }}"
+    method: POST
+    body_format: json
+    body:
+      jsonrpc: "2.0"
+      method: "host.create"
+      params:
+        host: "{{ mikrotik_host.name }}"
+        name: "MikroTik {{ mikrotik_host.name }}"
+        groups:
+          - groupid: "{{ hostgroup_id }}"
+        interfaces:
+          - type: 1
+            main: 1
+            useip: 1
+            ip: "{{ mikrotik_host.ip }}"
+            dns: ""
+            port: "22"
+        macros:
+          - macro: "{$MIKROTIK_USER}"
+            value: "{{ mikrotik_host.user }}"
+          - macro: "{$MIKROTIK_PASS}"
+            value: "{{ mikrotik_host.password }}"
+            type: 1
+      auth: "{{ auth }}"
+      id: 11
+  when: host_check.json.result | length == 0
+  register: host_created
+
+- name: "Host {{ mikrotik_host.name }} status"
+  ansible.builtin.debug:
+    msg: "{{ 'Created' if host_created.changed | default(false) else 'Already exists' }}"

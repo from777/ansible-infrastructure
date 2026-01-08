@@ -1,0 +1,100 @@
+# setup-mikrotik-hosts.yml
+# Добавляет хосты MikroTik в Zabbix (без templates)
+# Templates привязываются отдельными playbooks monitoring-*.yml
+# Запускать: при добавлении нового роутера
+---
+- name: Collect MikroTik hosts info
+  hosts: mikrotik
+  gather_facts: no
+  tasks:
+    - name: Store host info for Zabbix
+      ansible.builtin.set_fact:
+        mikrotik_host_info:
+          name: "{{ inventory_hostname }}"
+          ip: "{{ ansible_host }}"
+          user: "{{ ansible_user }}"
+          password: "{{ ansible_password }}"
+          zabbix_monitor: "{{ zabbix_monitor | default(false) }}"
+      delegate_to: localhost
+      delegate_facts: false
+      when: zabbix_monitor | default(false)
+
+    - name: Add to hosts list
+      ansible.builtin.set_fact:
+        mikrotik_hosts_list: "{{ mikrotik_hosts_list | default([]) + [mikrotik_host_info] }}"
+      delegate_to: localhost
+      when: zabbix_monitor | default(false)
+
+- name: Setup MikroTik hosts in Zabbix
+  hosts: zabbix
+  gather_facts: no
+  connection: local
+  vars:
+    zabbix_url: "http://{{ ansible_host }}/api_jsonrpc.php"
+    zabbix_user: "Admin"
+    zabbix_password: "zabbix"
+
+  tasks:
+    - name: Login to Zabbix API
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "user.login"
+          params:
+            username: "{{ zabbix_user }}"
+            password: "{{ zabbix_password }}"
+          id: 1
+      register: zabbix_auth
+
+    - name: Set auth token
+      ansible.builtin.set_fact:
+        auth: "{{ zabbix_auth.json.result }}"
+
+    # Host Group
+    - name: Check if host group exists
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "hostgroup.get"
+          params:
+            filter:
+              name: "MikroTik"
+          auth: "{{ auth }}"
+          id: 2
+      register: hostgroup_check
+
+    - name: Create host group MikroTik
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "hostgroup.create"
+          params:
+            name: "MikroTik"
+          auth: "{{ auth }}"
+          id: 3
+      when: hostgroup_check.json.result | length == 0
+      register: hostgroup_created
+
+    - name: Set host group ID
+      ansible.builtin.set_fact:
+        hostgroup_id: "{{ hostgroup_check.json.result[0].groupid if hostgroup_check.json.result | length > 0 else hostgroup_created.json.result.groupids[0] }}"
+
+    # Create hosts
+    - name: Check and create MikroTik hosts
+      ansible.builtin.include_tasks: tasks/create-zabbix-host.yml
+      loop: "{{ hostvars['localhost'].mikrotik_hosts_list | default([]) }}"
+      loop_control:
+        loop_var: mikrotik_host
+
+    - name: Done
+      ansible.builtin.debug:
+        msg: "MikroTik hosts added to Zabbix. Now run monitoring-*.yml to add templates."
