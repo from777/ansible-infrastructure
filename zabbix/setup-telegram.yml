@@ -1,6 +1,6 @@
 # setup-telegram.yml
 # Настройка Telegram в Zabbix + тестовое сообщение
-# Обновляет существующий media type или создаёт новый
+# Удаляет существующий media type и создаёт новый (идемпотентность)
 ---
 - name: Setup Telegram integration in Zabbix
   hosts: zabbix
@@ -26,6 +26,10 @@
           id: 1
       register: zabbix_auth
 
+    - name: DEBUG - login response
+      ansible.builtin.debug:
+        var: zabbix_auth.json
+
     - name: Set auth token
       ansible.builtin.set_fact:
         auth: "{{ zabbix_auth.json.result }}"
@@ -42,9 +46,19 @@
           params:
             filter:
               name: "Telegram"
+            selectMessageTemplates: "extend"
           auth: "{{ auth }}"
           id: 2
       register: existing_mediatype
+
+    - name: DEBUG - existing mediatype
+      ansible.builtin.debug:
+        var: existing_mediatype.json
+
+    - name: DEBUG - mediatype ID to delete
+      ansible.builtin.debug:
+        msg: "Will delete mediatype ID: {{ existing_mediatype.json.result[0].mediatypeid }}"
+      when: existing_mediatype.json.result | length > 0
 
     # Удалить существующий media type (идемпотентность)
     - name: Delete existing Telegram media type
@@ -65,7 +79,12 @@
     - name: DEBUG - delete response
       ansible.builtin.debug:
         var: delete_result.json
-      when: delete_result is defined
+      when: delete_result is defined and delete_result is not skipped
+
+    - name: FAIL if delete failed
+      ansible.builtin.fail:
+        msg: "Failed to delete media type: {{ delete_result.json.error }}"
+      when: delete_result is defined and delete_result is not skipped and delete_result.json.error is defined
 
     # Создать Telegram media type
     - name: Create Telegram media type
@@ -132,7 +151,7 @@
       ansible.builtin.set_fact:
         telegram_mediatypeid: "{{ created_mediatype.json.result.mediatypeids[0] }}"
 
-    # Получить Admin user и добавить/обновить Telegram media
+    # Получить Admin user
     - name: Get Admin user
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
@@ -148,6 +167,10 @@
           auth: "{{ auth }}"
           id: 5
       register: admin_user
+
+    - name: DEBUG - admin user
+      ansible.builtin.debug:
+        var: admin_user.json
 
     - name: Update Admin user with Telegram media
       ansible.builtin.uri:
@@ -167,6 +190,11 @@
                 period: "1-7,00:00-24:00"
           auth: "{{ auth }}"
           id: 6
+      register: user_update
+
+    - name: DEBUG - user update response
+      ansible.builtin.debug:
+        var: user_update.json
 
     # Тестовое сообщение
     - name: Send test message via Telegram
@@ -177,6 +205,11 @@
         body:
           chat_id: "{{ tg_chat_id }}"
           text: "✅ Zabbix Telegram настроен!\nСервер: {{ ansible_host }}"
+      register: test_msg
+
+    - name: DEBUG - test message response
+      ansible.builtin.debug:
+        var: test_msg.json
 
     - name: Done
       ansible.builtin.debug:
