@@ -100,4 +100,33 @@ vars:
 
 ---
 
+### 6. Debug playbooks - один файл на папку
+
+**Правило:** Все debug tasks для одной папки (например `zabbix/`) писать в ОДИН файл `debug.yml`, а не создавать отдельные файлы для каждой проверки.
+
+**Неправильно:**
+```
+zabbix/debug-alerts.yml
+zabbix/debug-host-group.yml
+zabbix/debug-telegram.yml
+```
+
+**Правильно:**
+```
+zabbix/debug.yml  # все debug tasks в одном файле
+```
+
+---
+
+### 7. Task Template в Semaphore - указывать параметры
+
+**Правило:** Когда просишь создать Task Template, ВСЕГДА указывать параметры:
+- Name
+- Playbook (полный путь)
+- Inventory
+- Vault (нужен или нет)
+- Environment (если нужно)
+
+---
+
 ## Дата обновления: 2026-01-08

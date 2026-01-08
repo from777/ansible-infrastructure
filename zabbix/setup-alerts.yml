@@ -1,6 +1,7 @@
 # setup-alerts.yml
 # Создаёт Action для отправки алертов MikroTik в Telegram
-# Запускать: один раз после setup-telegram.yml
+# Удаляет старый action и создаёт заново для чистой настройки
+# Запускать: после setup-telegram.yml
 ---
 - name: Setup MikroTik alerts in Zabbix
   hosts: zabbix
@@ -30,7 +31,38 @@
       ansible.builtin.set_fact:
         auth: "{{ zabbix_auth.json.result }}"
 
-    # Get MikroTik host group
+    # Удалить существующий action
+    - name: Get existing action
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "action.get"
+          params:
+            filter:
+              name: "MikroTik Alerts to Telegram"
+          auth: "{{ auth }}"
+          id: 2
+      register: existing_action
+
+    - name: Delete existing action
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "action.delete"
+          params:
+            - "{{ existing_action.json.result[0].actionid }}"
+          auth: "{{ auth }}"
+          id: 3
+      when: existing_action.json.result | length > 0
+      ignore_errors: yes
+
+    # Получить необходимые ID
     - name: Get MikroTik host group
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
@@ -43,15 +75,14 @@
             filter:
               name: "MikroTik"
           auth: "{{ auth }}"
-          id: 2
+          id: 4
       register: hostgroup
 
-    - name: Set host group ID
-      ansible.builtin.set_fact:
-        hostgroup_id: "{{ hostgroup.json.result[0].groupid }}"
-      when: hostgroup.json.result | length > 0
+    - name: FAIL if host group not found
+      ansible.builtin.fail:
+        msg: "Host group 'MikroTik' not found! Run setup-mikrotik-hosts.yml first."
+      when: hostgroup.json.result | length == 0
 
-    # Get Telegram media type
     - name: Get Telegram media type
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
@@ -64,10 +95,14 @@
             filter:
               name: "Telegram"
           auth: "{{ auth }}"
-          id: 3
+          id: 5
       register: mediatype
 
-    # Get Admin user
+    - name: FAIL if Telegram not configured
+      ansible.builtin.fail:
+        msg: "Telegram media type not found! Run setup-telegram.yml first."
+      when: mediatype.json.result | length == 0
+
     - name: Get Admin user
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
@@ -80,34 +115,10 @@
             filter:
               username: "Admin"
           auth: "{{ auth }}"
-          id: 4
+          id: 6
       register: admin_user
 
-    # Create Action
-    - name: Check if action exists
-      ansible.builtin.uri:
-        url: "{{ zabbix_url }}"
-        method: POST
-        body_format: json
-        body:
-          jsonrpc: "2.0"
-          method: "action.get"
-          params:
-            filter:
-              name: "MikroTik Alerts to Telegram"
-          auth: "{{ auth }}"
-          id: 5
-      register: action_check
-
-    - name: Debug - show conditions
-      ansible.builtin.debug:
-        msg:
-          - "action_exists: {{ action_check.json.result | length > 0 }}"
-          - "hostgroup_id: {{ hostgroup_id | default('NOT SET') }}"
-          - "mediatype_exists: {{ mediatype.json.result | length > 0 }}"
-          - "mediatype_id: {{ mediatype.json.result[0].mediatypeid | default('NOT SET') }}"
-          - "admin_userid: {{ admin_user.json.result[0].userid | default('NOT SET') }}"
-
+    # Создать action
     - name: Create action for Telegram
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
@@ -126,7 +137,7 @@
               conditions:
                 - conditiontype: 0
                   operator: 0
-                  value: "{{ hostgroup_id }}"
+                  value: "{{ hostgroup.json.result[0].groupid }}"
             operations:
               - operationtype: 0
                 esc_period: "0s"
@@ -145,18 +156,12 @@
                 opmessage_usr:
                   - userid: "{{ admin_user.json.result[0].userid }}"
           auth: "{{ auth }}"
-          id: 6
-      when:
-        - action_check.json.result | length == 0
-        - hostgroup_id is defined
-        - mediatype.json.result | length > 0
+          id: 7
       register: action_created
-
-    - name: Show action creation result
-      ansible.builtin.debug:
-        var: action_created
-      when: action_created is defined and action_created is not skipped
 
     - name: Done
       ansible.builtin.debug:
-        msg: "MikroTik Telegram alerts configured. Alerts will repeat every 30 min until resolved."
+        msg:
+          - "Action created: {{ action_created.json.result.actionids[0] }}"
+          - "При проблеме: сообщение сразу + повтор каждые 30 мин"
+          - "При решении: одно сообщение Resolved"
