@@ -3,28 +3,6 @@
 # Templates привязываются отдельными playbooks monitoring-*.yml
 # Запускать: при добавлении нового роутера
 ---
-- name: Collect MikroTik hosts info
-  hosts: mikrotik
-  gather_facts: no
-  tasks:
-    - name: Store host info for Zabbix
-      ansible.builtin.set_fact:
-        mikrotik_host_info:
-          name: "{{ inventory_hostname }}"
-          ip: "{{ ansible_host }}"
-          user: "{{ ansible_user }}"
-          password: "{{ ansible_password }}"
-          zabbix_monitor: "{{ zabbix_monitor | default(false) }}"
-      delegate_to: localhost
-      delegate_facts: false
-      when: zabbix_monitor | default(false)
-
-    - name: Add to hosts list
-      ansible.builtin.set_fact:
-        mikrotik_hosts_list: "{{ mikrotik_hosts_list | default([]) + [mikrotik_host_info] }}"
-      delegate_to: localhost
-      when: zabbix_monitor | default(false)
-
 - name: Setup MikroTik hosts in Zabbix
   hosts: zabbix
   gather_facts: no
@@ -88,10 +66,21 @@
       ansible.builtin.set_fact:
         hostgroup_id: "{{ hostgroup_check.json.result[0].groupid if hostgroup_check.json.result | length > 0 else hostgroup_created.json.result.groupids[0] }}"
 
+    # Build hosts list from inventory
+    - name: Build MikroTik hosts list
+      ansible.builtin.set_fact:
+        mikrotik_hosts_list: "{{ mikrotik_hosts_list | default([]) + [{'name': item, 'ip': hostvars[item].ansible_host, 'user': hostvars[item].ansible_user, 'password': hostvars[item].ansible_password}] }}"
+      loop: "{{ groups['mikrotik'] }}"
+      when: hostvars[item].zabbix_monitor | default(false)
+
+    - name: Show hosts to create
+      ansible.builtin.debug:
+        msg: "Hosts to add: {{ mikrotik_hosts_list | default([]) | map(attribute='name') | list }}"
+
     # Create hosts
     - name: Check and create MikroTik hosts
       ansible.builtin.include_tasks: tasks/create-zabbix-host.yml
-      loop: "{{ hostvars['localhost'].mikrotik_hosts_list | default([]) }}"
+      loop: "{{ mikrotik_hosts_list | default([]) }}"
       loop_control:
         loop_var: mikrotik_host
 
