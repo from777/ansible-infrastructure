@@ -254,7 +254,7 @@
           jsonrpc: "2.0"
           method: "trigger.create"
           params:
-            description: "New full-access user on {HOST.NAME}"
+            description: "New full-access user detected"
             expression: "last(/{{ template_name }}/ssh.run[users_count])>2"
             priority: 4
             manual_close: 1

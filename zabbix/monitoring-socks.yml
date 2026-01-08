@@ -228,7 +228,7 @@
           jsonrpc: "2.0"
           method: "trigger.create"
           params:
-            description: "SOCKS proxy enabled on {HOST.NAME}"
+            description: "SOCKS proxy enabled"
             expression: "find(/{{ template_name }}/ssh.run[socks_check],#1,\"like\",\"enabled: yes\")=1"
             priority: 4
             manual_close: 1
