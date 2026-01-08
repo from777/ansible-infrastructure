@@ -95,9 +95,15 @@
       when: template_check.json.result | length == 0
       register: template_created
 
-    - name: Set template ID
+    - name: Set template ID (existing)
       ansible.builtin.set_fact:
-        template_id: "{{ template_check.json.result[0].templateid if template_check.json.result | length > 0 else template_created.json.result.templateids[0] }}"
+        template_id: "{{ template_check.json.result[0].templateid }}"
+      when: template_check.json.result | length > 0
+
+    - name: Set template ID (new)
+      ansible.builtin.set_fact:
+        template_id: "{{ template_created.json.result.templateids[0] }}"
+      when: template_check.json.result | length == 0
 
     # Create Item
     - name: Check if item exists
