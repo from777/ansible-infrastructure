@@ -1,16 +1,22 @@
 # monitoring-socks.yml
-# Создаёт template для мониторинга SOCKS и привязывает к хостам
+# Создаёт template для мониторинга SOCKS и привязывает/отлинковывает к хостам
 # Запускать: после setup-mikrotik-hosts.yml
 ---
 - name: Collect hosts for SOCKS monitoring
   hosts: mikrotik
   gather_facts: no
   tasks:
-    - name: Add to SOCKS monitoring list
+    - name: Add to SOCKS monitoring list (monitor_socks=true)
       ansible.builtin.set_fact:
-        socks_hosts: "{{ socks_hosts | default([]) + [inventory_hostname] }}"
+        socks_hosts_to_link: "{{ socks_hosts_to_link | default([]) + [inventory_hostname] }}"
       delegate_to: localhost
       when: monitor_socks | default(false)
+
+    - name: Add to SOCKS unlink list (monitor_socks=false)
+      ansible.builtin.set_fact:
+        socks_hosts_to_unlink: "{{ socks_hosts_to_unlink | default([]) + [inventory_hostname] }}"
+      delegate_to: localhost
+      when: not (monitor_socks | default(false))
 
 - name: Setup SOCKS monitoring in Zabbix
   hosts: zabbix
@@ -216,10 +222,19 @@
           id: 8
       when: trigger_check.json.result | length == 0
 
-    # Link template to hosts
-    - name: Link template to hosts with monitor_socks=true
+    # Link template to hosts with monitor_socks=true
+    - name: Link template to hosts
       ansible.builtin.include_tasks: tasks/link-template-to-host.yml
-      loop: "{{ hostvars['localhost'].socks_hosts | default([]) }}"
+      loop: "{{ hostvars['localhost'].socks_hosts_to_link | default([]) }}"
+      loop_control:
+        loop_var: host_name
+      vars:
+        target_template_id: "{{ template_id }}"
+
+    # Unlink template from hosts with monitor_socks=false
+    - name: Unlink template from hosts
+      ansible.builtin.include_tasks: tasks/unlink-template-from-host.yml
+      loop: "{{ hostvars['localhost'].socks_hosts_to_unlink | default([]) }}"
       loop_control:
         loop_var: host_name
       vars:
@@ -227,4 +242,6 @@
 
     - name: Done
       ansible.builtin.debug:
-        msg: "SOCKS monitoring template linked to: {{ hostvars['localhost'].socks_hosts | default([]) }}"
+        msg:
+          - "SOCKS template LINKED to: {{ hostvars['localhost'].socks_hosts_to_link | default([]) }}"
+          - "SOCKS template UNLINKED from: {{ hostvars['localhost'].socks_hosts_to_unlink | default([]) }}"

@@ -66,24 +66,39 @@
       ansible.builtin.set_fact:
         hostgroup_id: "{{ hostgroup_check.json.result[0].groupid if hostgroup_check.json.result | length > 0 else hostgroup_created.json.result.groupids[0] }}"
 
-    # Build hosts list from inventory
-    - name: Build MikroTik hosts list
+    # Build hosts lists from inventory
+    - name: Build MikroTik hosts to ADD (zabbix_monitor=true)
       ansible.builtin.set_fact:
-        mikrotik_hosts_list: "{{ mikrotik_hosts_list | default([]) + [{'name': item, 'ip': hostvars[item].ansible_host, 'user': hostvars[item].ansible_user, 'password': hostvars[item].ansible_password}] }}"
+        mikrotik_hosts_to_add: "{{ mikrotik_hosts_to_add | default([]) + [{'name': item, 'ip': hostvars[item].ansible_host, 'user': hostvars[item].ansible_user, 'password': hostvars[item].ansible_password}] }}"
       loop: "{{ groups['mikrotik'] }}"
       when: hostvars[item].zabbix_monitor | default(false)
 
-    - name: Show hosts to create
+    - name: Build MikroTik hosts to DELETE (zabbix_monitor=false)
+      ansible.builtin.set_fact:
+        mikrotik_hosts_to_delete: "{{ mikrotik_hosts_to_delete | default([]) + [item] }}"
+      loop: "{{ groups['mikrotik'] }}"
+      when: not (hostvars[item].zabbix_monitor | default(false))
+
+    - name: Show hosts to add/delete
       ansible.builtin.debug:
-        msg: "Hosts to add: {{ mikrotik_hosts_list | default([]) | map(attribute='name') | list }}"
+        msg:
+          - "Hosts to ADD: {{ mikrotik_hosts_to_add | default([]) | map(attribute='name') | list }}"
+          - "Hosts to DELETE: {{ mikrotik_hosts_to_delete | default([]) }}"
 
     # Create hosts
     - name: Check and create MikroTik hosts
       ansible.builtin.include_tasks: tasks/create-zabbix-host.yml
-      loop: "{{ mikrotik_hosts_list | default([]) }}"
+      loop: "{{ mikrotik_hosts_to_add | default([]) }}"
       loop_control:
         loop_var: mikrotik_host
 
+    # Delete hosts
+    - name: Delete MikroTik hosts with zabbix_monitor=false
+      ansible.builtin.include_tasks: tasks/delete-zabbix-host.yml
+      loop: "{{ mikrotik_hosts_to_delete | default([]) }}"
+      loop_control:
+        loop_var: host_to_delete
+
     - name: Done
       ansible.builtin.debug:
-        msg: "MikroTik hosts added to Zabbix. Now run monitoring-*.yml to add templates."
+        msg: "MikroTik hosts synced with Zabbix. Now run monitoring-*.yml to add templates."

@@ -1,0 +1,36 @@
+# tasks/delete-zabbix-host.yml
+# Удаляет хост из Zabbix если существует
+---
+- name: "Check if host {{ host_to_delete }} exists"
+  ansible.builtin.uri:
+    url: "{{ zabbix_url }}"
+    method: POST
+    body_format: json
+    body:
+      jsonrpc: "2.0"
+      method: "host.get"
+      params:
+        filter:
+          host: "{{ host_to_delete }}"
+      auth: "{{ auth }}"
+      id: 20
+  register: host_check
+
+- name: "Delete host {{ host_to_delete }}"
+  ansible.builtin.uri:
+    url: "{{ zabbix_url }}"
+    method: POST
+    body_format: json
+    body:
+      jsonrpc: "2.0"
+      method: "host.delete"
+      params:
+        - "{{ host_check.json.result[0].hostid }}"
+      auth: "{{ auth }}"
+      id: 21
+  when: host_check.json.result | length > 0
+  register: host_deleted
+
+- name: "Host {{ host_to_delete }} status"
+  ansible.builtin.debug:
+    msg: "{{ 'Deleted from Zabbix' if host_deleted.changed | default(false) else 'Not found in Zabbix' }}"

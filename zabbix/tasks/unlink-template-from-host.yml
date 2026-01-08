@@ -1,0 +1,47 @@
+# tasks/unlink-template-from-host.yml
+# Отлинковывает template от хоста
+---
+- name: "Get host {{ host_name }}"
+  ansible.builtin.uri:
+    url: "{{ zabbix_url }}"
+    method: POST
+    body_format: json
+    body:
+      jsonrpc: "2.0"
+      method: "host.get"
+      params:
+        filter:
+          host: "{{ host_name }}"
+        selectParentTemplates: ["templateid"]
+      auth: "{{ auth }}"
+      id: 30
+  register: host_info
+
+- name: Set host info
+  ansible.builtin.set_fact:
+    current_host_id: "{{ host_info.json.result[0].hostid }}"
+    current_templates: "{{ host_info.json.result[0].parentTemplates | map(attribute='templateid') | list }}"
+  when: host_info.json.result | length > 0
+
+- name: "Unlink template from {{ host_name }}"
+  ansible.builtin.uri:
+    url: "{{ zabbix_url }}"
+    method: POST
+    body_format: json
+    body:
+      jsonrpc: "2.0"
+      method: "host.update"
+      params:
+        hostid: "{{ current_host_id }}"
+        templates_clear:
+          - templateid: "{{ target_template_id }}"
+      auth: "{{ auth }}"
+      id: 31
+  when:
+    - host_info.json.result | length > 0
+    - target_template_id in current_templates
+  register: unlink_result
+
+- name: "Unlink status for {{ host_name }}"
+  ansible.builtin.debug:
+    msg: "{{ 'Template unlinked' if unlink_result.changed | default(false) else 'Template was not linked' }}"

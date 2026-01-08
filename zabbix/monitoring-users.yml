@@ -7,11 +7,17 @@
   hosts: mikrotik
   gather_facts: no
   tasks:
-    - name: Add to Users monitoring list
+    - name: Add to Users monitoring list (monitor_users=true)
       ansible.builtin.set_fact:
-        users_hosts: "{{ users_hosts | default([]) + [inventory_hostname] }}"
+        users_hosts_to_link: "{{ users_hosts_to_link | default([]) + [inventory_hostname] }}"
       delegate_to: localhost
       when: monitor_users | default(false)
+
+    - name: Add to Users unlink list (monitor_users=false)
+      ansible.builtin.set_fact:
+        users_hosts_to_unlink: "{{ users_hosts_to_unlink | default([]) + [inventory_hostname] }}"
+      delegate_to: localhost
+      when: not (monitor_users | default(false))
 
 - name: Setup Users monitoring in Zabbix
   hosts: zabbix
@@ -233,10 +239,19 @@
           id: 10
       when: trigger_check.json.result | length == 0
 
-    # Link template to hosts
-    - name: Link template to hosts with monitor_users=true
+    # Link template to hosts with monitor_users=true
+    - name: Link template to hosts
       ansible.builtin.include_tasks: tasks/link-template-to-host.yml
-      loop: "{{ hostvars['localhost'].users_hosts | default([]) }}"
+      loop: "{{ hostvars['localhost'].users_hosts_to_link | default([]) }}"
+      loop_control:
+        loop_var: host_name
+      vars:
+        target_template_id: "{{ template_id }}"
+
+    # Unlink template from hosts with monitor_users=false
+    - name: Unlink template from hosts
+      ansible.builtin.include_tasks: tasks/unlink-template-from-host.yml
+      loop: "{{ hostvars['localhost'].users_hosts_to_unlink | default([]) }}"
       loop_control:
         loop_var: host_name
       vars:
@@ -244,4 +259,6 @@
 
     - name: Done
       ansible.builtin.debug:
-        msg: "Users monitoring template linked to: {{ hostvars['localhost'].users_hosts | default([]) }}"
+        msg:
+          - "Users template LINKED to: {{ hostvars['localhost'].users_hosts_to_link | default([]) }}"
+          - "Users template UNLINKED from: {{ hostvars['localhost'].users_hosts_to_unlink | default([]) }}"
