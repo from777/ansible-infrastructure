@@ -15,8 +15,8 @@ mikrotik:
       elk_server: 10.200.200.82
       router_ip: 192.168.0.1
       # Zabbix monitoring flags
-      zabbix_monitor: true
-      monitor_socks: true
+      zabbix_monitor: false
+      monitor_socks: false
       monitor_users: false
     hap_ax3:
       ansible_host: 192.168.0.88
