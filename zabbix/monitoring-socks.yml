@@ -2,22 +2,6 @@
 # Создаёт template для мониторинга SOCKS и привязывает/отлинковывает к хостам
 # Запускать: после setup-mikrotik-hosts.yml
 ---
-- name: Collect hosts for SOCKS monitoring
-  hosts: mikrotik
-  gather_facts: no
-  tasks:
-    - name: Add to SOCKS monitoring list (monitor_socks=true)
-      ansible.builtin.set_fact:
-        socks_hosts_to_link: "{{ socks_hosts_to_link | default([]) + [inventory_hostname] }}"
-      delegate_to: localhost
-      when: monitor_socks | default(false)
-
-    - name: Add to SOCKS unlink list (monitor_socks=false)
-      ansible.builtin.set_fact:
-        socks_hosts_to_unlink: "{{ socks_hosts_to_unlink | default([]) + [inventory_hostname] }}"
-      delegate_to: localhost
-      when: not (monitor_socks | default(false))
-
 - name: Setup SOCKS monitoring in Zabbix
   hosts: zabbix
   gather_facts: no
@@ -46,6 +30,25 @@
     - name: Set auth token
       ansible.builtin.set_fact:
         auth: "{{ zabbix_auth.json.result }}"
+
+    # Build hosts lists from inventory
+    - name: Build hosts to LINK (monitor_socks=true)
+      ansible.builtin.set_fact:
+        socks_hosts_to_link: "{{ socks_hosts_to_link | default([]) + [item] }}"
+      loop: "{{ groups['mikrotik'] }}"
+      when: hostvars[item].monitor_socks | default(false)
+
+    - name: Build hosts to UNLINK (monitor_socks=false)
+      ansible.builtin.set_fact:
+        socks_hosts_to_unlink: "{{ socks_hosts_to_unlink | default([]) + [item] }}"
+      loop: "{{ groups['mikrotik'] }}"
+      when: not (hostvars[item].monitor_socks | default(false))
+
+    - name: Show hosts to link/unlink
+      ansible.builtin.debug:
+        msg:
+          - "Hosts to LINK: {{ socks_hosts_to_link | default([]) }}"
+          - "Hosts to UNLINK: {{ socks_hosts_to_unlink | default([]) }}"
 
     # Get or create template group (Zabbix 7.0+ separates host groups and template groups)
     - name: Get Templates template group
@@ -221,7 +224,7 @@
     # Link template to hosts with monitor_socks=true
     - name: Link template to hosts
       ansible.builtin.include_tasks: tasks/link-template-to-host.yml
-      loop: "{{ hostvars['localhost'].socks_hosts_to_link | default([]) }}"
+      loop: "{{ socks_hosts_to_link | default([]) }}"
       loop_control:
         loop_var: host_name
       vars:
@@ -230,7 +233,7 @@
     # Unlink template from hosts with monitor_socks=false
     - name: Unlink template from hosts
       ansible.builtin.include_tasks: tasks/unlink-template-from-host.yml
-      loop: "{{ hostvars['localhost'].socks_hosts_to_unlink | default([]) }}"
+      loop: "{{ socks_hosts_to_unlink | default([]) }}"
       loop_control:
         loop_var: host_name
       vars:
@@ -239,5 +242,5 @@
     - name: Done
       ansible.builtin.debug:
         msg:
-          - "SOCKS template LINKED to: {{ hostvars['localhost'].socks_hosts_to_link | default([]) }}"
-          - "SOCKS template UNLINKED from: {{ hostvars['localhost'].socks_hosts_to_unlink | default([]) }}"
+          - "SOCKS template LINKED to: {{ socks_hosts_to_link | default([]) }}"
+          - "SOCKS template UNLINKED from: {{ socks_hosts_to_unlink | default([]) }}"

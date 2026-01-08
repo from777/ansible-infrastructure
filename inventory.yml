@@ -6,16 +6,16 @@ mikrotik:
       ansible_host: 192.168.0.1
       elk_server: 192.168.0.82
       router_ip: 192.168.0.1
-      zabbix_monitor: true   # -> setup-mikrotik-hosts.yml (добавляет/удаляет хост в Zabbix)
-      monitor_socks: true    # -> monitoring-socks.yml (линкует/отлинковывает template SOCKS)
-      monitor_users: true    # -> monitoring-users.yml (линкует/отлинковывает template Users)
+      zabbix_monitor: true   # при изменении запустить: setup-mikrotik-hosts.yml
+      monitor_socks: true    # при изменении запустить: monitoring-socks.yml
+      monitor_users: true    # при изменении запустить: monitoring-users.yml
     Mik_mom:
       ansible_host: 109.174.1.142
       elk_server: 10.200.200.82
       router_ip: 192.168.0.1
-      zabbix_monitor: false  # -> setup-mikrotik-hosts.yml (добавляет/удаляет хост в Zabbix)
-      monitor_socks: false   # -> monitoring-socks.yml (линкует/отлинковывает template SOCKS)
-      monitor_users: false   # -> monitoring-users.yml (линкует/отлинковывает template Users)
+      zabbix_monitor: false  # при изменении запустить: setup-mikrotik-hosts.yml
+      monitor_socks: false   # при изменении запустить: monitoring-socks.yml
+      monitor_users: false   # при изменении запустить: monitoring-users.yml
     hap_ax3:
       ansible_host: 192.168.0.88
       ansible_user: ansible+cet1024w
@@ -25,9 +25,9 @@ mikrotik:
         - 192.168.88.0/24
         - 192.168.0.0/24
         - 212.20.46.209
-      zabbix_monitor: false  # -> setup-mikrotik-hosts.yml (добавляет/удаляет хост в Zabbix)
-      monitor_socks: false   # -> monitoring-socks.yml (линкует/отлинковывает template SOCKS)
-      monitor_users: false   # -> monitoring-users.yml (линкует/отлинковывает template Users)
+      zabbix_monitor: false  # при изменении запустить: setup-mikrotik-hosts.yml
+      monitor_socks: false   # при изменении запустить: monitoring-socks.yml
+      monitor_users: false   # при изменении запустить: monitoring-users.yml
 
 zabbix_servers:
   hosts:
