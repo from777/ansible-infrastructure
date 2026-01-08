@@ -213,8 +213,8 @@
           id: 8
       when: count_item_check.json.result | length == 0
 
-    # Create Trigger - too many users
-    - name: Check if trigger exists
+    # Delete and recreate Trigger (idempotent)
+    - name: Get existing trigger
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
         method: POST
@@ -224,11 +224,26 @@
           method: "trigger.get"
           params:
             templateids: "{{ template_id }}"
-            filter:
-              description: "New full-access user detected"
+            search:
+              description: "full-access user"
           auth: "{{ auth }}"
           id: 9
       register: trigger_check
+
+    - name: Delete existing trigger
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "trigger.delete"
+          params:
+            - "{{ trigger_check.json.result[0].triggerid }}"
+          auth: "{{ auth }}"
+          id: 10
+      when: trigger_check.json.result | length > 0
+      ignore_errors: yes
 
     - name: Create trigger
       ansible.builtin.uri:
@@ -244,8 +259,7 @@
             priority: 4
             manual_close: 1
           auth: "{{ auth }}"
-          id: 10
-      when: trigger_check.json.result | length == 0
+          id: 11
 
     # Link template to hosts with monitor_users=true
     - name: Link template to hosts

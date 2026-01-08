@@ -187,8 +187,8 @@
           id: 6
       when: item_check.json.result | length == 0
 
-    # Create Trigger
-    - name: Check if trigger exists
+    # Delete and recreate Trigger (idempotent)
+    - name: Get existing trigger
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
         method: POST
@@ -198,11 +198,26 @@
           method: "trigger.get"
           params:
             templateids: "{{ template_id }}"
-            filter:
-              description: "SOCKS proxy enabled"
+            search:
+              description: "SOCKS proxy"
           auth: "{{ auth }}"
           id: 7
       register: trigger_check
+
+    - name: Delete existing trigger
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "trigger.delete"
+          params:
+            - "{{ trigger_check.json.result[0].triggerid }}"
+          auth: "{{ auth }}"
+          id: 8
+      when: trigger_check.json.result | length > 0
+      ignore_errors: yes
 
     - name: Create trigger
       ansible.builtin.uri:
@@ -218,8 +233,7 @@
             priority: 4
             manual_close: 1
           auth: "{{ auth }}"
-          id: 8
-      when: trigger_check.json.result | length == 0
+          id: 9
 
     # Link template to hosts with monitor_socks=true
     - name: Link template to hosts
