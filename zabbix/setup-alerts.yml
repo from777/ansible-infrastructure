@@ -99,6 +99,15 @@
           id: 5
       register: action_check
 
+    - name: Debug - show conditions
+      ansible.builtin.debug:
+        msg:
+          - "action_exists: {{ action_check.json.result | length > 0 }}"
+          - "hostgroup_id: {{ hostgroup_id | default('NOT SET') }}"
+          - "mediatype_exists: {{ mediatype.json.result | length > 0 }}"
+          - "mediatype_id: {{ mediatype.json.result[0].mediatypeid | default('NOT SET') }}"
+          - "admin_userid: {{ admin_user.json.result[0].userid | default('NOT SET') }}"
+
     - name: Create action for Telegram
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
@@ -141,6 +150,12 @@
         - action_check.json.result | length == 0
         - hostgroup_id is defined
         - mediatype.json.result | length > 0
+      register: action_created
+
+    - name: Show action creation result
+      ansible.builtin.debug:
+        var: action_created
+      when: action_created is defined and action_created is not skipped
 
     - name: Done
       ansible.builtin.debug:
