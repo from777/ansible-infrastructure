@@ -57,9 +57,23 @@
           id: 2
       register: hostgroup
 
+    - name: DEBUG - hostgroup response
+      ansible.builtin.debug:
+        var: hostgroup.json
+
     - name: Set host group ID
       ansible.builtin.set_fact:
         hostgroup_id: "{{ hostgroup.json.result[0].groupid }}"
+      when: hostgroup.json.result | length > 0
+
+    - name: DEBUG - hostgroup_id
+      ansible.builtin.debug:
+        var: hostgroup_id
+
+    - name: FAIL if host group not found
+      ansible.builtin.fail:
+        msg: "Host group 'MikroTik' not found! Run setup-mikrotik-hosts.yml first."
+      when: hostgroup_id is not defined
 
     # Create Template
     - name: Check if template exists
