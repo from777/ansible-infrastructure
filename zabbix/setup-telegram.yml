@@ -46,47 +46,23 @@
           id: 2
       register: existing_mediatype
 
-    - name: Set existing media type ID
-      ansible.builtin.set_fact:
-        telegram_mediatypeid: "{{ existing_mediatype.json.result[0].mediatypeid }}"
-      when: existing_mediatype.json.result | length > 0
-
-    # Обновить существующий media type
-    - name: Update existing Telegram media type
+    # Удалить существующий media type (идемпотентность)
+    - name: Delete existing Telegram media type
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
         method: POST
         body_format: json
         body:
           jsonrpc: "2.0"
-          method: "mediatype.update"
+          method: "mediatype.delete"
           params:
-            mediatypeid: "{{ telegram_mediatypeid }}"
-            status: 0
-            parameters:
-              - name: "bot_token"
-                value: "{{ tg_token }}"
-              - name: "chat_id"
-                value: "{ALERT.SENDTO}"
-              - name: "message"
-                value: "{ALERT.MESSAGE}"
-              - name: "subject"
-                value: "{ALERT.SUBJECT}"
-            message_templates:
-              - eventsource: 0
-                recovery: 0
-                subject: "🚨 {EVENT.NAME}"
-                message: "Host: {HOST.NAME}\nSeverity: {EVENT.SEVERITY}\nTime: {EVENT.TIME} {EVENT.DATE}"
-              - eventsource: 0
-                recovery: 1
-                subject: "✅ {EVENT.NAME}"
-                message: "Host: {HOST.NAME}\nResolved: {EVENT.RECOVERY.TIME} {EVENT.RECOVERY.DATE}"
+            - "{{ existing_mediatype.json.result[0].mediatypeid }}"
           auth: "{{ auth }}"
           id: 3
       when: existing_mediatype.json.result | length > 0
-      register: updated_mediatype
+      ignore_errors: yes
 
-    # Создать новый если не существует
+    # Создать Telegram media type
     - name: Create Telegram media type
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
@@ -136,13 +112,11 @@
                 message: "Host: {HOST.NAME}\nResolved: {EVENT.RECOVERY.TIME} {EVENT.RECOVERY.DATE}"
           auth: "{{ auth }}"
           id: 4
-      when: existing_mediatype.json.result | length == 0
       register: created_mediatype
 
-    - name: Set new media type ID
+    - name: Set media type ID
       ansible.builtin.set_fact:
         telegram_mediatypeid: "{{ created_mediatype.json.result.mediatypeids[0] }}"
-      when: existing_mediatype.json.result | length == 0
 
     # Получить Admin user и добавить/обновить Telegram media
     - name: Get Admin user
