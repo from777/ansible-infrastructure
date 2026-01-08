@@ -1,6 +1,6 @@
 # setup-telegram.yml
 # Настройка Telegram в Zabbix + тестовое сообщение
-# Удаляет старую конфигурацию и создаёт заново для чистой настройки
+# Обновляет существующий media type или создаёт новый
 ---
 - name: Setup Telegram integration in Zabbix
   hosts: zabbix
@@ -30,7 +30,7 @@
       ansible.builtin.set_fact:
         auth: "{{ zabbix_auth.json.result }}"
 
-    # Удалить существующий Telegram media type для чистой установки
+    # Найти существующий Telegram media type
     - name: Get existing Telegram media type
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
@@ -46,22 +46,47 @@
           id: 2
       register: existing_mediatype
 
-    - name: Delete existing Telegram media type
+    - name: Set existing media type ID
+      ansible.builtin.set_fact:
+        telegram_mediatypeid: "{{ existing_mediatype.json.result[0].mediatypeid }}"
+      when: existing_mediatype.json.result | length > 0
+
+    # Обновить существующий media type
+    - name: Update existing Telegram media type
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
         method: POST
         body_format: json
         body:
           jsonrpc: "2.0"
-          method: "mediatype.delete"
+          method: "mediatype.update"
           params:
-            - "{{ existing_mediatype.json.result[0].mediatypeid }}"
+            mediatypeid: "{{ telegram_mediatypeid }}"
+            status: 0
+            parameters:
+              - name: "bot_token"
+                value: "{{ tg_token }}"
+              - name: "chat_id"
+                value: "{ALERT.SENDTO}"
+              - name: "message"
+                value: "{ALERT.MESSAGE}"
+              - name: "subject"
+                value: "{ALERT.SUBJECT}"
+            message_templates:
+              - eventsource: 0
+                recovery: 0
+                subject: "🚨 {EVENT.NAME}"
+                message: "Severity: {EVENT.SEVERITY}\nTime: {EVENT.TIME} {EVENT.DATE}"
+              - eventsource: 0
+                recovery: 1
+                subject: "✅ {EVENT.NAME}"
+                message: "Resolved: {EVENT.RECOVERY.TIME} {EVENT.RECOVERY.DATE}"
           auth: "{{ auth }}"
           id: 3
       when: existing_mediatype.json.result | length > 0
-      ignore_errors: yes
+      register: updated_mediatype
 
-    # Создать Telegram media type
+    # Создать новый если не существует
     - name: Create Telegram media type
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
@@ -111,22 +136,15 @@
                 message: "Resolved: {EVENT.RECOVERY.TIME} {EVENT.RECOVERY.DATE}"
           auth: "{{ auth }}"
           id: 4
+      when: existing_mediatype.json.result | length == 0
       register: created_mediatype
 
-    - name: DEBUG - create response
-      ansible.builtin.debug:
-        var: created_mediatype.json
-
-    - name: FAIL if create failed
-      ansible.builtin.fail:
-        msg: "Failed to create Telegram media type: {{ created_mediatype.json.error | default('unknown error') }}"
-      when: created_mediatype.json.error is defined
-
-    - name: Set Telegram media type ID
+    - name: Set new media type ID
       ansible.builtin.set_fact:
         telegram_mediatypeid: "{{ created_mediatype.json.result.mediatypeids[0] }}"
+      when: existing_mediatype.json.result | length == 0
 
-    # Получить Admin user и добавить Telegram media
+    # Получить Admin user и добавить/обновить Telegram media
     - name: Get Admin user
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
@@ -143,10 +161,6 @@
           id: 5
       register: admin_user
 
-    - name: Set Admin user ID
-      ansible.builtin.set_fact:
-        admin_userid: "{{ admin_user.json.result[0].userid }}"
-
     - name: Update Admin user with Telegram media
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
@@ -156,7 +170,7 @@
           jsonrpc: "2.0"
           method: "user.update"
           params:
-            userid: "{{ admin_userid }}"
+            userid: "{{ admin_user.json.result[0].userid }}"
             medias:
               - mediatypeid: "{{ telegram_mediatypeid }}"
                 sendto: "{{ tg_chat_id }}"
@@ -180,5 +194,5 @@
       ansible.builtin.debug:
         msg:
           - "Telegram media type ID: {{ telegram_mediatypeid }}"
-          - "Media type ENABLED (status: 0)"
-          - "Message templates updated - no duplicates"
+          - "Media type ENABLED and configured"
+          - "Message templates updated"
