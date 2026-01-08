@@ -124,7 +124,7 @@
             filter:
               evaltype: 0
               conditions:
-                - conditiontype: 1
+                - conditiontype: 0
                   operator: 0
                   value: "{{ hostgroup_id }}"
             operations:
