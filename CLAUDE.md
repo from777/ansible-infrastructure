@@ -129,4 +129,19 @@ zabbix/debug.yml  # все debug tasks в одном файле
 
 ---
 
+### 8. Всегда указывать изменённые файлы
+
+**Правило:** В конце ответа ВСЕГДА указывать список изменённых/добавленных/удалённых playbooks:
+
+```
+**Изменённые файлы:**
+- ✏️ Изменён: zabbix/setup-telegram.yml
+- ➕ Добавлен: zabbix/new-playbook.yml
+- ❌ Удалён: zabbix/old-playbook.yml (удали Task Template в Semaphore!)
+```
+
+Если удалён playbook — напомнить удалить Task Template в Semaphore.
+
+---
+
 ## Дата обновления: 2026-01-08
