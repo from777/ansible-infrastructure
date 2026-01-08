@@ -1,0 +1,336 @@
+# setup-mikrotik-monitoring.yml
+# Настройка мониторинга MikroTik SOCKS в Zabbix
+# Использует общий inventory.yml из корня проекта
+---
+- name: Load MikroTik credentials
+  hosts: Mik_Tim
+  gather_facts: no
+  tasks:
+    - name: Store MikroTik credentials
+      ansible.builtin.set_fact:
+        mikrotik_creds:
+          host: "{{ ansible_host }}"
+          user: "{{ ansible_user }}"
+          password: "{{ ansible_password }}"
+      delegate_to: localhost
+      delegate_facts: true
+
+- name: Setup MikroTik monitoring in Zabbix
+  hosts: zabbix
+  gather_facts: no
+  vars:
+    zabbix_url: "http://{{ ansible_host }}/api_jsonrpc.php"
+    zabbix_user: "Admin"
+    zabbix_password: "zabbix"
+    mikrotik_host: "{{ hostvars['localhost'].mikrotik_creds.host }}"
+    mikrotik_user: "{{ hostvars['localhost'].mikrotik_creds.user }}"
+    mikrotik_pass: "{{ hostvars['localhost'].mikrotik_creds.password }}"
+
+  tasks:
+    # 1. Login
+    - name: Login to Zabbix API
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "user.login"
+          params:
+            username: "{{ zabbix_user }}"
+            password: "{{ zabbix_password }}"
+          id: 1
+      register: zabbix_auth
+
+    - name: Set auth token
+      ansible.builtin.set_fact:
+        auth: "{{ zabbix_auth.json.result }}"
+
+    # 2. Create Host Group
+    - name: Check if host group exists
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "hostgroup.get"
+          params:
+            filter:
+              name: "MikroTik"
+          auth: "{{ auth }}"
+          id: 2
+      register: hostgroup_check
+
+    - name: Create host group MikroTik
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "hostgroup.create"
+          params:
+            name: "MikroTik"
+          auth: "{{ auth }}"
+          id: 3
+      when: hostgroup_check.json.result | length == 0
+      register: hostgroup_created
+
+    - name: Set host group ID
+      ansible.builtin.set_fact:
+        hostgroup_id: "{{ hostgroup_check.json.result[0].groupid if hostgroup_check.json.result | length > 0 else hostgroup_created.json.result.groupids[0] }}"
+
+    # 3. Create Template
+    - name: Check if template exists
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "template.get"
+          params:
+            filter:
+              host: "Template MikroTik SOCKS"
+          auth: "{{ auth }}"
+          id: 4
+      register: template_check
+
+    - name: Create template
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "template.create"
+          params:
+            host: "Template MikroTik SOCKS"
+            name: "Template MikroTik SOCKS"
+            groups:
+              - groupid: "{{ hostgroup_id }}"
+          auth: "{{ auth }}"
+          id: 5
+      when: template_check.json.result | length == 0
+      register: template_created
+
+    - name: Set template ID
+      ansible.builtin.set_fact:
+        template_id: "{{ template_check.json.result[0].templateid if template_check.json.result | length > 0 else template_created.json.result.templateids[0] }}"
+
+    # 4. Create Item (SSH check)
+    - name: Check if item exists
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "item.get"
+          params:
+            templateids: "{{ template_id }}"
+            filter:
+              key_: "ssh.run[socks_check]"
+          auth: "{{ auth }}"
+          id: 6
+      register: item_check
+
+    - name: Create SSH item for SOCKS check
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "item.create"
+          params:
+            name: "SOCKS Proxy Status"
+            key_: "ssh.run[socks_check]"
+            hostid: "{{ template_id }}"
+            type: 13
+            value_type: 4
+            params: "/ip socks print"
+            username: "{$MIKROTIK_USER}"
+            password: "{$MIKROTIK_PASS}"
+            delay: "5m"
+            authtype: 0
+          auth: "{{ auth }}"
+          id: 7
+      when: item_check.json.result | length == 0
+
+    # 5. Create Trigger
+    - name: Check if trigger exists
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "trigger.get"
+          params:
+            templateids: "{{ template_id }}"
+            filter:
+              description: "SOCKS proxy enabled on {HOST.NAME}"
+          auth: "{{ auth }}"
+          id: 8
+      register: trigger_check
+
+    - name: Create trigger
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "trigger.create"
+          params:
+            description: "SOCKS proxy enabled on {HOST.NAME}"
+            expression: "find(/Template MikroTik SOCKS/ssh.run[socks_check],#1,\"like\",\"enabled: yes\")=1"
+            priority: 4
+            manual_close: 1
+          auth: "{{ auth }}"
+          id: 9
+      when: trigger_check.json.result | length == 0
+
+    # 6. Create Host Mik_Tim
+    - name: Check if host exists
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "host.get"
+          params:
+            filter:
+              host: "Mik_Tim"
+          auth: "{{ auth }}"
+          id: 10
+      register: host_check
+
+    - name: Create host Mik_Tim
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "host.create"
+          params:
+            host: "Mik_Tim"
+            name: "MikroTik Mik_Tim"
+            groups:
+              - groupid: "{{ hostgroup_id }}"
+            templates:
+              - templateid: "{{ template_id }}"
+            interfaces:
+              - type: 1
+                main: 1
+                useip: 1
+                ip: "{{ mikrotik_host }}"
+                dns: ""
+                port: "22"
+            macros:
+              - macro: "{$MIKROTIK_USER}"
+                value: "{{ mikrotik_user }}"
+              - macro: "{$MIKROTIK_PASS}"
+                value: "{{ mikrotik_pass }}"
+                type: 1
+          auth: "{{ auth }}"
+          id: 11
+      when: host_check.json.result | length == 0
+
+    # 7. Create Action for Telegram alerts
+    - name: Check if action exists
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "action.get"
+          params:
+            filter:
+              name: "MikroTik SOCKS Alert"
+          auth: "{{ auth }}"
+          id: 12
+      register: action_check
+
+    - name: Get Telegram media type ID
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "mediatype.get"
+          params:
+            filter:
+              name: "Telegram"
+          auth: "{{ auth }}"
+          id: 13
+      register: mediatype
+
+    - name: Get Admin user ID
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "user.get"
+          params:
+            filter:
+              username: "Admin"
+          auth: "{{ auth }}"
+          id: 14
+      register: admin_user
+
+    - name: Create action for Telegram
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "action.create"
+          params:
+            name: "MikroTik SOCKS Alert"
+            eventsource: 0
+            status: 0
+            esc_period: "30m"
+            filter:
+              evaltype: 0
+              conditions:
+                - conditiontype: 1
+                  operator: 0
+                  value: "{{ hostgroup_id }}"
+            operations:
+              - operationtype: 0
+                esc_period: "0s"
+                esc_step_from: 1
+                esc_step_to: 0
+                opmessage:
+                  mediatypeid: "{{ mediatype.json.result[0].mediatypeid }}"
+                  default_msg: 1
+                opmessage_usr:
+                  - userid: "{{ admin_user.json.result[0].userid }}"
+            recovery_operations:
+              - operationtype: 0
+                opmessage:
+                  mediatypeid: "{{ mediatype.json.result[0].mediatypeid }}"
+                  default_msg: 1
+                opmessage_usr:
+                  - userid: "{{ admin_user.json.result[0].userid }}"
+          auth: "{{ auth }}"
+          id: 15
+      when: action_check.json.result | length == 0
+
+    - name: Done
+      ansible.builtin.debug:
+        msg:
+          - "Host Group ID: {{ hostgroup_id }}"
+          - "Template ID: {{ template_id }}"
+          - "MikroTik Host: {{ mikrotik_host }}"
+          - "Setup complete! Zabbix will check SOCKS every 5 min"
