@@ -114,6 +114,15 @@
           id: 4
       register: created_mediatype
 
+    - name: DEBUG - create response
+      ansible.builtin.debug:
+        var: created_mediatype.json
+
+    - name: FAIL if media type creation failed
+      ansible.builtin.fail:
+        msg: "Failed to create media type: {{ created_mediatype.json.error }}"
+      when: created_mediatype.json.error is defined
+
     - name: Set media type ID
       ansible.builtin.set_fact:
         telegram_mediatypeid: "{{ created_mediatype.json.result.mediatypeids[0] }}"
