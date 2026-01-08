@@ -25,3 +25,9 @@ zabbix_servers:
     zabbix:
       ansible_host: 192.168.0.81
       ansible_user: vagrant
+
+elk_servers:
+  hosts:
+    elk:
+      ansible_host: 192.168.0.82
+      ansible_user: vagrant
