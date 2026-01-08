@@ -1,0 +1,165 @@
+# fix-alerts-action.yml
+# Удаляет и пересоздаёт action с правильными recovery_operations
+---
+- name: Fix MikroTik alerts action
+  hosts: zabbix
+  gather_facts: no
+  connection: local
+  vars:
+    zabbix_url: "http://{{ ansible_host }}/api_jsonrpc.php"
+    zabbix_user: "Admin"
+    zabbix_password: "zabbix"
+
+  tasks:
+    - name: Login to Zabbix API
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "user.login"
+          params:
+            username: "{{ zabbix_user }}"
+            password: "{{ zabbix_password }}"
+          id: 1
+      register: zabbix_auth
+
+    - name: Set auth token
+      ansible.builtin.set_fact:
+        auth: "{{ zabbix_auth.json.result }}"
+
+    # Get existing action
+    - name: Get existing action
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "action.get"
+          params:
+            filter:
+              name: "MikroTik Alerts to Telegram"
+          auth: "{{ auth }}"
+          id: 2
+      register: action_check
+
+    # Delete existing action
+    - name: Delete existing action
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "action.delete"
+          params:
+            - "{{ action_check.json.result[0].actionid }}"
+          auth: "{{ auth }}"
+          id: 3
+      when: action_check.json.result | length > 0
+      register: action_deleted
+
+    - name: Show delete result
+      ansible.builtin.debug:
+        msg: "Deleted action: {{ action_deleted.json.result | default('nothing to delete') }}"
+
+    # Get required IDs
+    - name: Get MikroTik host group
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "hostgroup.get"
+          params:
+            filter:
+              name: "MikroTik"
+          auth: "{{ auth }}"
+          id: 4
+      register: hostgroup
+
+    - name: Get Telegram media type
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "mediatype.get"
+          params:
+            filter:
+              name: "Telegram"
+          auth: "{{ auth }}"
+          id: 5
+      register: mediatype
+
+    - name: Get Admin user
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "user.get"
+          params:
+            filter:
+              username: "Admin"
+          auth: "{{ auth }}"
+          id: 6
+      register: admin_user
+
+    # Create new action with all operations
+    - name: Create action with recovery operations
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "action.create"
+          params:
+            name: "MikroTik Alerts to Telegram"
+            eventsource: 0
+            status: 0
+            esc_period: "30m"
+            filter:
+              evaltype: 0
+              conditions:
+                - conditiontype: 0
+                  operator: 0
+                  value: "{{ hostgroup.json.result[0].groupid }}"
+            operations:
+              - operationtype: 0
+                esc_period: "0s"
+                esc_step_from: 1
+                esc_step_to: 0
+                opmessage:
+                  mediatypeid: "{{ mediatype.json.result[0].mediatypeid }}"
+                  default_msg: 1
+                opmessage_usr:
+                  - userid: "{{ admin_user.json.result[0].userid }}"
+            recovery_operations:
+              - operationtype: 0
+                opmessage:
+                  mediatypeid: "{{ mediatype.json.result[0].mediatypeid }}"
+                  default_msg: 1
+                opmessage_usr:
+                  - userid: "{{ admin_user.json.result[0].userid }}"
+          auth: "{{ auth }}"
+          id: 7
+      register: action_created
+
+    - name: Show creation result
+      ansible.builtin.debug:
+        msg: "Created action: {{ action_created.json.result }}"
+
+    - name: Done
+      ansible.builtin.debug:
+        msg: |
+          Action пересоздан!
+          - При проблеме: сообщение сразу + повтор каждые 30 мин
+          - При решении: одно сообщение о recovery
+          Теперь включи SOCKS снова для теста.
