@@ -60,7 +60,12 @@
           auth: "{{ auth }}"
           id: 3
       when: existing_mediatype.json.result | length > 0
-      ignore_errors: yes
+      register: delete_result
+
+    - name: DEBUG - delete response
+      ansible.builtin.debug:
+        var: delete_result.json
+      when: delete_result is defined
 
     # Создать Telegram media type
     - name: Create Telegram media type
