@@ -70,4 +70,34 @@
 
 ---
 
-## Дата обновления: 2026-01-06
+### 5. Не хардкодить IP адреса в playbooks
+
+**Проблема:** IP адреса прописанные напрямую в playbook усложняют поддержку и переиспользование.
+
+**Неправильно:**
+```yaml
+vars:
+  zabbix_url: "http://192.168.0.68/api_jsonrpc.php"
+  elk_server: "192.168.0.82"
+```
+
+**Правильно:**
+```yaml
+# IP берётся из inventory
+hosts: zabbix
+vars:
+  zabbix_url: "http://{{ ansible_host }}/api_jsonrpc.php"
+
+# Или из host_vars
+vars:
+  elk_url: "http://{{ elk_server }}:9200"  # elk_server определён в inventory
+```
+
+**Правило:** Все IP адреса должны быть в:
+- `inventory.yml` → `ansible_host`
+- `host_vars/*.yml` → дополнительные IP (elk_server и т.д.)
+- `group_vars/*.yml` → общие для группы
+
+---
+
+## Дата обновления: 2026-01-08

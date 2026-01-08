@@ -152,7 +152,7 @@
         body_format: json
         body:
           chat_id: "{{ tg_chat_id }}"
-          text: "✅ Zabbix Telegram интеграция настроена!\n\nСервер: 192.168.0.68\nВремя: {{ now() }}"
+          text: "✅ Zabbix Telegram интеграция настроена!\n\nСервер: {{ ansible_host }}\nВремя: {{ now() }}"
       register: telegram_test
 
     - name: Result
