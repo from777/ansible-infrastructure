@@ -60,6 +60,46 @@
         msg: "Will delete mediatype ID: {{ existing_mediatype.json.result[0].mediatypeid }}"
       when: existing_mediatype.json.result | length > 0
 
+    # Сначала удалить action который использует этот media type
+    - name: Get action using Telegram
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "action.get"
+          params:
+            filter:
+              name: "MikroTik Alerts to Telegram"
+          auth: "{{ auth }}"
+          id: 10
+      register: telegram_action
+
+    - name: DEBUG - action response
+      ansible.builtin.debug:
+        var: telegram_action.json
+
+    - name: Delete action using Telegram
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "action.delete"
+          params:
+            - "{{ telegram_action.json.result[0].actionid }}"
+          auth: "{{ auth }}"
+          id: 11
+      when: telegram_action.json.result | length > 0
+      register: action_delete
+
+    - name: DEBUG - action delete response
+      ansible.builtin.debug:
+        var: action_delete.json
+      when: action_delete is defined and action_delete is not skipped
+
     # Удалить существующий media type (идемпотентность)
     - name: Delete existing Telegram media type
       ansible.builtin.uri:
