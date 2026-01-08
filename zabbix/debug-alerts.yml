@@ -1,0 +1,120 @@
+# debug-alerts.yml - проверяет настройки алертов
+---
+- name: Debug Zabbix alerts configuration
+  hosts: zabbix
+  gather_facts: no
+  connection: local
+  vars:
+    zabbix_url: "http://{{ ansible_host }}/api_jsonrpc.php"
+    zabbix_user: "Admin"
+    zabbix_password: "zabbix"
+
+  tasks:
+    - name: Login to Zabbix API
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "user.login"
+          params:
+            username: "{{ zabbix_user }}"
+            password: "{{ zabbix_password }}"
+          id: 1
+      register: zabbix_auth
+
+    - name: Set auth token
+      ansible.builtin.set_fact:
+        auth: "{{ zabbix_auth.json.result }}"
+
+    # Check trigger status
+    - name: Get SOCKS trigger
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "trigger.get"
+          params:
+            search:
+              description: "SOCKS"
+            expandExpression: true
+            selectHosts: ["name"]
+          auth: "{{ auth }}"
+          id: 2
+      register: triggers
+
+    - name: Show triggers
+      ansible.builtin.debug:
+        msg:
+          - "=== TRIGGERS ==="
+          - "{{ triggers.json.result }}"
+
+    # Check current problems
+    - name: Get current problems
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "problem.get"
+          params:
+            recent: true
+            selectTags: "extend"
+          auth: "{{ auth }}"
+          id: 3
+      register: problems
+
+    - name: Show problems
+      ansible.builtin.debug:
+        msg:
+          - "=== CURRENT PROBLEMS ==="
+          - "{{ problems.json.result }}"
+
+    # Check actions
+    - name: Get trigger actions
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "action.get"
+          params:
+            selectOperations: "extend"
+            selectFilter: "extend"
+          auth: "{{ auth }}"
+          id: 4
+      register: actions
+
+    - name: Show actions
+      ansible.builtin.debug:
+        msg:
+          - "=== ACTIONS ==="
+          - "{{ actions.json.result }}"
+
+    # Check Admin user media
+    - name: Get Admin user with media
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "user.get"
+          params:
+            filter:
+              username: "Admin"
+            selectMedias: "extend"
+          auth: "{{ auth }}"
+          id: 5
+      register: admin_user
+
+    - name: Show Admin media
+      ansible.builtin.debug:
+        msg:
+          - "=== ADMIN USER MEDIA ==="
+          - "{{ admin_user.json.result[0].medias | default('NO MEDIA CONFIGURED') }}"
