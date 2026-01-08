@@ -18,6 +18,7 @@
 - name: Setup MikroTik monitoring in Zabbix
   hosts: zabbix
   gather_facts: no
+  connection: local
   vars:
     zabbix_url: "http://{{ ansible_host }}/api_jsonrpc.php"
     zabbix_user: "Admin"
