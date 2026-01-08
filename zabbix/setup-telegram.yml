@@ -76,11 +76,11 @@
               - eventsource: 0
                 recovery: 0
                 subject: "🚨 {EVENT.NAME}"
-                message: "Severity: {EVENT.SEVERITY}\nTime: {EVENT.TIME} {EVENT.DATE}"
+                message: "Host: {HOST.NAME}\nSeverity: {EVENT.SEVERITY}\nTime: {EVENT.TIME} {EVENT.DATE}"
               - eventsource: 0
                 recovery: 1
                 subject: "✅ {EVENT.NAME}"
-                message: "Resolved: {EVENT.RECOVERY.TIME} {EVENT.RECOVERY.DATE}"
+                message: "Host: {HOST.NAME}\nResolved: {EVENT.RECOVERY.TIME} {EVENT.RECOVERY.DATE}"
           auth: "{{ auth }}"
           id: 3
       when: existing_mediatype.json.result | length > 0
@@ -129,11 +129,11 @@
               - eventsource: 0
                 recovery: 0
                 subject: "🚨 {EVENT.NAME}"
-                message: "Severity: {EVENT.SEVERITY}\nTime: {EVENT.TIME} {EVENT.DATE}"
+                message: "Host: {HOST.NAME}\nSeverity: {EVENT.SEVERITY}\nTime: {EVENT.TIME} {EVENT.DATE}"
               - eventsource: 0
                 recovery: 1
                 subject: "✅ {EVENT.NAME}"
-                message: "Resolved: {EVENT.RECOVERY.TIME} {EVENT.RECOVERY.DATE}"
+                message: "Host: {HOST.NAME}\nResolved: {EVENT.RECOVERY.TIME} {EVENT.RECOVERY.DATE}"
           auth: "{{ auth }}"
           id: 4
       when: existing_mediatype.json.result | length == 0

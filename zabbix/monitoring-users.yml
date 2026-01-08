@@ -225,7 +225,7 @@
           params:
             templateids: "{{ template_id }}"
             filter:
-              description: "New full-access user on {HOST.NAME}"
+              description: "New full-access user detected"
           auth: "{{ auth }}"
           id: 9
       register: trigger_check
