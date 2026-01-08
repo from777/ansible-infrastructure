@@ -50,25 +50,31 @@
       ansible.builtin.set_fact:
         auth: "{{ zabbix_auth.json.result }}"
 
-    # Get host group ID
-    - name: Get MikroTik host group
+    # Get template group (Zabbix 7.0+ separates host groups and template groups)
+    - name: Get Templates template group
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
         method: POST
         body_format: json
         body:
           jsonrpc: "2.0"
-          method: "hostgroup.get"
+          method: "templategroup.get"
           params:
             filter:
-              name: "MikroTik"
+              name: "Templates"
           auth: "{{ auth }}"
           id: 2
-      register: hostgroup
+      register: templategroup
 
-    - name: Set host group ID
+    - name: Set template group ID
       ansible.builtin.set_fact:
-        hostgroup_id: "{{ hostgroup.json.result[0].groupid }}"
+        templategroup_id: "{{ templategroup.json.result[0].groupid }}"
+      when: templategroup.json.result | length > 0
+
+    - name: FAIL if template group not found
+      ansible.builtin.fail:
+        msg: "Template group 'Templates' not found in Zabbix!"
+      when: templategroup_id is not defined
 
     # Create Template
     - name: Check if template exists
@@ -98,12 +104,11 @@
             host: "{{ template_name }}"
             name: "{{ template_name }}"
             groups:
-              - groupid: "{{ hostgroup_id }}"
+              - groupid: "{{ templategroup_id }}"
           auth: "{{ auth }}"
           id: 4
       when: template_check.json.result | length == 0
       register: template_created
-      ignore_errors: yes
 
     # Re-query template to get ID (works for both new and existing)
     - name: Get template ID
