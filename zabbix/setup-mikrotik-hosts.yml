@@ -92,10 +92,44 @@
       loop_control:
         loop_var: mikrotik_host
 
-    # Delete hosts
+    # Delete hosts with zabbix_monitor=false
     - name: Delete MikroTik hosts with zabbix_monitor=false
       ansible.builtin.include_tasks: tasks/delete-zabbix-host.yml
       loop: "{{ mikrotik_hosts_to_delete | default([]) }}"
+      loop_control:
+        loop_var: host_to_delete
+
+    # Delete orphan hosts (in Zabbix but not in inventory)
+    - name: Get all hosts in MikroTik group
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "host.get"
+          params:
+            groupids: "{{ hostgroup_id }}"
+            output:
+              - hostid
+              - host
+          auth: "{{ auth }}"
+          id: 100
+      register: zabbix_mikrotik_hosts
+
+    - name: Build list of orphan hosts
+      ansible.builtin.set_fact:
+        orphan_hosts: "{{ orphan_hosts | default([]) + [item.host] }}"
+      loop: "{{ zabbix_mikrotik_hosts.json.result }}"
+      when: item.host not in groups['mikrotik']
+
+    - name: Show orphan hosts to delete
+      ansible.builtin.debug:
+        msg: "Orphan hosts to DELETE: {{ orphan_hosts | default([]) }}"
+
+    - name: Delete orphan hosts
+      ansible.builtin.include_tasks: tasks/delete-zabbix-host.yml
+      loop: "{{ orphan_hosts | default([]) }}"
       loop_control:
         loop_var: host_to_delete
 
