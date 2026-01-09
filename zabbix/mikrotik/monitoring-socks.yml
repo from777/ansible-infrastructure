@@ -237,7 +237,7 @@
 
     # Link template to hosts with monitor_socks=true
     - name: Link template to hosts
-      ansible.builtin.include_tasks: tasks/link-template-to-host.yml
+      ansible.builtin.include_tasks: ../tasks/link-template-to-host.yml
       loop: "{{ socks_hosts_to_link | default([]) }}"
       loop_control:
         loop_var: host_name
@@ -246,7 +246,7 @@
 
     # Unlink template from hosts with monitor_socks=false
     - name: Unlink template from hosts
-      ansible.builtin.include_tasks: tasks/unlink-template-from-host.yml
+      ansible.builtin.include_tasks: ../tasks/unlink-template-from-host.yml
       loop: "{{ socks_hosts_to_unlink | default([]) }}"
       loop_control:
         loop_var: host_name
