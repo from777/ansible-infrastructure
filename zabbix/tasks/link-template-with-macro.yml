@@ -50,10 +50,10 @@
 # Check if macro already exists on host
 - name: Find existing macro
   ansible.builtin.set_fact:
-    existing_macro: "{{ current_macros | selectattr('macro', 'equalto', macro_name) | list | first | default(None) }}"
+    existing_macro_list: "{{ current_macros | selectattr('macro', 'equalto', macro_name) | list }}"
   when: host_info.json.result | length > 0
 
-# Create or update host macro
+# Create macro if not exists
 - name: "Create macro {{ macro_name }} on {{ host_name }}"
   ansible.builtin.uri:
     url: "{{ zabbix_url }}"
@@ -71,8 +71,9 @@
       id: 22
   when:
     - host_info.json.result | length > 0
-    - existing_macro is none or existing_macro == None
+    - existing_macro_list | length == 0
 
+# Update macro if exists and value changed
 - name: "Update macro {{ macro_name }} on {{ host_name }}"
   ansible.builtin.uri:
     url: "{{ zabbix_url }}"
@@ -82,11 +83,11 @@
       jsonrpc: "2.0"
       method: "usermacro.update"
       params:
-        hostmacroid: "{{ existing_macro.hostmacroid }}"
+        hostmacroid: "{{ existing_macro_list[0].hostmacroid }}"
         value: "{{ macro_value }}"
       auth: "{{ auth }}"
       id: 23
   when:
     - host_info.json.result | length > 0
-    - existing_macro is not none and existing_macro != None
-    - existing_macro.value != macro_value
+    - existing_macro_list | length > 0
+    - existing_macro_list[0].value != macro_value
