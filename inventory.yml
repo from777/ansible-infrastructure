@@ -9,6 +9,9 @@ mikrotik:
       zabbix_monitor: true   # при изменении запустить: setup-mikrotik-hosts.yml
       monitor_socks: true    # при изменении запустить: monitoring-socks.yml
       monitor_users: true    # при изменении запустить: monitoring-users.yml
+      allowed_users:         # пользователи с group=full (для monitor_users)
+        - admin
+        - smbuser
     Mik_mom:
       ansible_host: 109.174.1.142
       elk_server: 10.200.200.82
@@ -16,10 +19,13 @@ mikrotik:
       zabbix_monitor: false  # при изменении запустить: setup-mikrotik-hosts.yml
       monitor_socks: false   # при изменении запустить: monitoring-socks.yml
       monitor_users: false   # при изменении запустить: monitoring-users.yml
+      allowed_users:         # пользователи с group=full (для monitor_users)
+        - admin
+        - user1
     Mik_Mom_ax3:
       ansible_host: 192.168.0.88
       ansible_user: ansible+cet1024w
-      ansible_password: ansible_pass
+      ansible_password: ansible_passсмот
       router_ip: 192.168.88.1
       allowed_networks:
         - 192.168.88.0/24
@@ -27,7 +33,10 @@ mikrotik:
         - 212.20.46.209
       zabbix_monitor: true  # при изменении запустить: setup-mikrotik-hosts.yml
       monitor_socks: true   # при изменении запустить: monitoring-socks.yml
-      monitor_users: false   # при изменении запустить: monitoring-users.yml
+      monitor_users: false  # при изменении запустить: monitoring-users.yml
+      allowed_users:        # пользователи с group=full (для monitor_users)
+        - admin
+        - ansible
 
 zabbix_servers:
   hosts:

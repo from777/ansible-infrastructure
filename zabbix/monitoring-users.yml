@@ -1,6 +1,7 @@
 # monitoring-users.yml
-# Создаёт template для мониторинга новых пользователей на MikroTik
-# Триггер срабатывает если появился пользователь с group=full кроме известных
+# Мониторинг пользователей с full-доступом на MikroTik
+# Триггер срабатывает если появился пользователь НЕ из списка allowed_users
+# Список allowed_users задаётся в inventory.yml для каждого хоста
 # Запускать: после setup-mikrotik-hosts.yml
 ---
 - name: Setup Users monitoring in Zabbix
@@ -12,8 +13,6 @@
     zabbix_user: "Admin"
     zabbix_password: "zabbix"
     template_name: "Template MikroTik Users"
-    # Известные пользователи (не триггерить на них)
-    known_users: "admin|ansible"
 
   tasks:
     - name: Login to Zabbix API
@@ -79,7 +78,7 @@
         msg: "Template group 'Templates' not found in Zabbix!"
       when: templategroup_id is not defined
 
-    # Create Template
+    # Delete existing template (idempotent - recreate with new settings)
     - name: Check if template exists
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
@@ -95,6 +94,22 @@
           id: 3
       register: template_check
 
+    - name: Delete existing template (for clean recreation)
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "template.delete"
+          params:
+            - "{{ template_check.json.result[0].templateid }}"
+          auth: "{{ auth }}"
+          id: 4
+      when: template_check.json.result | length > 0
+      ignore_errors: yes
+
+    # Create Template with macro
     - name: Create template
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
@@ -108,48 +123,19 @@
             name: "{{ template_name }}"
             groups:
               - groupid: "{{ templategroup_id }}"
-          auth: "{{ auth }}"
-          id: 4
-      when: template_check.json.result | length == 0
-      register: template_created
-
-    # Re-query template to get ID (works for both new and existing)
-    - name: Get template ID
-      ansible.builtin.uri:
-        url: "{{ zabbix_url }}"
-        method: POST
-        body_format: json
-        body:
-          jsonrpc: "2.0"
-          method: "template.get"
-          params:
-            filter:
-              host: "{{ template_name }}"
+            macros:
+              - macro: "{$ALLOWED_USERS}"
+                value: "admin"
+                description: "Разрешённые пользователи с full-доступом (через |)"
           auth: "{{ auth }}"
           id: 5
-      register: template_final
+      register: template_created
 
     - name: Set template ID
       ansible.builtin.set_fact:
-        template_id: "{{ template_final.json.result[0].templateid }}"
+        template_id: "{{ template_created.json.result.templateids[0] }}"
 
-    # Create Item - get users list
-    - name: Check if item exists
-      ansible.builtin.uri:
-        url: "{{ zabbix_url }}"
-        method: POST
-        body_format: json
-        body:
-          jsonrpc: "2.0"
-          method: "item.get"
-          params:
-            templateids: "{{ template_id }}"
-            filter:
-              key_: "ssh.run[users_check]"
-          auth: "{{ auth }}"
-          id: 5
-      register: item_check
-
+    # Create Item - get users list with JavaScript preprocessing
     - name: Create SSH item for Users check
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
@@ -159,92 +145,43 @@
           jsonrpc: "2.0"
           method: "item.create"
           params:
-            name: "Users with full access"
+            name: "Unknown full-access users"
             key_: "ssh.run[users_check]"
             hostid: "{{ template_id }}"
-            type: 13
-            value_type: 4
+            type: 13  # SSH agent
+            value_type: 4  # Text
             params: "/user print where group=full"
             username: "{$MIKROTIK_USER}"
             password: "{$MIKROTIK_PASS}"
             delay: "15m"
             authtype: 0
+            preprocessing:
+              - type: "21"  # JavaScript
+                params: |
+                  var lines = value.split('\n');
+                  var users = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i].trim();
+                      if (/^\d+\s+/.test(line)) {
+                          var parts = line.split(/\s+/);
+                          if (parts.length >= 2) {
+                              users.push(parts[1]);
+                          }
+                      }
+                  }
+                  var allowed = '{$ALLOWED_USERS}'.split('|');
+                  var unknown = [];
+                  for (var j = 0; j < users.length; j++) {
+                      if (allowed.indexOf(users[j]) === -1) {
+                          unknown.push(users[j]);
+                      }
+                  }
+                  return unknown.length > 0 ? unknown.join(', ') : 'OK';
+                error_handler: "1"
           auth: "{{ auth }}"
           id: 6
-      when: item_check.json.result | length == 0
 
-    # Create Item - users count
-    - name: Check if count item exists
-      ansible.builtin.uri:
-        url: "{{ zabbix_url }}"
-        method: POST
-        body_format: json
-        body:
-          jsonrpc: "2.0"
-          method: "item.get"
-          params:
-            templateids: "{{ template_id }}"
-            filter:
-              key_: "ssh.run[users_count]"
-          auth: "{{ auth }}"
-          id: 7
-      register: count_item_check
-
-    - name: Create SSH item for Users count
-      ansible.builtin.uri:
-        url: "{{ zabbix_url }}"
-        method: POST
-        body_format: json
-        body:
-          jsonrpc: "2.0"
-          method: "item.create"
-          params:
-            name: "Full access users count"
-            key_: "ssh.run[users_count]"
-            hostid: "{{ template_id }}"
-            type: 13
-            value_type: 3
-            params: "/user print count-only where group=full"
-            username: "{$MIKROTIK_USER}"
-            password: "{$MIKROTIK_PASS}"
-            delay: "15m"
-            authtype: 0
-          auth: "{{ auth }}"
-          id: 8
-      when: count_item_check.json.result | length == 0
-
-    # Delete and recreate Trigger (idempotent)
-    - name: Get existing trigger
-      ansible.builtin.uri:
-        url: "{{ zabbix_url }}"
-        method: POST
-        body_format: json
-        body:
-          jsonrpc: "2.0"
-          method: "trigger.get"
-          params:
-            templateids: "{{ template_id }}"
-            search:
-              description: "full-access user"
-          auth: "{{ auth }}"
-          id: 9
-      register: trigger_check
-
-    - name: Delete existing trigger
-      ansible.builtin.uri:
-        url: "{{ zabbix_url }}"
-        method: POST
-        body_format: json
-        body:
-          jsonrpc: "2.0"
-          method: "trigger.delete"
-          params:
-            - "{{ trigger_check.json.result[0].triggerid }}"
-          auth: "{{ auth }}"
-          id: 10
-      when: trigger_check.json.result | length > 0
-      ignore_errors: yes
-
+    # Create Trigger
     - name: Create trigger
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
@@ -254,21 +191,24 @@
           jsonrpc: "2.0"
           method: "trigger.create"
           params:
-            description: "New full-access user detected"
-            expression: "last(/{{ template_name }}/ssh.run[users_count])>2"
-            priority: 4
+            description: "Unknown full-access user detected on {HOST.NAME}"
+            expression: "last(/{{ template_name }}/ssh.run[users_check])<>\"OK\""
+            priority: 4  # High
             manual_close: 1
+            comments: "Обнаружен пользователь с full-доступом не из списка allowed_users. Текущие неизвестные: {ITEM.LASTVALUE}"
           auth: "{{ auth }}"
-          id: 11
+          id: 7
 
-    # Link template to hosts with monitor_users=true
-    - name: Link template to hosts
-      ansible.builtin.include_tasks: tasks/link-template-to-host.yml
+    # Link template to hosts and set host macros
+    - name: Link template and set allowed_users macro
+      ansible.builtin.include_tasks: tasks/link-template-with-macro.yml
       loop: "{{ users_hosts_to_link | default([]) }}"
       loop_control:
         loop_var: host_name
       vars:
         target_template_id: "{{ template_id }}"
+        macro_name: "{$ALLOWED_USERS}"
+        macro_value: "{{ hostvars[host_name].allowed_users | default(['admin']) | join('|') }}"
 
     # Unlink template from hosts with monitor_users=false
     - name: Unlink template from hosts
@@ -282,5 +222,7 @@
     - name: Done
       ansible.builtin.debug:
         msg:
+          - "Template recreated with JavaScript preprocessing"
           - "Users template LINKED to: {{ users_hosts_to_link | default([]) }}"
           - "Users template UNLINKED from: {{ users_hosts_to_unlink | default([]) }}"
+          - "Each host has its own {$ALLOWED_USERS} macro from inventory"
