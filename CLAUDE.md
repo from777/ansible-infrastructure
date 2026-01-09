@@ -1,5 +1,68 @@
 # Lessons Learned - Ошибки и решения
 
+## Архитектурные принципы
+
+### Inventory = Single Source of Truth
+
+**Принцип:** `inventory.yml` — единственный источник правды для всей инфраструктуры.
+
+**Правила:**
+1. Все внешние системы (Zabbix, ELK, и т.д.) должны **синхронизироваться ИЗ inventory**, а не накапливать данные
+2. Если хост/ресурс есть в inventory с флагом `true` — он должен существовать в системе
+3. Если хост/ресурс имеет флаг `false` или удалён из inventory — он должен быть **удалён из системы**
+4. Playbooks реализуют модель **желаемого состояния** (desired state), а не аддитивную модель
+
+**Структура флагов в inventory:**
+```yaml
+mikrotik:
+  hosts:
+    Router_Name:
+      ansible_host: 192.168.0.1
+      zabbix_monitor: true    # sync → Zabbix hosts
+      monitor_socks: true     # sync → Zabbix SOCKS template
+      monitor_users: true     # sync → Zabbix Users template
+      elk_logging: true       # sync → ELK/Filebeat (будущее)
+```
+
+**Playbook должен:**
+1. Получить желаемое состояние из inventory (флаги)
+2. Получить текущее состояние из внешней системы
+3. **Создать** то, чего нет
+4. **Удалить** то, чего не должно быть (orphans)
+5. **Обновить** то, что изменилось
+
+**Пример синхронизации:**
+```yaml
+# 1. Получаем что ДОЛЖНО быть (из inventory)
+- name: Build hosts to ADD
+  set_fact:
+    hosts_to_add: "{{ hosts_to_add + [item] }}"
+  loop: "{{ groups['mikrotik'] }}"
+  when: hostvars[item].zabbix_monitor | default(false)
+
+# 2. Получаем что ЕСТЬ в системе
+- name: Get all hosts from Zabbix
+  uri:
+    method: POST
+    body:
+      method: "host.get"
+  register: zabbix_hosts
+
+# 3. Находим orphans (есть в системе, но нет в inventory)
+- name: Find orphan hosts
+  set_fact:
+    orphan_hosts: "{{ orphan_hosts + [item.host] }}"
+  loop: "{{ zabbix_hosts.json.result }}"
+  when: item.host not in groups['mikrotik']
+
+# 4. Удаляем orphans
+- name: Delete orphan hosts
+  include_tasks: delete-host.yml
+  loop: "{{ orphan_hosts }}"
+```
+
+---
+
 ## MikroTik RouterOS + Ansible
 
 ### 1. Кавычки в командах [find ...]
