@@ -214,7 +214,7 @@
     - name: Создать контейнер
       community.routeros.command:
         commands:
-          - /container add remote-image={{ container_image }} interface={{ container_name }} root-dir={{ smb_base }}/docker/{{ container_name }} dns={{ container_dns }} logging=yes start-on-boot=yes
+          - /container add name={{ container_name }} remote-image={{ container_image }} interface={{ container_name }} root-dir={{ smb_base }}/docker/{{ container_name }} dns={{ container_dns }} logging=yes start-on-boot=yes
       register: container_add_result
 
     - name: DEBUG - результат создания контейнера
