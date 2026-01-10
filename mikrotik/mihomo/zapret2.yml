@@ -74,6 +74,15 @@
       when: bridge_check.stdout[0] | int == 0
 
     # ============================================================
+    # ОЧИСТКА МУСОРА (unknown порты от предыдущих запусков)
+    # ============================================================
+    - name: Очистить unknown порты из bridge
+      community.routeros.command:
+        commands:
+          - /interface bridge port remove [find interface~"unknown" and bridge={{ docker_bridge }}]
+      ignore_errors: yes
+
+    # ============================================================
     # УДАЛИТЬ СТАРЫЙ КОНТЕЙНЕР (если есть)
     # ============================================================
     - name: Остановить старый контейнер
@@ -233,9 +242,61 @@
         prompt: "Загрузка образа nfqws2-mikrotik (90 сек)..."
 
     # ============================================================
-    # START
+    # ПЕРВЫЙ ЗАПУСК (установка zapret2)
     # ============================================================
-    - name: Запустить контейнер
+    - name: Запустить контейнер (первый раз для установки zapret2)
+      community.routeros.command:
+        commands:
+          - /container start [find interface={{ container_name }}]
+
+    - name: Ожидание установки zapret2 внутри контейнера
+      ansible.builtin.pause:
+        seconds: 120
+        prompt: "Установка zapret2 внутри контейнера (120 сек)..."
+
+    # ============================================================
+    # АВТОМАТИЧЕСКАЯ НАСТРОЙКА CONFIG
+    # ============================================================
+    - name: Остановить контейнер для настройки config
+      community.routeros.command:
+        commands:
+          - /container stop [find interface={{ container_name }}]
+      ignore_errors: yes
+
+    - name: Пауза для остановки
+      ansible.builtin.pause:
+        seconds: 10
+
+    - name: Проверить что zapret2 установился (config.default существует)
+      ansible.builtin.stat:
+        path: "{{ smb_mount_point }}/docker/{{ container_name }}/opt/zapret2/config.default"
+      delegate_to: localhost
+      register: zapret2_installed
+
+    - name: DEBUG - zapret2 установлен?
+      ansible.builtin.debug:
+        msg: "zapret2 установлен: {{ 'ДА' if zapret2_installed.stat.exists else 'НЕТ - контейнер не успел установить' }}"
+
+    - name: Записать config с рабочей стратегией DPI bypass
+      ansible.builtin.copy:
+        content: |
+          NFQWS2_ENABLE=1
+          MODE_FILTER=none
+          NFQWS2_OPT="{{ nfqws2_strategy }}"
+        dest: "{{ smb_mount_point }}/docker/{{ container_name }}/opt/zapret2/config"
+        mode: '0644'
+      delegate_to: localhost
+      when: zapret2_installed.stat.exists
+
+    - name: DEBUG - config записан
+      ansible.builtin.debug:
+        msg: "Config записан со стратегией: {{ nfqws2_strategy }}"
+      when: zapret2_installed.stat.exists
+
+    # ============================================================
+    # ФИНАЛЬНЫЙ ЗАПУСК
+    # ============================================================
+    - name: Запустить контейнер с правильным config
       community.routeros.command:
         commands:
           - /container start [find interface={{ container_name }}]
@@ -273,33 +334,27 @@
       ansible.builtin.debug:
         msg: |
           ================================================
-          {{ container_name }} установлен!
+          {{ container_name }} установлен и настроен!
           ================================================
           Контейнер: {{ container_name }}
           IP: {{ container_ip | default(auto_container_ip) }}
           Routing table: {{ routing_table_name }}
+          Стратегия: {{ nfqws2_strategy }}
           Status: {{ result.stdout[0] }}
+          Config: {{ 'записан автоматически' if zapret2_installed.stat.exists else 'НЕ ЗАПИСАН - установи вручную!' }}
           ================================================
 
           СЛЕДУЮЩИЕ ШАГИ:
 
-          1. НАСТРОИТЬ CONFIG (после первого запуска):
-             /container shell [find interface={{ container_name }}]
-
-             Внутри контейнера выполнить:
-             echo 'NFQWS2_ENABLE=1' > /opt/zapret2/config
-             echo 'MODE_FILTER=none' >> /opt/zapret2/config
-             echo 'NFQWS2_OPT="{{ nfqws2_strategy }}"' >> /opt/zapret2/config
-             /opt/zapret2/init.d/sysv/zapret2 start
-             exit
-
-          2. Добавить route для routing table:
+          1. Добавить route:
              /ip route add dst-address=0.0.0.0/0 gateway={{ container_ip | default(auto_container_ip) }} routing-table={{ routing_table_name }} comment="{{ container_name }} route"
 
-          3. Добавить mangle rule (для теста):
+          2. Добавить mangle rule (тест):
              /ip firewall mangle add action=mark-routing chain=prerouting dst-port=443 protocol=tcp new-routing-mark={{ routing_table_name }} passthrough=no src-address=192.168.0.248 place-before=0 comment="{{ container_name | lower }} test"
 
-          4. Если перестанет работать - найти новую стратегию:
+          3. Проверить YouTube в браузере
+
+          4. Если перестанет работать:
              /container shell [find interface={{ container_name }}]
              /opt/zapret2/init.d/sysv/zapret2 stop
              ./blockcheck2.sh --hosts=www.youtube.com
