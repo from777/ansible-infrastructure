@@ -41,13 +41,22 @@ if [ ! -d /opt/zapret2 ]; then
   done
 fi
 
-# set default config
-if [ ! -f /opt/zapret2/config ]; then
-    echo "Set default config NFQWS2"
-    cp /opt/zapret2/config.default /opt/zapret2/config
-    sed -i 's/^NFQWS2_ENABLE=.*/NFQWS2_ENABLE=1/' /opt/zapret2/config
-    # Use iptables mode since we're not using nftables inside container
-    sed -i 's/^[#]*FWTYPE=.*/FWTYPE=iptables/' /opt/zapret2/config
+# set config with working DPI bypass strategy
+# Strategy found via blockcheck2.sh for specific ISP
+if [ ! -f /opt/zapret2/config ] || [ -f /opt/zapret2/.reconfigure ]; then
+    echo "Configuring NFQWS2 with DPI bypass strategy"
+
+    # Use custom strategy from environment or default working one
+    STRATEGY="${NFQWS2_STRATEGY:---filter-tcp=443 --payload=tls_client_hello --lua-desync=wssize:wsize=1:scale=6 --lua-desync=multidisorder:pos=midsld}"
+
+    cat > /opt/zapret2/config << EOFCONFIG
+NFQWS2_ENABLE=1
+MODE_FILTER=none
+NFQWS2_OPT="$STRATEGY"
+EOFCONFIG
+
+    rm -f /opt/zapret2/.reconfigure
+    echo "Strategy: $STRATEGY"
 fi
 
 # REMOVED: nft commands - NAT is handled by MikroTik

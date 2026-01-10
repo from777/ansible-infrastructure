@@ -1,15 +1,17 @@
-# delete_zapret2.yml - Полное удаление nfqws2/zapret2 контейнера
+# delete_zapret2.yml - Полное удаление Zapret2 контейнера (DPI bypass)
 #
 # Использование:
 #   ansible-playbook delete_zapret2.yml -l Mik_Tim
 #
 # Удаляет:
-# - Контейнер NFQWS2
+# - Контейнер Zapret2
 # - veth интерфейс
 # - Порт из bridge
-# - Route
-# - Routing table
+# - Route и Routing table
 # - Mangle rules (опционально)
+# - Environment variables
+# - Mount для entrypoint
+# - Srcnat masquerade правило
 # - Root-dir на USB
 #
 ---
@@ -96,10 +98,10 @@
     # ============================================================
     # ШАГ 7: УДАЛИТЬ MANGLE RULES (опционально)
     # ============================================================
-    - name: "7. Удалить mangle rules (zapret2)"
+    - name: "7. Удалить mangle rules"
       community.routeros.command:
         commands:
-          - /ip firewall mangle remove [find comment~"zapret2"]
+          - /ip firewall mangle remove [find comment~"{{ container_name | lower }}"]
       ignore_errors: yes
       when: delete_mangle_rules | default(true)
 
@@ -109,7 +111,16 @@
     - name: "7a. Удалить srcnat masquerade"
       community.routeros.command:
         commands:
-          - /ip firewall nat remove [find comment~"nfqws2 masquerade"]
+          - /ip firewall nat remove [find comment~"{{ container_name }} masquerade"]
+      ignore_errors: yes
+
+    # ============================================================
+    # ШАГ 7b2: УДАЛИТЬ ENVLIST
+    # ============================================================
+    - name: "7b2. Удалить envlist"
+      community.routeros.command:
+        commands:
+          - /container envs remove [find list={{ container_name }}_env]
       ignore_errors: yes
 
     # ============================================================
@@ -150,10 +161,10 @@
           - Контейнер
           - veth интерфейс
           - Порт из bridge
-          - Route
-          - Routing table {{ routing_table_name }}
-          - Mangle rules (zapret2): {{ 'да' if delete_mangle_rules else 'нет' }}
+          - Route и routing table {{ routing_table_name }}
+          - Mangle rules: {{ 'да' if delete_mangle_rules else 'нет' }}
           - Srcnat masquerade правило
+          - Environment variables (envlist)
           - Mount для entrypoint
           - Папка root-dir
           ================================================

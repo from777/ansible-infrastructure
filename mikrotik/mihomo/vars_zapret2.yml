@@ -1,10 +1,10 @@
-# vars_zapret2.yml - Переменные для nfqws2/zapret2 контейнера
+# vars_zapret2.yml - Переменные для zapret2 контейнера (DPI bypass)
 ---
 # ============================================================
-# ПЕРЕМЕННЫЕ КОНТЕЙНЕРА NFQWS2
+# ПЕРЕМЕННЫЕ КОНТЕЙНЕРА ZAPRET2
 # ============================================================
 
-container_name: "NFQWS2"
+container_name: "Zapret2"
 container_image: "wiktorbgu/nfqws2-mikrotik:latest"
 
 # Сеть
@@ -13,7 +13,21 @@ container_network: "192.168.254"
 docker_bridge: "Bridge-Docker"
 
 # Routing table для перенаправления трафика
-routing_table_name: "to_nfqws2"
+routing_table_name: "to_zapret2"
+
+# ============================================================
+# СТРАТЕГИЯ DPI BYPASS
+# ============================================================
+# Найдена через blockcheck2.sh для конкретного провайдера
+# Если перестанет работать - запустить blockcheck2.sh заново
+#
+# Параметры:
+# --filter-tcp=443 : только HTTPS трафик
+# --payload=tls_client_hello : только первый пакет TLS (с SNI)
+# --lua-desync=wssize:wsize=1:scale=6 : манипуляция TCP window size
+# --lua-desync=multidisorder:pos=midsld : разбивка SNI и отправка не по порядку
+#
+nfqws2_strategy: "--filter-tcp=443 --payload=tls_client_hello --lua-desync=wssize:wsize=1:scale=6 --lua-desync=multidisorder:pos=midsld"
 
 # USB
 usb_partition: "usb1-part1"

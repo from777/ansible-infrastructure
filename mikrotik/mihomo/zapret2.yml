@@ -1,4 +1,4 @@
-# zapret2.yml - Установка nfqws2/zapret2 контейнера для обхода DPI
+# zapret2.yml - Установка Zapret2 контейнера для обхода DPI
 #
 # Образ: wiktorbgu/nfqws2-mikrotik
 # Docs: https://hub.docker.com/r/wiktorbgu/nfqws2-mikrotik
@@ -12,13 +12,15 @@
 # Использование:
 #   ansible-playbook zapret2.yml -l Mik_Tim
 #
-# ВАЖНО: Используется кастомный entrypoint без nftables команд!
-# NAT обеспечивается через srcnat masquerade правило на MikroTik.
+# Стратегия DPI bypass настраивается в vars_zapret2.yml (переменная nfqws2_strategy)
+# Если перестанет работать - запустить blockcheck2.sh в контейнере для поиска новой стратегии
 #
 # После установки:
 # 1. Добавить mangle rule для нужных хостов (см. примеры в конце плейбука)
-# 2. Проверить работу: /container shell [find interface=NFQWS2]
-# 3. Затем: /opt/zapret2/blockcheck2.sh
+# 2. Если нужно найти новую стратегию:
+#    /container shell [find interface=Zapret2]
+#    /opt/zapret2/init.d/sysv/zapret2 stop
+#    ./blockcheck2.sh --hosts=www.youtube.com
 #
 ---
 - name: "Zapret2: Install nfqws2-mikrotik container"
@@ -215,13 +217,27 @@
     - name: Удалить старое srcnat правило
       community.routeros.command:
         commands:
-          - /ip firewall nat remove [find comment~"nfqws2 masquerade"]
+          - /ip firewall nat remove [find comment~"{{ container_name }} masquerade"]
       ignore_errors: yes
 
     - name: Создать srcnat masquerade для контейнера
       community.routeros.command:
         commands:
-          - /ip firewall nat add chain=srcnat src-address={{ container_ip | default(auto_container_ip) }} action=masquerade comment="nfqws2 masquerade"
+          - /ip firewall nat add chain=srcnat src-address={{ container_ip | default(auto_container_ip) }} action=masquerade comment="{{ container_name }} masquerade"
+
+    # ============================================================
+    # ENVIRONMENT VARIABLES (стратегия DPI bypass)
+    # ============================================================
+    - name: Удалить старый envlist
+      community.routeros.command:
+        commands:
+          - /container envs remove [find list={{ container_name }}_env]
+      ignore_errors: yes
+
+    - name: Создать envlist со стратегией
+      community.routeros.command:
+        commands:
+          - /container envs add list={{ container_name }}_env name=NFQWS2_STRATEGY value="{{ nfqws2_strategy }}"
 
     # ============================================================
     # CONTAINER (с кастомным entrypoint)
@@ -229,7 +245,7 @@
     - name: Создать контейнер
       community.routeros.command:
         commands:
-          - /container add remote-image={{ container_image }} interface={{ container_name }} root-dir={{ smb_base }}/docker/{{ container_name }} mounts={{ container_name }}_entrypoint dns={{ container_dns }} logging=yes start-on-boot=yes entrypoint=/scripts/entrypoint_nfqws2.sh
+          - /container add remote-image={{ container_image }} interface={{ container_name }} root-dir={{ smb_base }}/docker/{{ container_name }} mounts={{ container_name }}_entrypoint envlist={{ container_name }}_env dns={{ container_dns }} logging=yes start-on-boot=yes entrypoint=/scripts/entrypoint_nfqws2.sh
 
     - name: Ожидание загрузки образа
       ansible.builtin.pause:
@@ -277,37 +293,39 @@
       ansible.builtin.debug:
         msg: |
           ================================================
-          NFQWS2/Zapret2 установлен!
+          {{ container_name }} установлен! (DPI bypass)
           ================================================
           Контейнер: {{ container_name }}
           IP: {{ container_ip | default(auto_container_ip) }}
           Routing table: {{ routing_table_name }}
+          Стратегия: {{ nfqws2_strategy }}
           Status: {{ result.stdout[0] }}
           ================================================
 
           СЛЕДУЮЩИЕ ШАГИ:
 
-          1. Добавить mangle rule для перенаправления трафика:
+          1. Добавить route для routing table:
+             /ip route add dst-address=0.0.0.0/0 gateway={{ container_ip | default(auto_container_ip) }} routing-table={{ routing_table_name }} comment="{{ container_name }} route"
 
-             # Вариант A - Конкретный хост (рекомендуется для теста):
+          2. Добавить mangle rule для перенаправления трафика:
+
+             # Вариант A - Конкретный хост (для теста):
              /ip firewall mangle add action=mark-routing chain=prerouting \
-               dst-address-type=!local in-interface-list=LAN \
+               dst-port=443 protocol=tcp \
                new-routing-mark={{ routing_table_name }} passthrough=no \
-               src-address=192.168.88.250 place-before=0 \
-               comment="zapret2 - test host"
+               src-address=192.168.0.248 place-before=0 \
+               comment="{{ container_name | lower }} - test host"
 
              # Вариант B - Вся LAN подсеть:
              /ip firewall mangle add action=mark-routing chain=prerouting \
-               dst-address-type=!local in-interface-list=LAN \
+               dst-port=443 protocol=tcp in-interface-list=LAN \
                new-routing-mark={{ routing_table_name }} passthrough=no \
-               src-address=192.168.88.0/24 place-before=0 \
-               comment="zapret2 - all LAN"
+               src-address=192.168.0.0/24 place-before=0 \
+               comment="{{ container_name | lower }} - all LAN"
 
-          2. Проверить работу blockcheck2:
+          3. Если перестанет работать - найти новую стратегию:
              /container shell [find interface={{ container_name }}]
-             /opt/zapret2/blockcheck2.sh
-
-          3. Редактировать конфиг (если нужно):
-             /container shell [find interface={{ container_name }}]
-             nano /opt/zapret2/config
+             /opt/zapret2/init.d/sysv/zapret2 stop
+             ./blockcheck2.sh --hosts=www.youtube.com
+             # Найти строки AVAILABLE, обновить nfqws2_strategy в vars_zapret2.yml
           ================================================
