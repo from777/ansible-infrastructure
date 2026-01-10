@@ -194,19 +194,7 @@
         commands:
           - /ip route add check-gateway=ping gateway={{ container_ip | default(auto_container_ip) }} routing-table={{ routing_table_name }} comment="nfqws2 gateway"
 
-    # ============================================================
-    # SRCNAT MASQUERADE для контейнера (вместо nftables внутри)
-    # ============================================================
-    - name: Удалить старое srcnat правило
-      community.routeros.command:
-        commands:
-          - /ip firewall nat remove [find comment~"{{ container_name }} masquerade"]
-      ignore_errors: yes
-
-    - name: Создать srcnat masquerade для контейнера
-      community.routeros.command:
-        commands:
-          - /ip firewall nat add chain=srcnat src-address={{ container_ip | default(auto_container_ip) }} action=masquerade comment="{{ container_name }} masquerade"
+    # SRCNAT не нужен - используется общее правило "Containers to WAN" для 192.168.254.0/24
 
     # ============================================================
     # CONTAINER (дефолтный образ без кастомного entrypoint)

@@ -105,23 +105,7 @@
       ignore_errors: yes
       when: delete_mangle_rules | default(true)
 
-    # ============================================================
-    # ШАГ 7a: УДАЛИТЬ SRCNAT MASQUERADE ПРАВИЛО
-    # ============================================================
-    - name: "7a. Удалить srcnat masquerade"
-      community.routeros.command:
-        commands:
-          - /ip firewall nat remove [find comment~"{{ container_name }} masquerade"]
-      ignore_errors: yes
-
-    # ============================================================
-    # ШАГ 7b2: УДАЛИТЬ ENVLIST
-    # ============================================================
-    - name: "7b2. Удалить envlist"
-      community.routeros.command:
-        commands:
-          - /container envs remove [find list={{ container_name }}_env]
-      ignore_errors: yes
+    # SRCNAT не удаляем - используется общее правило "Containers to WAN"
 
     # ============================================================
     # ШАГ 7b: УДАЛИТЬ MOUNT ДЛЯ ENTRYPOINT
