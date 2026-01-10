@@ -1,0 +1,41 @@
+# mikrotik/inventory.yml - inventory для mikrotik плейбуков
+# ВАЖНО: Основной источник данных - ../inventory.yml
+# Этот файл существует для совместимости с Task Templates в Semaphore
+---
+mikrotik:
+  hosts:
+    Mik_Tim:
+      ansible_host: 192.168.0.1
+      elk_server: 192.168.0.82
+      router_ip: 192.168.0.1
+      zabbix_monitor: true
+      monitor_socks: true
+      monitor_users: true
+      allowed_users:
+        - admin
+        - smbuser
+    Mik_mom:
+      ansible_host: 109.174.1.142
+      elk_server: 10.200.200.82
+      router_ip: 192.168.0.1
+      zabbix_monitor: false
+      monitor_socks: false
+      monitor_users: false
+      allowed_users:
+        - admin
+        - user1
+    Mik_Mom_ax3:
+      ansible_host: 192.168.0.88
+      ansible_user: ansible+cet1024w
+      ansible_password: ansible_passсмот
+      router_ip: 192.168.88.1
+      allowed_networks:
+        - 192.168.88.0/24
+        - 192.168.0.0/24
+        - 212.20.46.209
+      zabbix_monitor: true
+      monitor_socks: true
+      monitor_users: false
+      allowed_users:
+        - admin
+        - ansible
