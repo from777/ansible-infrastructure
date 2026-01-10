@@ -1,4 +1,4 @@
-# 2026-01-05 22:02:58 by RouterOS 7.20.6
+# 2026-01-10 19:46:27 by RouterOS 7.20.6
 # software id = E05L-801M
 #
 # model = RB5009UPr+S+
@@ -22,6 +22,8 @@ add address=192.168.254.4/24 dhcp=no gateway=192.168.254.1 gateway6="" \
     mac-address=52:FC:27:EA:A6:97 name=MIHOMO2
 add address=192.168.254.5/24 dhcp=no gateway=192.168.254.1 gateway6="" \
     mac-address=62:72:E1:C8:2A:10 name=MIHOMO3
+add address=192.168.254.6/24 dhcp=no gateway=192.168.254.1 gateway6="" \
+    mac-address=58:BF:5E:20:C5:DD name=NFQWS2
 /interface wireguard
 add listen-port=51820 mtu=1400 name=WG_Home
 /interface vlan
@@ -39,7 +41,6 @@ add dst=/etc/mihomo/awg name=proton_wg_conf src=\
 add dst=/etc/mihomo name=test_manual_conf src=usb1/docker_configs/test_manual
 add dst=/etc/mihomo name=test_super_test_conf src=\
     usb1/smb_share/docker_configs/test_super_test
-add dst=/etc/mihomo name=mamuka_conf src=usb1/smb_share/docker_configs/mamuka
 /disk
 add parent=usb1 partition-number=1 partition-offset=1048576 partition-size=\
     2000397795328 type=partition
@@ -116,6 +117,7 @@ add fib name=BlackList_EU
 add fib name=BlackList_RU
 add fib name=RDP-Server
 add fib name=vpn-all-table
+add disabled=no fib name=to_nfqws2
 /snmp community
 set [ find default=yes ] addresses=192.168.0.14/32 authentication-protocol=\
     SHA1 security=private
@@ -137,6 +139,10 @@ add dns=192.168.254.1 envlists=MIHOMO2 interface=MIHOMO2 name=\
 add dns=192.168.254.1 envlists=Germany interface=MIHOMO3 mounts=\
     proton_wg_conf name="Proton Only" remote-image=\
     wiktorbgu/mihomo-mikrotik:latest root-dir=usb1/docker/mihomo3 workdir=/
+# exited with status 1
+add dns=192.168.254.1 interface=NFQWS2 logging=yes name=\
+    nfqws2-mikrotik:latest remote-image=wiktorbgu/nfqws2-mikrotik:latest \
+    root-dir=usb1-part1/smb_share/docker/NFQWS2 start-on-boot=yes workdir=/
 /container config
 set registry-url=https://registry-1.docker.io tmpdir=/usb1/docker/pull
 /container envs
@@ -154,11 +160,10 @@ add key=SRV1 list=MIHOMO2 value="vless://b5f4e3a2-9c8d-4f7a-8e6b-1a3d5c7b9f2e@\
     176.9.141.234:2054\?encryption=none&flow=xtls-rprx-vision&security=reality\
     &sni=www.google.com&fp=chrome&pbk=j92tntLc26sEHfL85mkRJCcrjq9PSbDPzhcYnniM\
     8ys&sid=a1b2c3d4e5f6&type=tcp&headerType=none#RealityGoogle"
-add key=CONFIG list=mamuka_env value=custom_config.yaml
 add key=CONFIG list=test_manual_env value=custom_config.yaml
 add key=CONFIG list=test_super_test_env value=custom_config.yaml
 /ip smb
-set enabled=yes
+set enabled=yes interfaces=bridge1
 /interface bridge port
 add bridge=bridge1 hw=no interface=ether6 internal-path-cost=10 path-cost=10
 add bridge=bridge1 hw=no ingress-filtering=no interface=ether7 \
@@ -179,10 +184,7 @@ add bridge=bridge1 hw=no interface=sfp-sfpplus1 internal-path-cost=10 \
 add bridge=Bridge-Docker interface=MIHOMO
 add bridge=Bridge-Docker interface=MIHOMO2
 add bridge=Bridge-Docker interface=MIHOMO3
-add bridge=Bridge-Docker interface=*22
-add bridge=Bridge-Docker interface=*23
-add bridge=Bridge-Docker interface=*24
-add bridge=Bridge-Docker interface=*25
+add bridge=Bridge-Docker interface=NFQWS2
 /ip firewall connection tracking
 set enabled=yes
 /ipv6 settings
@@ -507,6 +509,12 @@ add address=192.168.0.82 client-id=\
     mac-address=00:0C:29:AF:36:66 server=defconf
 add address=192.168.0.103 client-id=1:0:7d:3b:2c:63:54 comment="Samsung s95f" \
     mac-address=00:7D:3B:2C:63:54 server=defconf
+add address=192.168.0.57 client-id=1:e6:30:9c:f8:ae:76 comment=\
+    "\D0\90\D0\B9\D1\84\D0\BE\D0\BD" mac-address=E6:30:9C:F8:AE:76 server=\
+    defconf
+add address=192.168.0.81 client-id=\
+    ff:29:d4:19:1c:0:1:0:1:30:f2:21:c7:0:c:29:d4:19:1c comment=zabbix \
+    mac-address=00:0C:29:D4:19:1C server=defconf
 /ip dhcp-server network
 add address=192.168.0.0/24 dns-server=192.168.0.1 gateway=192.168.0.1 \
     netmask=24 ntp-server=192.168.0.1
@@ -2320,13 +2328,6 @@ add action=change-mss chain=forward comment="MSS fix from WG_Home" \
 add action=change-mss chain=forward comment="MSS fix to WG_Home" new-mss=1300 \
     out-interface=WG_Home protocol=tcp tcp-flags=syn
 add action=passthrough chain=prerouting
-add action=mark-routing chain=prerouting comment=\
-    "RDP to 176.9.141.234 via MIHOMO3" disabled=yes dst-address=176.9.141.234 \
-    in-interface-list=LAN_and_GUEST new-routing-mark=RDP-Server passthrough=\
-    no src-address=!192.168.254.0/24
-add action=change-mss chain=forward comment="MSS fix for RDP server" \
-    disabled=yes dst-address=176.9.141.234 new-mss=1300 protocol=tcp \
-    tcp-flags=syn
 /ip firewall nat
 add action=masquerade chain=srcnat comment="WG to video server hairpin" \
     dst-address=192.168.0.243 log-prefix=SRC-NAT: src-address=10.101.101.0/24
@@ -2360,6 +2361,66 @@ add action=netmap chain=dstnat comment="NETMAP allow 192.168.0.243 for WG" \
     dst-address=10.200.200.243 to-addresses=192.168.0.243
 add action=netmap chain=dstnat comment="NETMAP allow 192.168.0.78 for WG" \
     dst-address=10.200.200.82 to-addresses=192.168.0.82
+add action=masquerade chain=srcnat comment="Containers to WAN" src-address=\
+    192.168.254.0/24
+add action=accept chain=dstnat comment="Allow containers DNS direct" \
+    dst-port=53 protocol=udp src-address=192.168.254.0/24
+add action=masquerade chain=srcnat comment="Containers to WAN" src-address=\
+    192.168.254.0/24
+add action=accept chain=dstnat comment="Allow containers DNS direct" \
+    dst-port=53 protocol=udp src-address=192.168.254.0/24
+add action=masquerade chain=srcnat comment="Containers to WAN" src-address=\
+    192.168.254.0/24
+add action=accept chain=dstnat comment="Allow containers DNS direct" \
+    dst-port=53 protocol=udp src-address=192.168.254.0/24
+add action=masquerade chain=srcnat comment="Containers to WAN" src-address=\
+    192.168.254.0/24
+add action=accept chain=dstnat comment="Allow containers DNS direct" \
+    dst-port=53 protocol=udp src-address=192.168.254.0/24
+add action=masquerade chain=srcnat comment="Containers to WAN" src-address=\
+    192.168.254.0/24
+add action=accept chain=dstnat comment="Allow containers DNS direct" \
+    dst-port=53 protocol=udp src-address=192.168.254.0/24
+add action=masquerade chain=srcnat comment="Containers to WAN" src-address=\
+    192.168.254.0/24
+add action=accept chain=dstnat comment="Allow containers DNS direct" \
+    dst-port=53 protocol=udp src-address=192.168.254.0/24
+add action=masquerade chain=srcnat comment="Containers to WAN" src-address=\
+    192.168.254.0/24
+add action=accept chain=dstnat comment="Allow containers DNS direct" \
+    dst-port=53 protocol=udp src-address=192.168.254.0/24
+add action=masquerade chain=srcnat comment="Containers to WAN" src-address=\
+    192.168.254.0/24
+add action=accept chain=dstnat comment="Allow containers DNS direct" \
+    dst-port=53 protocol=udp src-address=192.168.254.0/24
+add action=masquerade chain=srcnat comment="Containers to WAN" src-address=\
+    192.168.254.0/24
+add action=accept chain=dstnat comment="Allow containers DNS direct" \
+    dst-port=53 protocol=udp src-address=192.168.254.0/24
+add action=masquerade chain=srcnat comment="Containers to WAN" src-address=\
+    192.168.254.0/24
+add action=accept chain=dstnat comment="Allow containers DNS direct" \
+    dst-port=53 protocol=udp src-address=192.168.254.0/24
+add action=masquerade chain=srcnat comment="Containers to WAN" src-address=\
+    192.168.254.0/24
+add action=accept chain=dstnat comment="Allow containers DNS direct" \
+    dst-port=53 protocol=udp src-address=192.168.254.0/24
+add action=masquerade chain=srcnat comment="Containers to WAN" src-address=\
+    192.168.254.0/24
+add action=accept chain=dstnat comment="Allow containers DNS direct" \
+    dst-port=53 protocol=udp src-address=192.168.254.0/24
+add action=masquerade chain=srcnat comment="Containers to WAN" src-address=\
+    192.168.254.0/24
+add action=accept chain=dstnat comment="Allow containers DNS direct" \
+    dst-port=53 protocol=udp src-address=192.168.254.0/24
+add action=masquerade chain=srcnat comment="Containers to WAN" src-address=\
+    192.168.254.0/24
+add action=accept chain=dstnat comment="Allow containers DNS direct" \
+    dst-port=53 protocol=udp src-address=192.168.254.0/24
+add action=masquerade chain=srcnat comment="Containers to WAN" src-address=\
+    192.168.254.0/24
+add action=accept chain=dstnat comment="Allow containers DNS direct" \
+    dst-port=53 protocol=udp src-address=192.168.254.0/24
 /ip firewall raw
 add action=drop chain=prerouting log-prefix=RAW-CYBEROK-DROP \
     src-address-list=cyberok-ban
@@ -2386,6 +2447,8 @@ add disabled=yes distance=1 dst-address=0.0.0.0/0 gateway=192.168.254.5 \
     routing-table=RDP-Server scope=30 suppress-hw-offload=no target-scope=10
 add disabled=yes distance=1 dst-address=0.0.0.0/0 gateway=192.168.254.3 \
     routing-table=vpn-all-table
+add check-gateway=ping comment="nfqws2 gateway" gateway=192.168.254.6 \
+    routing-table=to_nfqws2
 /ip service
 set ftp disabled=yes
 set ssh address=192.168.0.0/24
@@ -2395,7 +2458,7 @@ set winbox address=192.168.0.0/24
 set api disabled=yes
 /ip smb shares
 set [ find default=yes ] directory=/pub
-add directory=usb1/smb_share name=usb1
+add directory=usb1-part1/smb_share name=usb1
 add directory=usb1/docker_configs name=docker_configs
 /ip ssh
 set always-allow-password-login=yes forwarding-enabled=local
@@ -2498,8 +2561,9 @@ set enabled=yes
 add address=0.ru.pool.ntp.org
 add address=1.ru.pool.ntp.org
 add address=2.ru.pool.ntp.org
-add address=pool.ntp.org
 add address=3.ru.pool.ntp.org
+/system package update
+set channel=testing
 /system scheduler
 add disabled=yes interval=1d name="Backup And Update" on-event=\
     "/system script run BackupAndUpdate;" policy=\
