@@ -115,48 +115,8 @@
       delegate_to: localhost
       ignore_errors: yes
 
-    - name: Удалить старый mount для entrypoint
-      community.routeros.command:
-        commands:
-          - /container mounts remove [find name={{ container_name }}_entrypoint]
-      ignore_errors: yes
-
-    # ============================================================
-    # КАСТОМНЫЙ ENTRYPOINT (без nftables команд)
-    # ============================================================
-    - name: Создать директорию для скриптов
-      ansible.builtin.file:
-        path: "{{ smb_mount_point }}/docker/scripts"
-        state: directory
-      delegate_to: localhost
-
-    - name: Скопировать кастомный entrypoint.sh
-      ansible.builtin.copy:
-        src: files/entrypoint_nfqws2.sh
-        dest: "{{ smb_mount_point }}/docker/scripts/entrypoint_nfqws2.sh"
-        mode: '0755'
-      delegate_to: localhost
-
-    - name: Проверить что папка scripts существует на USB
-      community.routeros.command:
-        commands:
-          - /file print count-only where name~"{{ smb_base }}/docker/scripts"
-      register: scripts_folder_check
-      ignore_errors: yes
-
-    - name: DEBUG - папка scripts на USB
-      ansible.builtin.debug:
-        msg: "Папка {{ smb_base }}/docker/scripts на USB: {{ 'существует' if scripts_folder_check.stdout[0] | default('0') | int > 0 else 'НЕ СУЩЕСТВУЕТ' }}"
-
-    - name: Создать mount для entrypoint
-      community.routeros.command:
-        commands:
-          - /container mounts add name={{ container_name }}_entrypoint src={{ smb_base }}/docker/scripts dst=/scripts
-      register: mount_add_result
-
-    - name: DEBUG - результат создания mount
-      ansible.builtin.debug:
-        msg: "Результат /container mounts add: {{ mount_add_result.stdout }}"
+    # ПРИМЕЧАНИЕ: Кастомный entrypoint убран - используем дефолтный образ
+    # После первого запуска контейнера нужно настроить config вручную
 
     # ============================================================
     # АВТООПРЕДЕЛЕНИЕ IP
@@ -240,30 +200,12 @@
           - /ip firewall nat add chain=srcnat src-address={{ container_ip | default(auto_container_ip) }} action=masquerade comment="{{ container_name }} masquerade"
 
     # ============================================================
-    # ПРОВЕРКА MOUNT
-    # ============================================================
-    - name: Проверить что mount создан
-      community.routeros.command:
-        commands:
-          - /container mounts print count-only where name={{ container_name }}_entrypoint
-      register: mount_check
-
-    - name: DEBUG - mount существует?
-      ansible.builtin.debug:
-        msg: "Mount {{ container_name }}_entrypoint: {{ 'ДА' if mount_check.stdout[0] | int > 0 else 'НЕТ - ПРОБЛЕМА!' }}"
-
-    - name: Fail если mount не создан
-      ansible.builtin.fail:
-        msg: "Mount {{ container_name }}_entrypoint не создан! Проверь путь {{ smb_base }}/docker/scripts на USB"
-      when: mount_check.stdout[0] | int == 0
-
-    # ============================================================
-    # CONTAINER (без envlist - стратегия в entrypoint по умолчанию)
+    # CONTAINER (дефолтный образ без кастомного entrypoint)
     # ============================================================
     - name: Создать контейнер
       community.routeros.command:
         commands:
-          - /container add remote-image={{ container_image }} interface={{ container_name }} root-dir={{ smb_base }}/docker/{{ container_name }} mounts={{ container_name }}_entrypoint dns={{ container_dns }} logging=yes start-on-boot=yes entrypoint=/scripts/entrypoint_nfqws2.sh
+          - /container add remote-image={{ container_image }} interface={{ container_name }} root-dir={{ smb_base }}/docker/{{ container_name }} dns={{ container_dns }} logging=yes start-on-boot=yes
       register: container_add_result
 
     - name: DEBUG - результат создания контейнера
@@ -276,9 +218,13 @@
           - /container print count-only where interface={{ container_name }}
       register: container_exists
 
+    - name: DEBUG - контейнер создан?
+      ansible.builtin.debug:
+        msg: "Контейнер {{ container_name }}: {{ 'СОЗДАН' if container_exists.stdout[0] | int > 0 else 'НЕ СОЗДАН!' }}"
+
     - name: Fail если контейнер не создан
       ansible.builtin.fail:
-        msg: "Контейнер не создан! Проверь логи RouterOS"
+        msg: "Контейнер не создан! Результат команды: {{ container_add_result.stdout }}"
       when: container_exists.stdout[0] | int == 0
 
     - name: Ожидание загрузки образа
@@ -327,39 +273,34 @@
       ansible.builtin.debug:
         msg: |
           ================================================
-          {{ container_name }} установлен! (DPI bypass)
+          {{ container_name }} установлен!
           ================================================
           Контейнер: {{ container_name }}
           IP: {{ container_ip | default(auto_container_ip) }}
           Routing table: {{ routing_table_name }}
-          Стратегия: {{ nfqws2_strategy }}
           Status: {{ result.stdout[0] }}
           ================================================
 
           СЛЕДУЮЩИЕ ШАГИ:
 
-          1. Добавить route для routing table:
+          1. НАСТРОИТЬ CONFIG (после первого запуска):
+             /container shell [find interface={{ container_name }}]
+
+             Внутри контейнера выполнить:
+             echo 'NFQWS2_ENABLE=1' > /opt/zapret2/config
+             echo 'MODE_FILTER=none' >> /opt/zapret2/config
+             echo 'NFQWS2_OPT="{{ nfqws2_strategy }}"' >> /opt/zapret2/config
+             /opt/zapret2/init.d/sysv/zapret2 start
+             exit
+
+          2. Добавить route для routing table:
              /ip route add dst-address=0.0.0.0/0 gateway={{ container_ip | default(auto_container_ip) }} routing-table={{ routing_table_name }} comment="{{ container_name }} route"
 
-          2. Добавить mangle rule для перенаправления трафика:
+          3. Добавить mangle rule (для теста):
+             /ip firewall mangle add action=mark-routing chain=prerouting dst-port=443 protocol=tcp new-routing-mark={{ routing_table_name }} passthrough=no src-address=192.168.0.248 place-before=0 comment="{{ container_name | lower }} test"
 
-             # Вариант A - Конкретный хост (для теста):
-             /ip firewall mangle add action=mark-routing chain=prerouting \
-               dst-port=443 protocol=tcp \
-               new-routing-mark={{ routing_table_name }} passthrough=no \
-               src-address=192.168.0.248 place-before=0 \
-               comment="{{ container_name | lower }} - test host"
-
-             # Вариант B - Вся LAN подсеть:
-             /ip firewall mangle add action=mark-routing chain=prerouting \
-               dst-port=443 protocol=tcp in-interface-list=LAN \
-               new-routing-mark={{ routing_table_name }} passthrough=no \
-               src-address=192.168.0.0/24 place-before=0 \
-               comment="{{ container_name | lower }} - all LAN"
-
-          3. Если перестанет работать - найти новую стратегию:
+          4. Если перестанет работать - найти новую стратегию:
              /container shell [find interface={{ container_name }}]
              /opt/zapret2/init.d/sysv/zapret2 stop
              ./blockcheck2.sh --hosts=www.youtube.com
-             # Найти строки AVAILABLE, обновить nfqws2_strategy в vars_zapret2.yml
           ================================================
