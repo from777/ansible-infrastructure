@@ -26,6 +26,8 @@
     ansible_network_os: community.routeros.routeros
     ansible_command_timeout: 180
     smb_base: "{{ usb_partition }}/smb_share"
+    # DNS = IP роутера на Bridge-Docker (для резолвинга внутри контейнера)
+    container_dns: "192.168.254.1"
   vars_files:
     - vars_zapret2.yml
 
@@ -183,7 +185,7 @@
     - name: Создать контейнер
       community.routeros.command:
         commands:
-          - /container add remote-image={{ container_image }} interface={{ container_name }} root-dir={{ smb_base }}/docker/{{ container_name }} logging=yes start-on-boot=yes
+          - /container add remote-image={{ container_image }} interface={{ container_name }} root-dir={{ smb_base }}/docker/{{ container_name }} dns={{ container_dns }} logging=yes start-on-boot=yes
 
     - name: Ожидание загрузки образа
       ansible.builtin.pause:
@@ -207,6 +209,22 @@
         commands:
           - /container print where interface={{ container_name }}
       register: result
+
+    # Проверить логи если контейнер не запустился
+    - name: Получить логи контейнера (последние 20 строк)
+      community.routeros.command:
+        commands:
+          - /log print where topics~"container" and message~"{{ container_name }}"
+      register: container_logs
+      ignore_errors: yes
+      when: "'STOPPED' in result.stdout[0] or 'exited' in result.stdout[0]"
+
+    - name: Показать логи контейнера (если упал)
+      ansible.builtin.debug:
+        msg: |
+          КОНТЕЙНЕР НЕ ЗАПУСТИЛСЯ!
+          Логи: {{ container_logs.stdout[0] | default('нет логов') }}
+      when: "'STOPPED' in result.stdout[0] or 'exited' in result.stdout[0]"
 
     # ============================================================
     # РЕЗУЛЬТАТ
