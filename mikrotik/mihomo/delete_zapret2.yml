@@ -1,0 +1,139 @@
+# delete_zapret2.yml - Полное удаление nfqws2/zapret2 контейнера
+#
+# Использование:
+#   ansible-playbook delete_zapret2.yml -l Mik_Tim
+#
+# Удаляет:
+# - Контейнер NFQWS2
+# - veth интерфейс
+# - Порт из bridge
+# - Route
+# - Routing table
+# - Mangle rules (опционально)
+# - Root-dir на USB
+#
+---
+- name: "Zapret2: Delete nfqws2-mikrotik container"
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    ansible_command_timeout: 120
+    smb_base: "{{ usb_partition }}/smb_share"
+    # Удалять mangle rules с комментарием zapret2?
+    delete_mangle_rules: true
+  vars_files:
+    - vars_zapret2.yml
+
+  tasks:
+    - name: Показать что удаляем
+      ansible.builtin.debug:
+        msg: "Удаляем контейнер: {{ container_name }}"
+
+    # ============================================================
+    # ШАГ 1: ОСТАНОВИТЬ КОНТЕЙНЕР
+    # ============================================================
+    - name: "1. Остановить контейнер"
+      community.routeros.command:
+        commands:
+          - /container stop [find name={{ container_name }}]
+      ignore_errors: yes
+
+    - name: Пауза 10 сек
+      ansible.builtin.pause:
+        seconds: 10
+
+    # ============================================================
+    # ШАГ 2: УДАЛИТЬ КОНТЕЙНЕР
+    # ============================================================
+    - name: "2. Удалить контейнер"
+      community.routeros.command:
+        commands:
+          - /container remove [find name={{ container_name }}]
+      ignore_errors: yes
+
+    - name: Пауза 5 сек
+      ansible.builtin.pause:
+        seconds: 5
+
+    # ============================================================
+    # ШАГ 3: УДАЛИТЬ ПОРТ ИЗ BRIDGE
+    # ============================================================
+    - name: "3. Удалить порт из bridge"
+      community.routeros.command:
+        commands:
+          - /interface bridge port remove [find interface={{ container_name }}]
+      ignore_errors: yes
+
+    # ============================================================
+    # ШАГ 4: УДАЛИТЬ VETH
+    # ============================================================
+    - name: "4. Удалить veth"
+      community.routeros.command:
+        commands:
+          - /interface veth remove [find name={{ container_name }}]
+      ignore_errors: yes
+
+    # ============================================================
+    # ШАГ 5: УДАЛИТЬ ROUTE
+    # ============================================================
+    - name: "5. Удалить route"
+      community.routeros.command:
+        commands:
+          - /ip route remove [find routing-table={{ routing_table_name }}]
+      ignore_errors: yes
+
+    # ============================================================
+    # ШАГ 6: УДАЛИТЬ ROUTING TABLE
+    # ============================================================
+    - name: "6. Удалить routing table"
+      community.routeros.command:
+        commands:
+          - /routing table remove [find name={{ routing_table_name }}]
+      ignore_errors: yes
+
+    # ============================================================
+    # ШАГ 7: УДАЛИТЬ MANGLE RULES (опционально)
+    # ============================================================
+    - name: "7. Удалить mangle rules (zapret2)"
+      community.routeros.command:
+        commands:
+          - /ip firewall mangle remove [find comment~"zapret2"]
+      ignore_errors: yes
+      when: delete_mangle_rules | default(true)
+
+    # ============================================================
+    # ШАГ 8: УДАЛИТЬ ПАПКУ ROOT-DIR
+    # ============================================================
+    - name: "8. Удалить папку root-dir через SMB"
+      ansible.builtin.file:
+        path: "{{ smb_mount_point }}/docker/{{ container_name }}"
+        state: absent
+      delegate_to: localhost
+      ignore_errors: yes
+
+    # ============================================================
+    # ШАГ 9: ОЧИСТКА UNKNOWN ПОРТОВ
+    # ============================================================
+    - name: "9. Очистить unknown порты"
+      community.routeros.command:
+        commands:
+          - /interface bridge port remove [find interface~unknown and bridge={{ docker_bridge }}]
+      ignore_errors: yes
+
+    - name: "Готово"
+      ansible.builtin.debug:
+        msg: |
+          ================================================
+          Контейнер {{ container_name }} полностью удалён!
+          ================================================
+          Удалено:
+          - Контейнер
+          - veth интерфейс
+          - Порт из bridge
+          - Route
+          - Routing table {{ routing_table_name }}
+          - Mangle rules (zapret2): {{ 'да' if delete_mangle_rules else 'нет' }}
+          - Папка root-dir
+          ================================================

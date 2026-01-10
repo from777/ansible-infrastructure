@@ -1,0 +1,251 @@
+# zapret2.yml - Установка nfqws2/zapret2 контейнера для обхода DPI
+#
+# Образ: wiktorbgu/nfqws2-mikrotik
+# Docs: https://hub.docker.com/r/wiktorbgu/nfqws2-mikrotik
+#
+# Требования:
+# - MikroTik ROS >= 7.21rc1
+# - ARM64 или AMD64 архитектура
+# - USB накопитель
+# - Выполненные плейбуки: 00a_container_package.yml, 00b_container_mode.yml, 01b_network.yml
+#
+# Использование:
+#   ansible-playbook zapret2.yml -l Mik_Tim
+#
+# После установки:
+# 1. Добавить mangle rule для нужных хостов (см. примеры в конце плейбука)
+# 2. Проверить работу: /container sh 0 → /opt/zapret2/blockcheck2.sh
+# 3. Редактировать конфиг: /container sh 0 → nano /opt/zapret2/config
+#
+---
+- name: "Zapret2: Install nfqws2-mikrotik container"
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    ansible_command_timeout: 180
+    smb_base: "{{ usb_partition }}/smb_share"
+  vars_files:
+    - vars_zapret2.yml
+
+  tasks:
+    # ============================================================
+    # ПРОВЕРКИ
+    # ============================================================
+    - name: Проверить USB
+      community.routeros.command:
+        commands:
+          - /file print where name={{ usb_partition }} and type=disk
+      register: disk_check
+
+    - name: Fail если USB не примонтирован
+      ansible.builtin.fail:
+        msg: "{{ usb_partition }} не найден! Сначала запусти 01a_usb_format.yml"
+      when: "usb_partition not in disk_check.stdout[0]"
+
+    - name: Проверить container registry
+      community.routeros.command:
+        commands:
+          - /container config print
+      register: container_config_check
+
+    - name: Fail если registry не настроен
+      ansible.builtin.fail:
+        msg: "Container registry не настроен! Сначала запусти 00b_container_mode.yml"
+      when: "'registry-1.docker.io' not in container_config_check.stdout[0]"
+
+    - name: Проверить Bridge-Docker
+      community.routeros.command:
+        commands:
+          - /interface bridge print count-only where name={{ docker_bridge }}
+      register: bridge_check
+
+    - name: Fail если Bridge-Docker не существует
+      ansible.builtin.fail:
+        msg: "{{ docker_bridge }} не найден! Сначала запусти 01b_network.yml"
+      when: bridge_check.stdout[0] | int == 0
+
+    # ============================================================
+    # УДАЛИТЬ СТАРЫЙ КОНТЕЙНЕР (если есть)
+    # ============================================================
+    - name: Остановить старый контейнер
+      community.routeros.command:
+        commands:
+          - /container stop [find name={{ container_name }}]
+      ignore_errors: yes
+
+    - name: Пауза для остановки
+      ansible.builtin.pause:
+        seconds: 5
+
+    - name: Удалить старый контейнер
+      community.routeros.command:
+        commands:
+          - /container remove [find name={{ container_name }}]
+      ignore_errors: yes
+
+    - name: Пауза после удаления контейнера
+      ansible.builtin.pause:
+        seconds: 3
+
+    - name: Удалить порт из bridge
+      community.routeros.command:
+        commands:
+          - /interface bridge port remove [find interface={{ container_name }}]
+      ignore_errors: yes
+
+    - name: Удалить veth
+      community.routeros.command:
+        commands:
+          - /interface veth remove [find name={{ container_name }}]
+      ignore_errors: yes
+
+    - name: Удалить root-dir контейнера через SMB
+      ansible.builtin.file:
+        path: "{{ smb_mount_point }}/docker/{{ container_name }}"
+        state: absent
+      delegate_to: localhost
+      ignore_errors: yes
+
+    # ============================================================
+    # АВТООПРЕДЕЛЕНИЕ IP
+    # ============================================================
+    - name: Получить все veth адреса
+      community.routeros.command:
+        commands:
+          - /interface veth print where address~"{{ container_network }}"
+      register: veth_list
+
+    - name: Определить следующий свободный IP
+      ansible.builtin.set_fact:
+        auto_container_ip: >-
+          {%- set ips = [] -%}
+          {%- for line in veth_list.stdout[0].split('\n') -%}
+            {%- if container_network in line -%}
+              {%- set match = line | regex_search('address=([0-9.]+)/', '\\1') -%}
+              {%- if match -%}
+                {%- set _ = ips.append(match[0].split('.')[-1] | int) -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{ container_network }}.{{ (ips | max | default(1)) + 1 }}
+
+    - name: Показать выбранный IP
+      ansible.builtin.debug:
+        msg: "Контейнер {{ container_name }} получит IP: {{ container_ip | default(auto_container_ip) }}"
+
+    # ============================================================
+    # VETH INTERFACE
+    # ============================================================
+    - name: Создать veth интерфейс
+      community.routeros.command:
+        commands:
+          - /interface veth add name={{ container_name }} address={{ container_ip | default(auto_container_ip) }}/24 gateway={{ container_gateway }}
+
+    - name: Добавить veth в bridge
+      community.routeros.command:
+        commands:
+          - /interface bridge port add bridge={{ docker_bridge }} interface={{ container_name }}
+
+    # ============================================================
+    # ROUTING TABLE (для перенаправления трафика)
+    # ============================================================
+    - name: Проверить routing table
+      community.routeros.command:
+        commands:
+          - /routing table print count-only where name={{ routing_table_name }}
+      register: routing_table_exists
+
+    - name: Создать routing table
+      community.routeros.command:
+        commands:
+          - /routing table add disabled=no fib name={{ routing_table_name }}
+      when: routing_table_exists.stdout[0] | int == 0
+
+    # ============================================================
+    # ROUTE К КОНТЕЙНЕРУ
+    # ============================================================
+    - name: Удалить старый route
+      community.routeros.command:
+        commands:
+          - /ip route remove [find routing-table={{ routing_table_name }} and comment~"nfqws2"]
+      ignore_errors: yes
+
+    - name: Создать route к контейнеру
+      community.routeros.command:
+        commands:
+          - /ip route add check-gateway=ping gateway={{ container_ip | default(auto_container_ip) }} routing-table={{ routing_table_name }} comment="nfqws2 gateway"
+
+    # ============================================================
+    # CONTAINER
+    # ============================================================
+    - name: Создать контейнер
+      community.routeros.command:
+        commands:
+          - /container add remote-image={{ container_image }} interface={{ container_name }} root-dir={{ smb_base }}/docker/{{ container_name }} logging=yes start-on-boot=yes
+
+    - name: Ожидание загрузки образа
+      ansible.builtin.pause:
+        seconds: 90
+        prompt: "Загрузка образа nfqws2-mikrotik (90 сек)..."
+
+    # ============================================================
+    # START
+    # ============================================================
+    - name: Запустить контейнер
+      community.routeros.command:
+        commands:
+          - /container start [find interface={{ container_name }}]
+
+    - name: Ожидание запуска
+      ansible.builtin.pause:
+        seconds: 15
+
+    - name: Проверить статус
+      community.routeros.command:
+        commands:
+          - /container print where interface={{ container_name }}
+      register: result
+
+    # ============================================================
+    # РЕЗУЛЬТАТ
+    # ============================================================
+    - name: Результат
+      ansible.builtin.debug:
+        msg: |
+          ================================================
+          NFQWS2/Zapret2 установлен!
+          ================================================
+          Контейнер: {{ container_name }}
+          IP: {{ container_ip | default(auto_container_ip) }}
+          Routing table: {{ routing_table_name }}
+          Status: {{ result.stdout[0] }}
+          ================================================
+
+          СЛЕДУЮЩИЕ ШАГИ:
+
+          1. Добавить mangle rule для перенаправления трафика:
+
+             # Вариант A - Конкретный хост (рекомендуется для теста):
+             /ip firewall mangle add action=mark-routing chain=prerouting \
+               dst-address-type=!local in-interface-list=LAN \
+               new-routing-mark={{ routing_table_name }} passthrough=no \
+               src-address=192.168.88.250 place-before=0 \
+               comment="zapret2 - test host"
+
+             # Вариант B - Вся LAN подсеть:
+             /ip firewall mangle add action=mark-routing chain=prerouting \
+               dst-address-type=!local in-interface-list=LAN \
+               new-routing-mark={{ routing_table_name }} passthrough=no \
+               src-address=192.168.88.0/24 place-before=0 \
+               comment="zapret2 - all LAN"
+
+          2. Проверить работу blockcheck2:
+             /container shell [find interface={{ container_name }}]
+             /opt/zapret2/blockcheck2.sh
+
+          3. Редактировать конфиг (если нужно):
+             /container shell [find interface={{ container_name }}]
+             nano /opt/zapret2/config
+          ================================================

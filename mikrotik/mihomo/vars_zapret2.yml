@@ -1,0 +1,24 @@
+# vars_zapret2.yml - Переменные для nfqws2/zapret2 контейнера
+---
+# ============================================================
+# ПЕРЕМЕННЫЕ КОНТЕЙНЕРА NFQWS2
+# ============================================================
+
+container_name: "NFQWS2"
+container_image: "wiktorbgu/nfqws2-mikrotik:latest"
+
+# Сеть
+container_gateway: "192.168.254.1"
+container_network: "192.168.254"
+docker_bridge: "Bridge-Docker"
+
+# Routing table для перенаправления трафика
+routing_table_name: "to_nfqws2"
+
+# USB
+usb_partition: "usb1-part1"
+smb_mount_point: "/mnt/mikrotik_smb"
+
+# Пакет container (зависит от архитектуры роутера)
+# hAP ax3 = arm64, hEX/hAP ac2 = arm, x86 = x86
+container_pkg_url: "https://download.mikrotik.com/routeros/7.20.6/container-7.20.6-arm64.npk"
