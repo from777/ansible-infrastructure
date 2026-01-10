@@ -180,21 +180,7 @@
           - /routing table add disabled=no fib name={{ routing_table_name }}
       when: routing_table_exists.stdout[0] | int == 0
 
-    # ============================================================
-    # ROUTE К КОНТЕЙНЕРУ
-    # ============================================================
-    - name: Удалить старый route
-      community.routeros.command:
-        commands:
-          - /ip route remove [find routing-table={{ routing_table_name }}]
-      ignore_errors: yes
-
-    - name: Создать route к контейнеру
-      community.routeros.command:
-        commands:
-          - /ip route add gateway={{ container_ip | default(auto_container_ip) }}%{{ docker_bridge }} routing-table={{ routing_table_name }} comment="{{ container_name }} gateway"
-
-    # SRCNAT не нужен - используется общее правило "Containers to WAN" для 192.168.254.0/24
+    # Route и SRCNAT не создаём - пользователь настраивает маршрутизацию сам
 
     # ============================================================
     # CONTAINER (дефолтный образ без кастомного entrypoint)
@@ -326,24 +312,16 @@
           ================================================
           Контейнер: {{ container_name }}
           IP: {{ container_ip | default(auto_container_ip) }}
-          Routing table: {{ routing_table_name }}
           Стратегия: {{ nfqws2_strategy }}
           Status: {{ result.stdout[0] }}
           Config: {{ 'записан автоматически' if zapret2_installed.stat.exists else 'НЕ ЗАПИСАН - установи вручную!' }}
           ================================================
 
-          СЛЕДУЮЩИЕ ШАГИ:
+          Маршрутизацию настраивай сам.
+          Gateway для route: {{ container_ip | default(auto_container_ip) }}%{{ docker_bridge }}
 
-          1. Добавить route:
-             /ip route add dst-address=0.0.0.0/0 gateway={{ container_ip | default(auto_container_ip) }} routing-table={{ routing_table_name }} comment="{{ container_name }} route"
-
-          2. Добавить mangle rule (тест):
-             /ip firewall mangle add action=mark-routing chain=prerouting dst-port=443 protocol=tcp new-routing-mark={{ routing_table_name }} passthrough=no src-address=192.168.0.248 place-before=0 comment="{{ container_name | lower }} test"
-
-          3. Проверить YouTube в браузере
-
-          4. Если перестанет работать:
-             /container shell [find interface={{ container_name }}]
-             /opt/zapret2/init.d/sysv/zapret2 stop
-             ./blockcheck2.sh --hosts=www.youtube.com
+          Если перестанет работать:
+          /container shell [find interface={{ container_name }}]
+          /opt/zapret2/init.d/sysv/zapret2 stop
+          ./blockcheck2.sh --hosts=www.youtube.com
           ================================================
