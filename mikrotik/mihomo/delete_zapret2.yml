@@ -104,6 +104,24 @@
       when: delete_mangle_rules | default(true)
 
     # ============================================================
+    # ШАГ 7a: УДАЛИТЬ SRCNAT MASQUERADE ПРАВИЛО
+    # ============================================================
+    - name: "7a. Удалить srcnat masquerade"
+      community.routeros.command:
+        commands:
+          - /ip firewall nat remove [find comment~"nfqws2 masquerade"]
+      ignore_errors: yes
+
+    # ============================================================
+    # ШАГ 7b: УДАЛИТЬ MOUNT ДЛЯ ENTRYPOINT
+    # ============================================================
+    - name: "7b. Удалить mount для entrypoint"
+      community.routeros.command:
+        commands:
+          - /container mounts remove [find name={{ container_name }}_entrypoint]
+      ignore_errors: yes
+
+    # ============================================================
     # ШАГ 8: УДАЛИТЬ ПАПКУ ROOT-DIR
     # ============================================================
     - name: "8. Удалить папку root-dir через SMB"
@@ -135,5 +153,7 @@
           - Route
           - Routing table {{ routing_table_name }}
           - Mangle rules (zapret2): {{ 'да' if delete_mangle_rules else 'нет' }}
+          - Srcnat masquerade правило
+          - Mount для entrypoint
           - Папка root-dir
           ================================================

@@ -12,10 +12,13 @@
 # Использование:
 #   ansible-playbook zapret2.yml -l Mik_Tim
 #
+# ВАЖНО: Используется кастомный entrypoint без nftables команд!
+# NAT обеспечивается через srcnat masquerade правило на MikroTik.
+#
 # После установки:
 # 1. Добавить mangle rule для нужных хостов (см. примеры в конце плейбука)
-# 2. Проверить работу: /container sh 0 → /opt/zapret2/blockcheck2.sh
-# 3. Редактировать конфиг: /container sh 0 → nano /opt/zapret2/config
+# 2. Проверить работу: /container shell [find interface=NFQWS2]
+# 3. Затем: /opt/zapret2/blockcheck2.sh
 #
 ---
 - name: "Zapret2: Install nfqws2-mikrotik container"
@@ -110,6 +113,33 @@
       delegate_to: localhost
       ignore_errors: yes
 
+    - name: Удалить старый mount для entrypoint
+      community.routeros.command:
+        commands:
+          - /container mounts remove [find name={{ container_name }}_entrypoint]
+      ignore_errors: yes
+
+    # ============================================================
+    # КАСТОМНЫЙ ENTRYPOINT (без nftables команд)
+    # ============================================================
+    - name: Создать директорию для скриптов
+      ansible.builtin.file:
+        path: "{{ smb_mount_point }}/docker/scripts"
+        state: directory
+      delegate_to: localhost
+
+    - name: Скопировать кастомный entrypoint.sh
+      ansible.builtin.copy:
+        src: files/entrypoint_nfqws2.sh
+        dest: "{{ smb_mount_point }}/docker/scripts/entrypoint_nfqws2.sh"
+        mode: '0755'
+      delegate_to: localhost
+
+    - name: Создать mount для entrypoint
+      community.routeros.command:
+        commands:
+          - /container mounts add name={{ container_name }}_entrypoint src={{ smb_base }}/docker/scripts dst=/scripts
+
     # ============================================================
     # АВТООПРЕДЕЛЕНИЕ IP
     # ============================================================
@@ -180,12 +210,26 @@
           - /ip route add check-gateway=ping gateway={{ container_ip | default(auto_container_ip) }} routing-table={{ routing_table_name }} comment="nfqws2 gateway"
 
     # ============================================================
-    # CONTAINER
+    # SRCNAT MASQUERADE для контейнера (вместо nftables внутри)
+    # ============================================================
+    - name: Удалить старое srcnat правило
+      community.routeros.command:
+        commands:
+          - /ip firewall nat remove [find comment~"nfqws2 masquerade"]
+      ignore_errors: yes
+
+    - name: Создать srcnat masquerade для контейнера
+      community.routeros.command:
+        commands:
+          - /ip firewall nat add chain=srcnat src-address={{ container_ip | default(auto_container_ip) }} action=masquerade comment="nfqws2 masquerade"
+
+    # ============================================================
+    # CONTAINER (с кастомным entrypoint)
     # ============================================================
     - name: Создать контейнер
       community.routeros.command:
         commands:
-          - /container add remote-image={{ container_image }} interface={{ container_name }} root-dir={{ smb_base }}/docker/{{ container_name }} dns={{ container_dns }} logging=yes start-on-boot=yes
+          - /container add remote-image={{ container_image }} interface={{ container_name }} root-dir={{ smb_base }}/docker/{{ container_name }} mounts={{ container_name }}_entrypoint dns={{ container_dns }} logging=yes start-on-boot=yes entrypoint=/scripts/entrypoint_nfqws2.sh
 
     - name: Ожидание загрузки образа
       ansible.builtin.pause:
