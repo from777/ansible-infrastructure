@@ -186,13 +186,13 @@
     - name: Удалить старый route
       community.routeros.command:
         commands:
-          - /ip route remove [find routing-table={{ routing_table_name }} and comment~"nfqws2"]
+          - /ip route remove [find routing-table={{ routing_table_name }}]
       ignore_errors: yes
 
     - name: Создать route к контейнеру
       community.routeros.command:
         commands:
-          - /ip route add check-gateway=ping gateway={{ container_ip | default(auto_container_ip) }} routing-table={{ routing_table_name }} comment="nfqws2 gateway"
+          - /ip route add gateway={{ container_ip | default(auto_container_ip) }}%{{ docker_bridge }} routing-table={{ routing_table_name }} comment="{{ container_name }} gateway"
 
     # SRCNAT не нужен - используется общее правило "Containers to WAN" для 192.168.254.0/24
 
