@@ -254,7 +254,27 @@ zabbix/debug.yml  # все debug tasks в одном файле
 
 ---
 
-### 12. При ошибках — СНАЧАЛА запросить логи
+### 12. Контейнеры MikroTik — искать по interface, не по name
+
+**Проблема:** При создании контейнера без параметра `name=`, MikroTik присваивает ему имя образа (например `wiktorbgu/nfqws2-mikrotik:latest`), а не имя интерфейса.
+
+**Неправильно:**
+```yaml
+- /container stop [find name={{ container_name }}]    # НЕ найдёт!
+- /container remove [find name={{ container_name }}]  # НЕ найдёт!
+```
+
+**Правильно:**
+```yaml
+- /container stop [find interface={{ container_name }}]
+- /container remove [find interface={{ container_name }}]
+```
+
+**Правило:** Всегда искать контейнеры по `interface=`, т.к. interface всегда соответствует имени veth который мы создаём.
+
+---
+
+### 13. При ошибках — СНАЧАЛА запросить логи
 
 **Правило:** Если playbook или контейнер завершился с ошибкой — НЕ гадать причину, а СНАЧАЛА попросить пользователя предоставить логи.
 

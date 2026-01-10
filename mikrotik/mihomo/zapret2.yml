@@ -74,7 +74,7 @@
     - name: Остановить старый контейнер
       community.routeros.command:
         commands:
-          - /container stop [find name={{ container_name }}]
+          - /container stop [find interface={{ container_name }}]
       ignore_errors: yes
 
     - name: Пауза для остановки
@@ -84,7 +84,7 @@
     - name: Удалить старый контейнер
       community.routeros.command:
         commands:
-          - /container remove [find name={{ container_name }}]
+          - /container remove [find interface={{ container_name }}]
       ignore_errors: yes
 
     - name: Пауза после удаления контейнера
