@@ -137,10 +137,26 @@
         mode: '0755'
       delegate_to: localhost
 
+    - name: Проверить что папка scripts существует на USB
+      community.routeros.command:
+        commands:
+          - /file print count-only where name~"{{ smb_base }}/docker/scripts"
+      register: scripts_folder_check
+      ignore_errors: yes
+
+    - name: DEBUG - папка scripts на USB
+      ansible.builtin.debug:
+        msg: "Папка {{ smb_base }}/docker/scripts на USB: {{ 'существует' if scripts_folder_check.stdout[0] | default('0') | int > 0 else 'НЕ СУЩЕСТВУЕТ' }}"
+
     - name: Создать mount для entrypoint
       community.routeros.command:
         commands:
           - /container mounts add name={{ container_name }}_entrypoint src={{ smb_base }}/docker/scripts dst=/scripts
+      register: mount_add_result
+
+    - name: DEBUG - результат создания mount
+      ansible.builtin.debug:
+        msg: "Результат /container mounts add: {{ mount_add_result.stdout }}"
 
     # ============================================================
     # АВТООПРЕДЕЛЕНИЕ IP
@@ -224,26 +240,46 @@
           - /ip firewall nat add chain=srcnat src-address={{ container_ip | default(auto_container_ip) }} action=masquerade comment="{{ container_name }} masquerade"
 
     # ============================================================
-    # ENVIRONMENT VARIABLES (стратегия DPI bypass)
+    # ПРОВЕРКА MOUNT
     # ============================================================
-    - name: Удалить старый envlist
+    - name: Проверить что mount создан
       community.routeros.command:
         commands:
-          - /container envs remove [find list={{ container_name }}_env]
-      ignore_errors: yes
+          - /container mounts print count-only where name={{ container_name }}_entrypoint
+      register: mount_check
 
-    - name: Создать envlist со стратегией
-      community.routeros.command:
-        commands:
-          - /container envs add list={{ container_name }}_env name=NFQWS2_STRATEGY value="{{ nfqws2_strategy }}"
+    - name: DEBUG - mount существует?
+      ansible.builtin.debug:
+        msg: "Mount {{ container_name }}_entrypoint: {{ 'ДА' if mount_check.stdout[0] | int > 0 else 'НЕТ - ПРОБЛЕМА!' }}"
+
+    - name: Fail если mount не создан
+      ansible.builtin.fail:
+        msg: "Mount {{ container_name }}_entrypoint не создан! Проверь путь {{ smb_base }}/docker/scripts на USB"
+      when: mount_check.stdout[0] | int == 0
 
     # ============================================================
-    # CONTAINER (с кастомным entrypoint)
+    # CONTAINER (без envlist - стратегия в entrypoint по умолчанию)
     # ============================================================
     - name: Создать контейнер
       community.routeros.command:
         commands:
-          - /container add remote-image={{ container_image }} interface={{ container_name }} root-dir={{ smb_base }}/docker/{{ container_name }} mounts={{ container_name }}_entrypoint envlist={{ container_name }}_env dns={{ container_dns }} logging=yes start-on-boot=yes entrypoint=/scripts/entrypoint_nfqws2.sh
+          - /container add remote-image={{ container_image }} interface={{ container_name }} root-dir={{ smb_base }}/docker/{{ container_name }} mounts={{ container_name }}_entrypoint dns={{ container_dns }} logging=yes start-on-boot=yes entrypoint=/scripts/entrypoint_nfqws2.sh
+      register: container_add_result
+
+    - name: DEBUG - результат создания контейнера
+      ansible.builtin.debug:
+        msg: "Результат /container add: {{ container_add_result.stdout }}"
+
+    - name: Проверить что контейнер появился
+      community.routeros.command:
+        commands:
+          - /container print count-only where interface={{ container_name }}
+      register: container_exists
+
+    - name: Fail если контейнер не создан
+      ansible.builtin.fail:
+        msg: "Контейнер не создан! Проверь логи RouterOS"
+      when: container_exists.stdout[0] | int == 0
 
     - name: Ожидание загрузки образа
       ansible.builtin.pause:
