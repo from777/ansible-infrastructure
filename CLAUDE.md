@@ -302,4 +302,18 @@ zabbix/debug.yml  # все debug tasks в одном файле
 
 ---
 
+### 14. Inventory указывается в настройках Task, не в playbook
+
+**Правило:** Путь к inventory файлу НЕ прописывается в playbook. Он указывается в **настройках Task** (Task Template) в Semaphore.
+
+**Если playbook не находит хосты** (ошибка "No inventory was parsed", "Could not match supplied host pattern"):
+- Проблема НЕ в playbook
+- Проблема в настройках Task в Semaphore → поле **Inventory**
+- Нужно указать правильный путь к `inventory.yml`
+
+**Неправильно говорить:** "Измени настройки Semaphore"
+**Правильно говорить:** "Измени настройки Task в Semaphore → поле Inventory"
+
+---
+
 ## Дата обновления: 2026-01-10
