@@ -255,7 +255,7 @@
       ansible.builtin.copy:
         content: |
           NFQWS2_ENABLE=1
-          MODE_FILTER=none
+          MODE_FILTER=all
           NFQWS2_OPT="{{ nfqws2_strategy }}"
         dest: "{{ smb_mount_point }}/docker/{{ container_name }}/opt/zapret2/config"
         mode: '0644'

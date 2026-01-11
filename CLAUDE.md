@@ -324,4 +324,37 @@ zabbix/debug.yml  # все debug tasks в одном файле
 
 ---
 
+### 15. Всегда указывать ГДЕ выполнять команды
+
+**Правило:** При выдаче команд ВСЕГДА указывать где их выполнять:
+- На роутере MikroTik
+- Внутри контейнера (какого именно)
+- На локальной машине
+- На сервере Semaphore
+
+**Неправильно:**
+```
+/opt/zapret2/init.d/sysv/zapret2 stop
+./blockcheck2.sh --hosts=www.youtube.com
+```
+
+**Правильно:**
+```
+# Внутри контейнера NFQWS2:
+/opt/zapret2/init.d/sysv/zapret2 stop
+./blockcheck2.sh --hosts=www.youtube.com
+```
+
+или
+
+```
+# На роутере MikroTik:
+/container shell [find interface=NFQWS2]
+
+# Затем внутри контейнера:
+/opt/zapret2/init.d/sysv/zapret2 stop
+```
+
+---
+
 ## Дата обновления: 2026-01-11

@@ -21,13 +21,15 @@ routing_table_name: "to_zapret2"
 # Найдена через blockcheck2.sh для конкретного провайдера
 # Если перестанет работать - запустить blockcheck2.sh заново
 #
-# Параметры:
-# --filter-tcp=443 : только HTTPS трафик
-# --payload=tls_client_hello : только первый пакет TLS (с SNI)
-# --lua-desync=wssize:wsize=1:scale=6 : манипуляция TCP window size
-# --lua-desync=multidisorder:pos=midsld : разбивка SNI и отправка не по порядку
+# Метод: Фейк-пакеты с TTL + разбиение на позиции midsld
+# ip_ttl=3 : TTL=3 чтобы фейк не дошёл до сервера, но прошёл DPI
+# fakedsplit:pos=midsld : разбиение в середине SNI домена
 #
-nfqws2_strategy: "--filter-tcp=443 --payload=tls_client_hello --lua-desync=wssize:wsize=1:scale=6 --lua-desync=multidisorder:pos=midsld"
+nfqws2_strategy_https: "--payload=tls_client_hello --lua-desync=fake:blob=fake_default_tls:ip_ttl=3:repeats=1 --lua-desync=fakedsplit:pos=midsld:ip_ttl=3"
+nfqws2_strategy_quic: "--payload=quic_initial --lua-desync=fake:blob=fake_default_quic:repeats=10"
+
+# Комбинированная стратегия для config
+nfqws2_strategy: "--filter-tcp=443 {{ nfqws2_strategy_https }}"
 
 # USB
 usb_partition: "usb1-part1"
