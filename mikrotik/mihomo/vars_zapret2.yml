@@ -21,10 +21,10 @@ routing_table_name: "to_zapret2"
 # Найдена через blockcheck2.sh для конкретного провайдера
 # Если перестанет работать - запустить blockcheck2.sh заново
 #
-# Метод: fakedsplit с tcp_ts=-1000 (модификация TCP timestamp)
-# Работает стабильно на большинстве DPI
+# Метод: fakedsplit с tcp_seq=-3000 (модификация TCP sequence number)
+# Работает для YouTube и других сайтов
 #
-nfqws2_strategy_https: "--payload=tls_client_hello --lua-desync=fakedsplit:pos=midsld:tcp_ts=-1000"
+nfqws2_strategy_https: "--payload=tls_client_hello --lua-desync=fakedsplit:pos=midsld:tcp_seq=-3000"
 nfqws2_strategy_quic: "--payload=quic_initial --lua-desync=fake:blob=fake_default_quic:repeats=10"
 
 # Комбинированная стратегия для config
