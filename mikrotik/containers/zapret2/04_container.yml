@@ -112,7 +112,7 @@
         content: |
           NFQWS2_ENABLE=1
           MODE_FILTER=all
-          INIT_APPLY_FW=1
+          INIT_APPLY_FW=0
           DISABLE_IPV6=1
           NFQWS2_PORTS_TCP=443
           NFQWS2_TCP_PKT_OUT=20
