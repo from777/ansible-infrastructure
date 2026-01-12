@@ -91,6 +91,22 @@
       ansible.builtin.debug:
         msg: "zapret2 установлен: {{ 'ДА' if zapret2_installed.stat.exists else 'НЕТ - контейнер не успел установить' }}"
 
+    - name: FAIL если zapret2 не установился
+      ansible.builtin.fail:
+        msg: |
+          ОШИБКА: zapret2 не установился внутри контейнера!
+          Файл config.default не найден: {{ smb_mount_point }}/docker/{{ container_name }}/opt/zapret2/config.default
+
+          Возможные причины:
+          1. DNS не настроен на роутере - контейнер не смог скачать образ
+             Проверь: /ip dns print
+             Исправь: /ip dns set servers=8.8.8.8,1.1.1.1
+          2. Нет интернета на роутере
+          3. Registry ghcr.io недоступен
+
+          Логи контейнера: /log print where topics~"container"
+      when: not zapret2_installed.stat.exists
+
     - name: Записать config с рабочей стратегией DPI bypass
       ansible.builtin.copy:
         content: |
@@ -132,23 +148,26 @@
       ignore_errors: yes
       when: "'STOPPED' in result.stdout[0] or 'exited' in result.stdout[0]"
 
-    - name: Показать логи контейнера (если упал)
-      ansible.builtin.debug:
+    - name: FAIL если контейнер не запустился
+      ansible.builtin.fail:
         msg: |
-          КОНТЕЙНЕР НЕ ЗАПУСТИЛСЯ!
+          ОШИБКА: Контейнер {{ container_name }} не запустился!
+          Статус: {{ result.stdout[0] }}
           Логи: {{ container_logs.stdout[0] | default('нет логов') }}
+
+          Проверь логи на роутере: /log print where topics~"container"
       when: "'STOPPED' in result.stdout[0] or 'exited' in result.stdout[0]"
 
-    # ===== РЕЗУЛЬТАТ =====
+    # ===== РЕЗУЛЬТАТ (только если всё ОК) =====
     - name: Результат
       ansible.builtin.debug:
         msg: |
           ================================================
-          {{ container_name }} установлен!
+          {{ container_name }} установлен и запущен!
           ================================================
           IP: {{ container_ip | default(auto_container_ip) }}
           Стратегия: {{ nfqws2_strategy }}
-          Config: {{ 'записан автоматически' if zapret2_installed.stat.exists else 'НЕ ЗАПИСАН - установи вручную!' }}
+          Config: записан автоматически
           Status: {{ result.stdout[0] }}
           ================================================
 
