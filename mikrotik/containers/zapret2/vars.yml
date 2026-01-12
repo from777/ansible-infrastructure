@@ -11,7 +11,7 @@ container_image: "wiktorbgu/nfqws2-mikrotik:latest"
 # ROUTING
 # ============================================================
 # Routing table для перенаправления трафика через контейнер
-routing_table_name: "to_zapret2"
+routing_table_name: "BlackList_DPI"
 
 # ============================================================
 # СТРАТЕГИЯ DPI BYPASS
