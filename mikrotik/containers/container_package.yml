@@ -1,5 +1,9 @@
 # container_package.yml - Установка пакета container на MikroTik
-# Запускается один раз перед использованием контейнеров
+# Автоматически определяет версию RouterOS и архитектуру
+#
+# Использование:
+#   ansible-playbook container_package.yml -l Mik_Tim
+#
 ---
 - name: "Install container package"
   hosts: mikrotik
@@ -8,20 +12,46 @@
   vars:
     ansible_network_os: community.routeros.routeros
     ansible_command_timeout: 120
-  vars_files:
-    - shared/vars_common.yml
 
   tasks:
+    # ===== ОПРЕДЕЛЕНИЕ ВЕРСИИ И АРХИТЕКТУРЫ =====
+    - name: Получить версию RouterOS
+      community.routeros.command:
+        commands:
+          - /system resource print
+      register: resource_info
+
+    - name: Парсить версию и архитектуру
+      ansible.builtin.set_fact:
+        ros_version: "{{ resource_info.stdout[0] | regex_search('version: ([0-9]+\\.[0-9]+[^\\s]*)', '\\1') | first }}"
+        ros_arch: "{{ resource_info.stdout[0] | regex_search('architecture-name: (\\S+)', '\\1') | first }}"
+
+    - name: Показать информацию о системе
+      ansible.builtin.debug:
+        msg: |
+          RouterOS версия: {{ ros_version }}
+          Архитектура: {{ ros_arch }}
+          URL пакета: https://download.mikrotik.com/routeros/{{ ros_version }}/container-{{ ros_version }}-{{ ros_arch }}.npk
+
+    # ===== ПРОВЕРКА ПАКЕТА =====
     - name: Проверить наличие пакета container
       community.routeros.command:
         commands:
           - /system package print count-only where name=container
       register: pkg_exists
 
+    - name: Проверить версию установленного пакета
+      community.routeros.command:
+        commands:
+          - /system package print where name=container
+      register: pkg_version
+      when: pkg_exists.stdout[0] | int > 0
+
     - name: Статус пакета
       ansible.builtin.debug:
         msg: "Container package: {{ 'установлен' if pkg_exists.stdout[0] | int > 0 else 'отсутствует' }}"
 
+    # ===== УСТАНОВКА ПАКЕТА =====
     - name: Установка пакета
       block:
         - name: Удалить старый файл пакета если есть
@@ -30,10 +60,15 @@
               - /file remove container.npk
           ignore_errors: yes
 
-        - name: Скачать пакет container
+        - name: Скачать пакет container (версия {{ ros_version }})
           community.routeros.command:
             commands:
-              - /tool fetch url={{ container_pkg_url }} dst-path=container.npk
+              - /tool fetch url=https://download.mikrotik.com/routeros/{{ ros_version }}/container-{{ ros_version }}-{{ ros_arch }}.npk dst-path=container.npk
+          register: fetch_result
+
+        - name: DEBUG - результат скачивания
+          ansible.builtin.debug:
+            msg: "{{ fetch_result.stdout }}"
 
         - name: Перезагрузить роутер
           ansible.netcommon.cli_command:
@@ -65,6 +100,7 @@
             seconds: 15
       when: pkg_exists.stdout[0] | int == 0
 
+    # ===== ПРОВЕРКА РЕЗУЛЬТАТА =====
     - name: Проверить установку пакета
       community.routeros.command:
         commands:
@@ -73,7 +109,12 @@
 
     - name: Результат
       ansible.builtin.debug:
-        msg: "{{ 'OK: Пакет container установлен' if pkg_final.stdout[0] | int > 0 else 'FAILED: Пакет не установлен' }}"
+        msg: |
+          ================================================
+          {{ 'OK: Пакет container установлен' if pkg_final.stdout[0] | int > 0 else 'FAILED: Пакет не установлен' }}
+          RouterOS: {{ ros_version }}
+          Архитектура: {{ ros_arch }}
+          ================================================
 
     - name: Fail если пакет не установлен
       ansible.builtin.fail:

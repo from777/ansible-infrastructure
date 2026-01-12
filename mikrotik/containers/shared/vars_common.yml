@@ -17,5 +17,5 @@ container_network: "192.168.254"
 container_gateway: "192.168.254.1"
 container_dns: "192.168.254.1"
 
-# Container package (arm64 по умолчанию)
-container_pkg_url: "https://download.mikrotik.com/routeros/7.20.6/container-7.20.6-arm64.npk"
+# Container package URL определяется автоматически в container_package.yml
+# на основе версии RouterOS и архитектуры роутера

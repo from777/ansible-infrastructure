@@ -19,20 +19,18 @@ containers/
 ├── mihomo/                     # Контейнер mihomo (прокси)
 │   ├── mihomo_awg.yml          # Мастер-плейбук AWG режим
 │   ├── mihomo_vless.yml        # Мастер-плейбук VLESS режим
-│   ├── 03_configs_awg.yml      # Конфиги для AWG
-│   ├── 03_configs_vless.yml    # Конфиги для VLESS
-│   ├── 04_container.yml        # Создание контейнера
-│   ├── delete.yml              # Удаление
-│   ├── update_subscription.yml # Обновление подписок
+│   ├── 03_configs_awg.yml      # Конфиги для AWG (зависимость)
+│   ├── 03_configs_vless.yml    # Конфиги для VLESS (зависимость)
+│   ├── 04_container.yml        # Создание контейнера (зависимость)
+│   ├── update_subscription.yml # Обновление VLESS/VMess подписок
 │   ├── vars.yml                # Переменные
 │   └── configs/                # Конфиги mihomo
 │
 ├── zapret2/                    # Контейнер zapret2 (DPI bypass)
 │   ├── zapret2.yml             # Мастер-плейбук
-│   ├── 03_config.yml           # Подготовка конфига
-│   ├── 04_container.yml        # Создание контейнера
-│   ├── 05_routing.yml          # Routing table
-│   ├── delete.yml              # Удаление
+│   ├── 03_config.yml           # Подготовка конфига (зависимость)
+│   ├── 04_container.yml        # Создание контейнера (зависимость)
+│   ├── 05_routing.yml          # Routing table (зависимость)
 │   └── vars.yml                # Переменные
 │
 ├── configs/                    # Общие конфиги (используются разными контейнерами)
@@ -43,11 +41,10 @@ containers/
 ├── scripts/                    # Скрипты
 │   └── parse_proxy_urls.py     # Парсер VLESS/VMess URL
 │
-├── container_package.yml       # Установка пакета container
+├── container_package.yml       # Установка пакета container (автоопределение версии)
 ├── container_mode.yml          # Включение container mode
 ├── usb_format.yml              # Форматирование USB в ext4
-├── delete_container.yml        # Универсальное удаление
-└── test_connection.yml         # Тест подключения
+└── delete_container.yml        # Универсальное удаление любого контейнера
 ```
 
 ## Быстрый старт
@@ -87,13 +84,10 @@ ansible-playbook zapret2/zapret2.yml -l Mik_Tim
 
 ```bash
 # Удалить mihomo
-ansible-playbook mihomo/delete.yml -l Mik_Tim
+ansible-playbook delete_container.yml -l Mik_Tim -e container_name="Mihomo"
 
-# Удалить zapret2
-ansible-playbook zapret2/delete.yml -l Mik_Tim
-
-# Универсальное удаление
-ansible-playbook delete_container.yml -l Mik_Tim -e container_name="Имя"
+# Удалить zapret2 (с routing table и mangle rules)
+ansible-playbook delete_container.yml -l Mik_Tim -e container_name="Zapret2" -e delete_routing_table=true -e routing_table_name="BlackList_DPI" -e delete_mangle=true
 ```
 
 ## Принципы
