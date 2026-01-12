@@ -1,6 +1,7 @@
-# 00a_container_package.yml
+# container_package.yml - Установка пакета container на MikroTik
+# Запускается один раз перед использованием контейнеров
 ---
-- name: "00a: Install container package"
+- name: "Install container package"
   hosts: mikrotik
   gather_facts: no
   connection: ansible.netcommon.network_cli
@@ -8,7 +9,7 @@
     ansible_network_os: community.routeros.routeros
     ansible_command_timeout: 120
   vars_files:
-    - vars.yml
+    - shared/vars_common.yml
 
   tasks:
     - name: Проверить наличие пакета container

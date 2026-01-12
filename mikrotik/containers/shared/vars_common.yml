@@ -1,0 +1,21 @@
+# vars_common.yml - Общие переменные для всех контейнеров
+---
+# USB
+usb_partition: "usb1-part1"
+
+# SMB
+smb_mount_point: "/mnt/mikrotik_smb"
+smb_interface: "bridge1"
+smb_share_name: "usb1"
+smb_share_dir: "usb1-part1/smb_share"
+
+# Docker network
+docker_bridge: "Bridge-Docker"
+docker_bridge_ip: "192.168.254.1/24"
+docker_network: "192.168.254.0/24"
+container_network: "192.168.254"
+container_gateway: "192.168.254.1"
+container_dns: "192.168.254.1"
+
+# Container package (arm64 по умолчанию)
+container_pkg_url: "https://download.mikrotik.com/routeros/7.20.6/container-7.20.6-arm64.npk"

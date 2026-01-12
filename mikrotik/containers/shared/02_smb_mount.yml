@@ -1,4 +1,5 @@
-# 02_smb_mount.yml
+# 02_smb_mount.yml - SMB share на роутере + монтирование на Semaphore
+# Вызывается из мастер-плейбуков
 ---
 - name: "02: SMB share on router + mount on Semaphore"
   hosts: mikrotik
@@ -8,7 +9,7 @@
     ansible_network_os: community.routeros.routeros
     ansible_command_timeout: 120
   vars_files:
-    - vars.yml
+    - vars_common.yml
 
   tasks:
     # ===== ПРОВЕРКА USB =====
@@ -20,7 +21,7 @@
 
     - name: Fail если флешка не примонтирована
       ansible.builtin.fail:
-        msg: "{{ usb_partition }} не найден! Сначала запусти 01_usb_format_ext4_bridge.yml"
+        msg: "{{ usb_partition }} не найден! Сначала запусти usb_format.yml"
       when: "usb_partition not in disk_check.stdout[0]"
 
     # ===== ROUTER: SMB =====

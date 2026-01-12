@@ -1,0 +1,13 @@
+# create_veth.yml - Создание veth интерфейса и добавление в bridge
+# Использование: include_tasks: ../shared/tasks/create_veth.yml
+# Требуемые переменные: container_name, container_ip или auto_container_ip, container_gateway, docker_bridge
+---
+- name: Создать veth интерфейс
+  community.routeros.command:
+    commands:
+      - /interface veth add name={{ container_name }} address={{ container_ip | default(auto_container_ip) }}/24 gateway={{ container_gateway }}
+
+- name: Добавить veth в bridge
+  community.routeros.command:
+    commands:
+      - /interface bridge port add bridge={{ docker_bridge }} interface={{ container_name }}

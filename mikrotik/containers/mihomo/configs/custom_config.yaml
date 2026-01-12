@@ -1,5 +1,5 @@
 # custom_config.yaml
-# Минимальный конфиг для wiktorbgu/mihomo-mikrotik
+# Конфиг для wiktorbgu/mihomo-mikrotik (AWG режим)
 #
 # Образ автоматически:
 # - Читает все .conf из /etc/mihomo/awg/

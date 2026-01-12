@@ -1,0 +1,51 @@
+# 05_routing.yml - Настройка routing table для Zapret2
+# Создаёт routing table для перенаправления трафика через контейнер
+---
+- name: "05: Zapret2 Routing"
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    ansible_command_timeout: 120
+  vars_files:
+    - ../shared/vars_common.yml
+    - vars.yml
+
+  tasks:
+    # ===== ПОЛУЧИТЬ IP КОНТЕЙНЕРА =====
+    - name: Автоопределение IP контейнера
+      ansible.builtin.include_tasks: ../shared/tasks/auto_ip.yml
+
+    # ===== ROUTING TABLE =====
+    - name: Проверить routing table
+      community.routeros.command:
+        commands:
+          - /routing table print count-only where name={{ routing_table_name }}
+      register: routing_table_exists
+
+    - name: Создать routing table
+      community.routeros.command:
+        commands:
+          - /routing table add disabled=no fib name={{ routing_table_name }}
+      when: routing_table_exists.stdout[0] | int == 0
+
+    # ===== РЕЗУЛЬТАТ =====
+    - name: Результат
+      ansible.builtin.debug:
+        msg: |
+          ================================================
+          Routing table создан: {{ routing_table_name }}
+          ================================================
+
+          Теперь настрой mangle rules для перенаправления трафика.
+
+          Пример mangle rule для YouTube:
+          /ip firewall mangle add chain=prerouting action=mark-routing \
+            new-routing-mark={{ routing_table_name }} passthrough=yes \
+            dst-address-list=youtube comment="zapret2 youtube"
+
+          Пример route:
+          /ip route add dst-address=0.0.0.0/0 gateway={{ container_ip | default(auto_container_ip) }}%{{ docker_bridge }} \
+            routing-table={{ routing_table_name }}
+          ================================================

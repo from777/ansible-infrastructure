@@ -1,0 +1,39 @@
+# 03_config.yml - Подготовка конфига для Zapret2
+# Zapret2 особенный: конфиг создаётся ПОСЛЕ первого запуска контейнера
+# Этот плейбук просто проверяет SMB и создаёт папку
+---
+- name: "03: Prepare for Zapret2 config"
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    ansible_command_timeout: 120
+    smb_path: "{{ smb_mount_point }}/docker/{{ container_name }}"
+  vars_files:
+    - ../shared/vars_common.yml
+    - vars.yml
+
+  tasks:
+    # ===== ПРОВЕРКА SMB =====
+    - name: "03: Проверить что SMB смонтирован"
+      ansible.builtin.stat:
+        path: "{{ smb_mount_point }}"
+      register: smb_mounted
+      delegate_to: localhost
+
+    - name: "03: Fail если SMB не смонтирован"
+      ansible.builtin.fail:
+        msg: "SMB не смонтирован! SMB настроен в 02_smb_mount.yml"
+      when: not smb_mounted.stat.exists
+
+    - name: "03: Показать стратегию DPI bypass"
+      ansible.builtin.debug:
+        msg: |
+          Стратегия для Zapret2:
+          {{ nfqws2_strategy }}
+
+          Если перестанет работать:
+          /container shell [find interface={{ container_name }}]
+          /opt/zapret2/init.d/sysv/zapret2 stop
+          ./blockcheck2.sh --hosts=www.youtube.com

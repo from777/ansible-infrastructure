@@ -1,6 +1,7 @@
-# 01a_usb_format.yml
+# usb_format.yml - Форматирование USB в ext4
+# ВНИМАНИЕ: Удаляет все данные на USB!
 ---
-- name: "01a: USB format ext4 (WIPES DATA!)"
+- name: "USB format ext4 (WIPES DATA!)"
   hosts: mikrotik
   gather_facts: no
   connection: ansible.netcommon.network_cli
@@ -9,7 +10,7 @@
     ansible_command_timeout: 120
     usb_disk: "usb1"
   vars_files:
-    - vars.yml
+    - shared/vars_common.yml
 
   tasks:
     - name: Получить информацию о дисках

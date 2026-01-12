@@ -1,0 +1,26 @@
+# auto_ip.yml - Автоопределение следующего свободного IP для контейнера
+# Использование: include_tasks: ../shared/tasks/auto_ip.yml
+# Требуемые переменные: container_network (например "192.168.254")
+# Результат: auto_container_ip (например "192.168.254.5")
+---
+- name: Получить все veth адреса (terse формат)
+  community.routeros.command:
+    commands:
+      - /interface veth print terse where address~"{{ container_network }}"
+  register: veth_list
+
+- name: Определить следующий свободный IP
+  ansible.builtin.set_fact:
+    auto_container_ip: >-
+      {%- set ips = [] -%}
+      {%- for line in veth_list.stdout[0].split('\n') -%}
+        {%- set match = line | regex_search('address=(' ~ container_network ~ '\\.([0-9]+))', '\\2') -%}
+        {%- if match -%}
+          {%- set _ = ips.append(match[0] | int) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ container_network }}.{{ (ips | max | default(1)) + 1 }}
+
+- name: Показать выбранный IP
+  ansible.builtin.debug:
+    msg: "Контейнер {{ container_name }} получит IP: {{ container_ip | default(auto_container_ip) }}"

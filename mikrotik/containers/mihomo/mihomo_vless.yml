@@ -1,14 +1,14 @@
-# mihomo_vless.yml
-# Альтернатива mihomo_all.yml для режима VLESS/VMess
+# mihomo_vless.yml - Установка mihomo в режиме VLESS/VMess
 #
 # Использование:
-#   ansible-playbook mihomo_vless.yml -i inventory.yml
+#   ansible-playbook mihomo_vless.yml -l Mik_Tim
+#   ansible-playbook mihomo_vless.yml -l Mik_Tim -e subscription_url="https://другой-url.com/proxies.txt"
 #
 # Особенности:
-# - Парсит configs/vless/proxies.txt
+# - Парсит configs/vless/proxies.txt или скачивает по subscription_url
 # - Генерирует proxies.yaml из vless:// и vmess:// URL
 # - Использует url-test для автовыбора лучшего прокси
-# - Fallback переключается на другой при отказе
+#
 ---
 - name: "Set VLESS config"
   hosts: mikrotik
@@ -20,11 +20,11 @@
         # Базовый образ mihomo без AWG логики
         container_image: "metacubex/mihomo:latest"
 
-- name: "01b: Network (Bridge + NAT + DNS)"
-  ansible.builtin.import_playbook: 01b_network.yml
+- name: "01: Network (Bridge + NAT + DNS)"
+  ansible.builtin.import_playbook: ../shared/01_network.yml
 
 - name: "02: SMB mount"
-  ansible.builtin.import_playbook: 02_smb_mount.yml
+  ansible.builtin.import_playbook: ../shared/02_smb_mount.yml
 
 - name: "03: VLESS Configs"
   ansible.builtin.import_playbook: 03_configs_vless.yml

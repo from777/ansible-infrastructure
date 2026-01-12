@@ -1,16 +1,15 @@
-# 01b_network.yml
+# 01_network.yml - Bridge-Docker + NAT + DNS
+# Вызывается из мастер-плейбуков (mihomo_awg.yml, zapret2.yml, и т.д.)
 ---
-- name: "01b: Bridge-Docker + NAT + DNS"
+- name: "01: Bridge-Docker + NAT + DNS"
   hosts: mikrotik
   gather_facts: no
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
     ansible_command_timeout: 120
-    docker_bridge_ip: "192.168.254.1/24"
-    docker_network: "192.168.254.0/24"
   vars_files:
-    - vars.yml
+    - vars_common.yml
 
   tasks:
     # ===== ПРОВЕРКА USB =====
@@ -22,7 +21,7 @@
 
     - name: Fail если USB не примонтирован
       ansible.builtin.fail:
-        msg: "{{ usb_partition }} не найден! Сначала запусти 01a_usb_format.yml"
+        msg: "{{ usb_partition }} не найден! Сначала запусти usb_format.yml"
       when: "usb_partition not in disk_check.stdout[0]"
 
     # ===== BRIDGE =====

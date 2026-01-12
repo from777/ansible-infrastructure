@@ -1,0 +1,36 @@
+# zapret2.yml - Установка Zapret2 контейнера для обхода DPI
+#
+# Образ: wiktorbgu/nfqws2-mikrotik
+# Docs: https://hub.docker.com/r/wiktorbgu/nfqws2-mikrotik
+#
+# Требования:
+# - MikroTik ROS >= 7.21rc1
+# - ARM64 или AMD64 архитектура
+# - USB накопитель
+# - Выполненные плейбуки: container_package.yml, container_mode.yml
+#
+# Использование:
+#   ansible-playbook zapret2.yml -l Mik_Tim
+#
+# После установки:
+# 1. Добавить mangle rule для нужных хостов
+# 2. Если нужно найти новую стратегию:
+#    /container shell [find interface=Zapret2]
+#    /opt/zapret2/init.d/sysv/zapret2 stop
+#    ./blockcheck2.sh --hosts=www.youtube.com
+#
+---
+- name: "01: Network (Bridge + NAT + DNS)"
+  ansible.builtin.import_playbook: ../shared/01_network.yml
+
+- name: "02: SMB mount"
+  ansible.builtin.import_playbook: ../shared/02_smb_mount.yml
+
+- name: "03: Config"
+  ansible.builtin.import_playbook: 03_config.yml
+
+- name: "04: Container"
+  ansible.builtin.import_playbook: 04_container.yml
+
+- name: "05: Routing"
+  ansible.builtin.import_playbook: 05_routing.yml

@@ -1,0 +1,60 @@
+# cleanup.yml - Остановка и удаление старого контейнера
+# Использование: include_tasks: ../shared/tasks/cleanup.yml
+# Требуемые переменные: container_name, docker_bridge, smb_mount_point
+---
+- name: Очистить unknown порты из bridge
+  community.routeros.command:
+    commands:
+      - /interface bridge port remove [find interface~"unknown" and bridge={{ docker_bridge }}]
+  ignore_errors: yes
+
+- name: Остановить старый контейнер
+  community.routeros.command:
+    commands:
+      - /container stop [find interface={{ container_name }}]
+  ignore_errors: yes
+
+- name: Пауза для остановки
+  ansible.builtin.pause:
+    seconds: 5
+
+- name: Удалить старый контейнер
+  community.routeros.command:
+    commands:
+      - /container remove [find interface={{ container_name }}]
+  ignore_errors: yes
+
+- name: Пауза после удаления контейнера
+  ansible.builtin.pause:
+    seconds: 3
+
+- name: Удалить порт из bridge
+  community.routeros.command:
+    commands:
+      - /interface bridge port remove [find interface={{ container_name }}]
+  ignore_errors: yes
+
+- name: Удалить veth
+  community.routeros.command:
+    commands:
+      - /interface veth remove [find name={{ container_name }}]
+  ignore_errors: yes
+
+- name: Удалить mount
+  community.routeros.command:
+    commands:
+      - /container mounts remove [find name={{ container_name }}_conf]
+  ignore_errors: yes
+
+- name: Удалить envlist
+  community.routeros.command:
+    commands:
+      - /container envs remove [find list={{ container_name }}_env]
+  ignore_errors: yes
+
+- name: Удалить root-dir контейнера через SMB
+  ansible.builtin.file:
+    path: "{{ smb_mount_point }}/docker/{{ container_name }}"
+    state: absent
+  delegate_to: localhost
+  ignore_errors: yes

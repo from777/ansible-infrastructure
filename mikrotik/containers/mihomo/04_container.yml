@@ -1,0 +1,107 @@
+# 04_container.yml - Создание контейнера mihomo
+---
+- name: "04: Container"
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    ansible_command_timeout: 120
+    smb_base: "{{ usb_partition }}/smb_share"
+  vars_files:
+    - ../shared/vars_common.yml
+    - vars.yml
+
+  tasks:
+    # ===== ПРОВЕРКИ (повторное использование shared/tasks/checks.yml) =====
+    - name: Проверки
+      ansible.builtin.include_tasks: ../shared/tasks/checks.yml
+
+    # ===== ОЧИСТКА СТАРОГО КОНТЕЙНЕРА (повторное использование shared/tasks/cleanup.yml) =====
+    - name: Очистка старого контейнера
+      ansible.builtin.include_tasks: ../shared/tasks/cleanup.yml
+
+    # ===== АВТООПРЕДЕЛЕНИЕ IP (повторное использование shared/tasks/auto_ip.yml) =====
+    - name: Автоопределение IP
+      ansible.builtin.include_tasks: ../shared/tasks/auto_ip.yml
+
+    # ===== СОЗДАНИЕ VETH (повторное использование shared/tasks/create_veth.yml) =====
+    - name: Создание veth
+      ansible.builtin.include_tasks: ../shared/tasks/create_veth.yml
+
+    # ===== MOUNT =====
+    - name: Удалить старый mount (пересоздаём с правильным путём)
+      community.routeros.command:
+        commands:
+          - /container mounts remove [find name={{ container_name }}_conf]
+      ignore_errors: yes
+
+    - name: Создать mount
+      community.routeros.command:
+        commands:
+          - /container mounts add name={{ container_name }}_conf src={{ smb_base }}/docker_configs/{{ container_name }} dst=/etc/mihomo
+
+    # ===== ENVLIST =====
+    - name: Удалить старый envlist
+      community.routeros.command:
+        commands:
+          - /container envs remove [find list={{ container_name }}_env]
+      ignore_errors: yes
+
+    - name: Создать envlist с CONFIG
+      community.routeros.command:
+        commands:
+          - /container envs add list={{ container_name }}_env key=CONFIG value={{ container_config }}
+      when:
+        - container_config is defined
+        - container_config | length > 0
+
+    - name: Создать envlist без CONFIG
+      community.routeros.command:
+        commands:
+          - /container envs add list={{ container_name }}_env key=TZ value=Europe/Moscow
+      when:
+        - container_config is not defined or container_config | length == 0
+
+    # ===== CONTAINER =====
+    - name: Создать контейнер (образ wiktorbgu с AWG)
+      community.routeros.command:
+        commands:
+          - /container add remote-image={{ container_image }} interface={{ container_name }} root-dir={{ smb_base }}/docker/{{ container_name }} mounts={{ container_name }}_conf envlist={{ container_name }}_env dns={{ container_dns }} logging=yes name="{{ container_name }}" start-on-boot=yes
+      when: "'wiktorbgu' in container_image"
+
+    - name: Создать контейнер (базовый образ mihomo)
+      community.routeros.command:
+        commands:
+          - /container add remote-image={{ container_image }} interface={{ container_name }} root-dir={{ smb_base }}/docker/{{ container_name }} mounts={{ container_name }}_conf envlist={{ container_name }}_env dns={{ container_dns }} logging=yes name="{{ container_name }}" start-on-boot=yes cmd="-d /etc/mihomo"
+      when: "'metacubex' in container_image"
+
+    - name: Ожидание загрузки образа
+      ansible.builtin.pause:
+        seconds: 60
+        prompt: "Загрузка образа (60 сек)..."
+
+    # ===== START =====
+    - name: Запустить контейнер
+      community.routeros.command:
+        commands:
+          - /container start [find name="{{ container_name }}"]
+
+    - name: Ожидание запуска
+      ansible.builtin.pause:
+        seconds: 10
+
+    - name: Проверить статус
+      community.routeros.command:
+        commands:
+          - /container print where name="{{ container_name }}"
+      register: result
+
+    - name: Результат
+      ansible.builtin.debug:
+        msg: |
+          Контейнер: {{ container_name }}
+          IP: {{ container_ip | default(auto_container_ip) }}
+          DNS: {{ container_dns }}
+          UI: http://{{ container_ip | default(auto_container_ip) }}:9090/ui/
+          Status: {{ result.stdout[0] }}

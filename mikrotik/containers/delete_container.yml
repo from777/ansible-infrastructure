@@ -1,0 +1,84 @@
+# delete_container.yml - Универсальное удаление контейнера
+#
+# Использование:
+#   ansible-playbook delete_container.yml -l Mik_Tim -e container_name="Mihomo"
+#   ansible-playbook delete_container.yml -l Mik_Tim -e container_name="Zapret2"
+#
+# Параметры:
+#   container_name: имя контейнера (обязательно)
+#   delete_routing_table: true/false (по умолчанию false)
+#   routing_table_name: имя таблицы (если delete_routing_table=true)
+#   delete_mangle: true/false (по умолчанию false)
+#
+---
+- name: "Delete container"
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    ansible_command_timeout: 120
+    smb_base: "{{ usb_partition }}/smb_share"
+  vars_files:
+    - shared/vars_common.yml
+
+  tasks:
+    # ===== ВАЛИДАЦИЯ =====
+    - name: Проверить что container_name задан
+      ansible.builtin.fail:
+        msg: "container_name не задан! Использование: ansible-playbook delete_container.yml -e container_name=имя"
+      when: container_name is not defined or container_name | length == 0
+
+    - name: Показать что удаляем
+      ansible.builtin.debug:
+        msg: "Удаляем контейнер: {{ container_name }}"
+
+    # ===== ОЧИСТКА КОНТЕЙНЕРА (повторное использование shared/tasks/cleanup.yml) =====
+    - name: Очистка контейнера
+      ansible.builtin.include_tasks: shared/tasks/cleanup.yml
+
+    # ===== УДАЛИТЬ ПАПКУ КОНФИГОВ =====
+    - name: Удалить папку конфигов
+      ansible.builtin.file:
+        path: "{{ smb_mount_point }}/docker_configs/{{ container_name }}"
+        state: absent
+      delegate_to: localhost
+      ignore_errors: yes
+
+    # ===== ROUTING (опционально) =====
+    - name: Удалить route
+      community.routeros.command:
+        commands:
+          - /ip route remove [find routing-table={{ routing_table_name }}]
+      ignore_errors: yes
+      when:
+        - delete_routing_table | default(false)
+        - routing_table_name is defined
+
+    - name: Удалить routing table
+      community.routeros.command:
+        commands:
+          - /routing table remove [find name={{ routing_table_name }}]
+      ignore_errors: yes
+      when:
+        - delete_routing_table | default(false)
+        - routing_table_name is defined
+
+    # ===== MANGLE (опционально) =====
+    - name: Удалить mangle rules
+      community.routeros.command:
+        commands:
+          - /ip firewall mangle remove [find comment~"{{ container_name | lower }}"]
+      ignore_errors: yes
+      when: delete_mangle | default(false)
+
+    # ===== ОЧИСТКА UNKNOWN ПОРТОВ =====
+    - name: Очистить unknown порты
+      community.routeros.command:
+        commands:
+          - /interface bridge port remove [find interface~unknown and bridge={{ docker_bridge }}]
+      ignore_errors: yes
+
+    - name: "Готово"
+      ansible.builtin.debug:
+        msg: "Контейнер {{ container_name }} удалён"

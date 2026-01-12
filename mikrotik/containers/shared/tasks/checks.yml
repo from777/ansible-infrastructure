@@ -1,0 +1,36 @@
+# checks.yml - Общие проверки перед созданием контейнера
+# Использование: include_tasks: ../shared/tasks/checks.yml
+# Требуемые переменные: usb_partition, docker_bridge
+---
+- name: Проверить USB
+  community.routeros.command:
+    commands:
+      - /file print where name={{ usb_partition }} and type=disk
+  register: disk_check
+
+- name: Fail если USB не примонтирован
+  ansible.builtin.fail:
+    msg: "{{ usb_partition }} не найден! Сначала запусти usb_format.yml"
+  when: "usb_partition not in disk_check.stdout[0]"
+
+- name: Проверить container registry
+  community.routeros.command:
+    commands:
+      - /container config print
+  register: container_config_check
+
+- name: Fail если registry не настроен
+  ansible.builtin.fail:
+    msg: "Container registry не настроен! Сначала запусти container_mode.yml"
+  when: "'registry-1.docker.io' not in container_config_check.stdout[0]"
+
+- name: Проверить Bridge-Docker
+  community.routeros.command:
+    commands:
+      - /interface bridge print count-only where name={{ docker_bridge }}
+  register: bridge_check
+
+- name: Fail если Bridge-Docker не существует
+  ansible.builtin.fail:
+    msg: "{{ docker_bridge }} не найден! Сначала запусти 01_network.yml"
+  when: bridge_check.stdout[0] | int == 0

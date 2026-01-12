@@ -1,0 +1,155 @@
+# 04_container.yml - Создание контейнера Zapret2
+# Особенности:
+# - Не использует mount/envlist — образ сам устанавливает zapret2
+# - Config пишется ПОСЛЕ первого запуска через SMB
+---
+- name: "04: Zapret2 Container"
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    ansible_command_timeout: 180
+    smb_base: "{{ usb_partition }}/smb_share"
+  vars_files:
+    - ../shared/vars_common.yml
+    - vars.yml
+
+  tasks:
+    # ===== ПРОВЕРКИ (повторное использование shared/tasks/checks.yml) =====
+    - name: Проверки
+      ansible.builtin.include_tasks: ../shared/tasks/checks.yml
+
+    # ===== ОЧИСТКА СТАРОГО КОНТЕЙНЕРА (повторное использование shared/tasks/cleanup.yml) =====
+    - name: Очистка старого контейнера
+      ansible.builtin.include_tasks: ../shared/tasks/cleanup.yml
+
+    # ===== АВТООПРЕДЕЛЕНИЕ IP (повторное использование shared/tasks/auto_ip.yml) =====
+    - name: Автоопределение IP
+      ansible.builtin.include_tasks: ../shared/tasks/auto_ip.yml
+
+    # ===== СОЗДАНИЕ VETH (повторное использование shared/tasks/create_veth.yml) =====
+    - name: Создание veth
+      ansible.builtin.include_tasks: ../shared/tasks/create_veth.yml
+
+    # ===== CONTAINER (без mount/envlist — образ работает иначе) =====
+    - name: Создать контейнер
+      community.routeros.command:
+        commands:
+          - /container add name={{ container_name }} remote-image={{ container_image }} interface={{ container_name }} root-dir={{ smb_base }}/docker/{{ container_name }} dns={{ container_dns }} logging=yes start-on-boot=yes
+      register: container_add_result
+
+    - name: DEBUG - результат создания контейнера
+      ansible.builtin.debug:
+        msg: "Результат /container add: {{ container_add_result.stdout }}"
+
+    - name: Проверить что контейнер появился
+      community.routeros.command:
+        commands:
+          - /container print count-only where interface={{ container_name }}
+      register: container_exists
+
+    - name: Fail если контейнер не создан
+      ansible.builtin.fail:
+        msg: "Контейнер не создан! Результат команды: {{ container_add_result.stdout }}"
+      when: container_exists.stdout[0] | int == 0
+
+    - name: Ожидание загрузки образа
+      ansible.builtin.pause:
+        seconds: 90
+        prompt: "Загрузка образа nfqws2-mikrotik (90 сек)..."
+
+    # ===== ПЕРВЫЙ ЗАПУСК (установка zapret2) =====
+    - name: Запустить контейнер (первый раз для установки zapret2)
+      community.routeros.command:
+        commands:
+          - /container start [find interface={{ container_name }}]
+
+    - name: Ожидание установки zapret2 внутри контейнера
+      ansible.builtin.pause:
+        seconds: 120
+        prompt: "Установка zapret2 внутри контейнера (120 сек)..."
+
+    # ===== АВТОМАТИЧЕСКАЯ НАСТРОЙКА CONFIG =====
+    - name: Остановить контейнер для настройки config
+      community.routeros.command:
+        commands:
+          - /container stop [find interface={{ container_name }}]
+      ignore_errors: yes
+
+    - name: Пауза для остановки
+      ansible.builtin.pause:
+        seconds: 10
+
+    - name: Проверить что zapret2 установился (config.default существует)
+      ansible.builtin.stat:
+        path: "{{ smb_mount_point }}/docker/{{ container_name }}/opt/zapret2/config.default"
+      delegate_to: localhost
+      register: zapret2_installed
+
+    - name: DEBUG - zapret2 установлен?
+      ansible.builtin.debug:
+        msg: "zapret2 установлен: {{ 'ДА' if zapret2_installed.stat.exists else 'НЕТ - контейнер не успел установить' }}"
+
+    - name: Записать config с рабочей стратегией DPI bypass
+      ansible.builtin.copy:
+        content: |
+          NFQWS2_ENABLE=1
+          MODE_FILTER=all
+          INIT_APPLY_FW=1
+          DISABLE_IPV6=1
+          NFQWS2_PORTS_TCP=443
+          NFQWS2_TCP_PKT_OUT=20
+          NFQWS2_TCP_PKT_IN=10
+          NFQWS2_OPT="{{ nfqws2_strategy }}"
+        dest: "{{ smb_mount_point }}/docker/{{ container_name }}/opt/zapret2/config"
+        mode: '0644'
+      delegate_to: localhost
+      when: zapret2_installed.stat.exists
+
+    # ===== ФИНАЛЬНЫЙ ЗАПУСК =====
+    - name: Запустить контейнер с правильным config
+      community.routeros.command:
+        commands:
+          - /container start [find interface={{ container_name }}]
+
+    - name: Ожидание запуска
+      ansible.builtin.pause:
+        seconds: 15
+
+    - name: Проверить статус
+      community.routeros.command:
+        commands:
+          - /container print where interface={{ container_name }}
+      register: result
+
+    # Проверить логи если контейнер не запустился
+    - name: Получить логи контейнера (если упал)
+      community.routeros.command:
+        commands:
+          - /log print where topics~"container" and message~"{{ container_name }}"
+      register: container_logs
+      ignore_errors: yes
+      when: "'STOPPED' in result.stdout[0] or 'exited' in result.stdout[0]"
+
+    - name: Показать логи контейнера (если упал)
+      ansible.builtin.debug:
+        msg: |
+          КОНТЕЙНЕР НЕ ЗАПУСТИЛСЯ!
+          Логи: {{ container_logs.stdout[0] | default('нет логов') }}
+      when: "'STOPPED' in result.stdout[0] or 'exited' in result.stdout[0]"
+
+    # ===== РЕЗУЛЬТАТ =====
+    - name: Результат
+      ansible.builtin.debug:
+        msg: |
+          ================================================
+          {{ container_name }} установлен!
+          ================================================
+          IP: {{ container_ip | default(auto_container_ip) }}
+          Стратегия: {{ nfqws2_strategy }}
+          Config: {{ 'записан автоматически' if zapret2_installed.stat.exists else 'НЕ ЗАПИСАН - установи вручную!' }}
+          Status: {{ result.stdout[0] }}
+          ================================================
+
+          Маршрутизацию настраивай в 05_routing.yml или сам.

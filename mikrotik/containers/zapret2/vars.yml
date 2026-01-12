@@ -1,18 +1,16 @@
-# vars_zapret2.yml - Переменные для zapret2 контейнера (DPI bypass)
+# vars.yml - Переменные для контейнера Zapret2 (DPI bypass)
 ---
 # ============================================================
-# ПЕРЕМЕННЫЕ КОНТЕЙНЕРА ZAPRET2
+# ПЕРЕМЕННЫЕ КОНТЕЙНЕРА
 # ============================================================
 
 container_name: "Zapret2"
 container_image: "wiktorbgu/nfqws2-mikrotik:latest"
 
-# Сеть
-container_gateway: "192.168.254.1"
-container_network: "192.168.254"
-docker_bridge: "Bridge-Docker"
-
-# Routing table для перенаправления трафика
+# ============================================================
+# ROUTING
+# ============================================================
+# Routing table для перенаправления трафика через контейнер
 routing_table_name: "to_zapret2"
 
 # ============================================================
@@ -30,10 +28,15 @@ nfqws2_strategy_quic: "--payload=quic_initial --lua-desync=fake:blob=fake_defaul
 # Комбинированная стратегия для config
 nfqws2_strategy: "--filter-tcp=443 {{ nfqws2_strategy_https }}"
 
-# USB
-usb_partition: "usb1-part1"
-smb_mount_point: "/mnt/mikrotik_smb"
+# ============================================================
+# СЕТЬ (наследуется из shared/vars_common.yml)
+# ============================================================
+# container_gateway: "192.168.254.1"
+# docker_bridge: "Bridge-Docker"
+# container_network: "192.168.254"
 
-# Пакет container (зависит от архитектуры роутера)
-# hAP ax3 = arm64, hEX/hAP ac2 = arm, x86 = x86
-container_pkg_url: "https://download.mikrotik.com/routeros/7.20.6/container-7.20.6-arm64.npk"
+# ============================================================
+# SMB (наследуется из shared/vars_common.yml)
+# ============================================================
+# smb_mount_point: "/mnt/mikrotik_smb"
+# usb_partition: "usb1-part1"

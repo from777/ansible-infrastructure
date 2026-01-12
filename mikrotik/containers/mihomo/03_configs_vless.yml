@@ -1,5 +1,4 @@
-# 03_configs_vless.yml
-# Плейбук для VLESS/VMess режима
+# 03_configs_vless.yml - Копирование конфигов для VLESS режима
 # Парсит proxies.txt и генерирует proxies.yaml для mihomo
 ---
 - name: "03: Copy VLESS configs to container"
@@ -10,10 +9,16 @@
     ansible_network_os: community.routeros.routeros
     ansible_command_timeout: 120
     smb_path: "{{ smb_mount_point }}/docker_configs/{{ container_name }}"
-    repo_path: "{{ playbook_dir }}/configs"
-    # Используем VLESS конфиг вместо обычного
+    # Путь к общим конфигам (awg, vless, srv)
+    configs_path: "{{ playbook_dir }}/../configs"
+    # Путь к специфичным конфигам mihomo
+    mihomo_configs_path: "{{ playbook_dir }}/configs"
+    # Путь к скриптам
+    scripts_path: "{{ playbook_dir }}/../scripts"
+    # Используем VLESS конфиг
     container_config: "custom_config_vless.yaml"
   vars_files:
+    - ../shared/vars_common.yml
     - vars.yml
 
   tasks:
@@ -62,7 +67,7 @@
 
     - name: "03: Проверить локальный proxies.txt"
       ansible.builtin.stat:
-        path: "{{ repo_path }}/vless/proxies.txt"
+        path: "{{ configs_path }}/vless/proxies.txt"
       register: proxies_txt
       delegate_to: localhost
       when: subscription_url is not defined or subscription_url | length == 0
@@ -78,7 +83,7 @@
 
     - name: "03: Определить источник прокси"
       ansible.builtin.set_fact:
-        proxy_source: "{{ '/tmp/subscription_proxies.txt' if (subscription_url is defined and subscription_url | length > 0) else repo_path + '/vless/proxies.txt' }}"
+        proxy_source: "{{ '/tmp/subscription_proxies.txt' if (subscription_url is defined and subscription_url | length > 0) else configs_path + '/vless/proxies.txt' }}"
 
     - name: "03: Показать источник"
       ansible.builtin.debug:
@@ -88,7 +93,7 @@
     - name: "03: Парсить VLESS/VMess URL"
       ansible.builtin.command:
         cmd: >
-          python3 {{ playbook_dir }}/scripts/parse_proxy_urls.py
+          python3 {{ scripts_path }}/parse_proxy_urls.py
           {{ proxy_source }}
           {{ smb_path }}/srv/proxies.yaml
       delegate_to: localhost
@@ -109,22 +114,15 @@
     # ===== CUSTOM CONFIG =====
     - name: "03: Копировать custom_config_vless.yaml"
       ansible.builtin.copy:
-        src: "{{ repo_path }}/template/custom_config_vless.yaml"
+        src: "{{ mihomo_configs_path }}/templates/custom_config_vless.yaml"
         dest: "{{ smb_path }}/custom_config_vless.yaml"
         mode: '0644'
       delegate_to: localhost
 
     - name: "03: Копировать как config.yaml (для базового образа mihomo)"
       ansible.builtin.copy:
-        src: "{{ repo_path }}/template/custom_config_vless.yaml"
+        src: "{{ mihomo_configs_path }}/templates/custom_config_vless.yaml"
         dest: "{{ smb_path }}/config.yaml"
-        mode: '0644'
-      delegate_to: localhost
-
-    - name: "03: Копировать в template"
-      ansible.builtin.copy:
-        src: "{{ repo_path }}/template/custom_config_vless.yaml"
-        dest: "{{ smb_path }}/template/custom_config_vless.yaml"
         mode: '0644'
       delegate_to: localhost
 
@@ -215,17 +213,6 @@
         - not geoip_target.stat.exists
         - (existing_geoip.files | default([])) | length == 0
 
-    - name: "03: Статус геобазы"
-      ansible.builtin.debug:
-        msg: >-
-          {% if geoip_target.stat.exists %}
-          Геобаза уже есть
-          {% elif (existing_geoip.files | default([])) | length > 0 %}
-          Геобаза скопирована из {{ existing_geoip.files[0].path }}
-          {% else %}
-          Геобаза скачана с GitHub
-          {% endif %}
-
     # ===== РЕЗУЛЬТАТ =====
     - name: "03: Показать сгенерированные прокси"
       ansible.builtin.command:
@@ -240,5 +227,3 @@
           CONFIG: {{ container_config }}
           Proxies preview:
           {{ proxies_preview.stdout }}
-
-          Для применения запусти 04_container.yml
