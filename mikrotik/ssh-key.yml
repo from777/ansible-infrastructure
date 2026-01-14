@@ -1,0 +1,114 @@
+# ssh-key.yml - Установка SSH ключа и отключение парольной аутентификации
+---
+- name: Configure SSH key authentication for MikroTik
+  hosts: mikrotik
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+    ssh_key_filename: Mikrotik.pub
+    ssh_user: admin
+
+  tasks:
+    # ============================================
+    # 1. Проверка наличия файла ключа на роутере
+    # ============================================
+    - name: Check if SSH key file exists on router
+      community.routeros.command:
+        commands:
+          - /file print count-only where name={{ ssh_key_filename }}
+      register: key_file_check
+
+    - name: FAIL if SSH key file not found
+      ansible.builtin.fail:
+        msg: |
+
+          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+          !!! ОШИБКА: ФАЙЛ {{ ssh_key_filename }} НЕ НАЙДЕН НА РОУТЕРЕ !!!
+          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+          СКОПИРУЙ ПУБЛИЧНЫЙ КЛЮЧ НА РОУТЕР КОМАНДОЙ:
+
+          scp {{ ssh_key_filename }} admin@{{ ansible_host }}:/
+
+          ИЛИ ЧЕРЕЗ WINBOX: Files -> Upload -> {{ ssh_key_filename }}
+
+          ПОСЛЕ ЭТОГО ЗАПУСТИ PLAYBOOK ПОВТОРНО!
+
+          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      when: key_file_check.stdout[0] | int == 0
+
+    # ============================================
+    # 2. Получение текущих SSH ключей пользователя
+    # ============================================
+    - name: Get existing SSH keys for user
+      community.routeros.command:
+        commands:
+          - /user ssh-keys print count-only where user={{ ssh_user }}
+      register: existing_keys
+
+    - name: Show existing keys count
+      ansible.builtin.debug:
+        msg: "Найдено существующих ключей для {{ ssh_user }}: {{ existing_keys.stdout[0] }}"
+
+    # ============================================
+    # 3. Удаление старых ключей (если есть)
+    # ============================================
+    - name: Remove existing SSH keys for user
+      community.routeros.command:
+        commands:
+          - /user ssh-keys remove [find user={{ ssh_user }}]
+      when: existing_keys.stdout[0] | int > 0
+      register: keys_removed
+
+    - name: Log keys removal
+      ansible.builtin.debug:
+        msg: "Удалены старые SSH ключи для пользователя {{ ssh_user }}"
+      when: existing_keys.stdout[0] | int > 0
+
+    # ============================================
+    # 4. Импорт нового ключа
+    # ============================================
+    - name: Import SSH key for user
+      community.routeros.command:
+        commands:
+          - /user ssh-keys import user={{ ssh_user }} public-key-file={{ ssh_key_filename }}
+      register: key_import
+
+    - name: Log key import success
+      ansible.builtin.debug:
+        msg: "SSH ключ {{ ssh_key_filename }} успешно импортирован для пользователя {{ ssh_user }}"
+
+    # ============================================
+    # 5. Отключение парольной аутентификации SSH
+    # ============================================
+    - name: Disable SSH password authentication
+      community.routeros.command:
+        commands:
+          - /ip ssh set always-allow-password-login=no
+
+    - name: Log password auth disabled
+      ansible.builtin.debug:
+        msg: "Парольная аутентификация SSH отключена"
+
+    # ============================================
+    # 6. Проверка результата
+    # ============================================
+    - name: Verify SSH keys installed
+      community.routeros.command:
+        commands:
+          - /user ssh-keys print where user={{ ssh_user }}
+      register: verify_keys
+
+    - name: Show final result
+      ansible.builtin.debug:
+        msg: |
+          ✅ SSH KEY CONFIGURATION COMPLETE
+          ================================
+          Router: {{ inventory_hostname }}
+          User: {{ ssh_user }}
+          Key file: {{ ssh_key_filename }}
+          Password auth: DISABLED
+
+          Installed keys:
+          {{ verify_keys.stdout_lines | join('\n') }}
