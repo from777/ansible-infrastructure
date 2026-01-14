@@ -152,9 +152,9 @@
             value_type: 4  # Text
             params: "/user print where group=full"
             username: "{$MIKROTIK_USER}"
-            privatekey: "{$SSH_PRIVKEY}"
+            password: "{$MIKROTIK_PASS}"
             delay: "15m"
-            authtype: 1
+            authtype: 0
             preprocessing:
               - type: "21"  # JavaScript
                 params: |

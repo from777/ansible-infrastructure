@@ -39,9 +39,9 @@
         macros:
           - macro: "{$MIKROTIK_USER}"
             value: "{{ mikrotik_host.user }}"
-          - macro: "{$SSH_PRIVKEY}"
-            value: "/var/lib/zabbix/.ssh/id_rsa"
-            description: "Path to SSH private key on Zabbix server"
+          - macro: "{$MIKROTIK_PASS}"
+            value: "{{ mikrotik_host.password }}"
+            type: 1
       auth: "{{ auth }}"
       id: 11
   when: host_check.json.result | length == 0
