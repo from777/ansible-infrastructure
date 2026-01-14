@@ -180,9 +180,9 @@
             value_type: 4
             params: "/ip socks print"
             username: "{$MIKROTIK_USER}"
-            password: "{$MIKROTIK_PASS}"
+            privatekey: "{$SSH_PRIVKEY}"
             delay: "5m"
-            authtype: 0
+            authtype: 1
           auth: "{{ auth }}"
           id: 6
       when: item_check.json.result | length == 0
