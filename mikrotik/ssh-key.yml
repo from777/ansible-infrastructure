@@ -82,14 +82,16 @@
     # ============================================
     # 5. Отключение парольной аутентификации SSH
     # ============================================
+    # password-authentication=no - полностью отключает парольную аутентификацию
+    # (параметр добавлен в RouterOS 7.13+)
     - name: Disable SSH password authentication
       community.routeros.command:
         commands:
-          - /ip ssh set always-allow-password-login=no
+          - /ip ssh set password-authentication=no
 
     - name: Log password auth disabled
       ansible.builtin.debug:
-        msg: "Парольная аутентификация SSH отключена"
+        msg: "Парольная аутентификация SSH полностью отключена (password-authentication=no)"
 
     # ============================================
     # 6. Проверка результата
