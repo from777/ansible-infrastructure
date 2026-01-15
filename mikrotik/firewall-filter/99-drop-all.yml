@@ -1,6 +1,9 @@
 # 99-drop-all.yml
 # Финальные drop правила - ВЫПОЛНЯЕТСЯ ПОСЛЕДНИМ!
 # Блокирует весь трафик который не попал под предыдущие правила
+#
+# ЗАЩИТА: Плейбук НЕ выполнится если нет правила SAFE-ACCESS!
+# Это предотвращает случайную блокировку доступа к роутеру.
 ---
 - name: Add final drop rules
   hosts: mikrotik
@@ -10,6 +13,31 @@
     ansible_network_os: community.routeros.routeros
 
   tasks:
+    # === ЗАЩИТА: Проверка SAFE-ACCESS ===
+    - name: Check SAFE-ACCESS rule exists
+      community.routeros.command:
+        commands:
+          - /ip firewall filter print count-only where comment~"SAFE-ACCESS"
+      register: safe_access_check
+
+    - name: ABORT if no SAFE-ACCESS rule
+      fail:
+        msg: |
+          ═══════════════════════════════════════════════════════════
+          ОПАСНО: Правило SAFE-ACCESS не найдено!
+          ═══════════════════════════════════════════════════════════
+
+          Добавление drop-правил БЕЗ SAFE-ACCESS заблокирует
+          доступ к роутеру и ты потеряешь управление!
+
+          Варианты решения:
+          1. Запусти полную настройку: firewall-full.yml
+          2. Или сначала создай защиту: 00-safe-access.yml
+
+          Плейбук остановлен для твоей безопасности.
+          ═══════════════════════════════════════════════════════════
+      when: (safe_access_check.stdout[0] | regex_search('[0-9]+') | int) == 0
+
     # === DROP ALL INPUT ===
     - name: Check input drop all exists
       community.routeros.command:
@@ -20,7 +48,7 @@
     - name: Add input drop all
       community.routeros.command:
         commands:
-          - /ip firewall filter add chain=input action=drop log=yes log-prefix="INPUT-DROP:" comment="Drop all other to router"
+          - /ip firewall filter add chain=input action=drop comment="Drop all other to router"
       when: (input_drop_check.stdout[0] | regex_search('[0-9]+') | int) == 0
 
     # === DROP ALL FORWARD ===
@@ -33,7 +61,7 @@
     - name: Add forward drop all
       community.routeros.command:
         commands:
-          - /ip firewall filter add chain=forward action=drop log=yes log-prefix="FORWARD-DROP:" comment="Drop all other forward"
+          - /ip firewall filter add chain=forward action=drop comment="Drop all other forward"
       when: (forward_drop_check.stdout[0] | regex_search('[0-9]+') | int) == 0
 
     - name: Show result
