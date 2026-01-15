@@ -80,18 +80,18 @@
         msg: "SSH ключ {{ ssh_key_filename }} успешно импортирован для пользователя {{ ssh_user }}"
 
     # ============================================
-    # 5. Отключение парольной аутентификации SSH
+    # 5. Настройка SSH безопасности
     # ============================================
-    # password-authentication=no - полностью отключает парольную аутентификацию
-    # (параметр добавлен в RouterOS 7.13+)
-    - name: Disable SSH password authentication
+    # always-allow-password-login=no - пользователи с SSH ключом
+    # не могут входить по паролю (только по ключу)
+    - name: Disable password login for users with SSH keys
       community.routeros.command:
         commands:
-          - /ip ssh set password-authentication=no
+          - /ip ssh set always-allow-password-login=no
 
-    - name: Log password auth disabled
+    - name: Log SSH security configured
       ansible.builtin.debug:
-        msg: "Парольная аутентификация SSH полностью отключена (password-authentication=no)"
+        msg: "SSH: пользователи с ключами могут входить только по ключу (always-allow-password-login=no)"
 
     # ============================================
     # 6. Проверка результата
@@ -110,7 +110,7 @@
           Router: {{ inventory_hostname }}
           User: {{ ssh_user }}
           Key file: {{ ssh_key_filename }}
-          Password auth: DISABLED
+          Password login: DISABLED for users with SSH keys
 
           Installed keys:
           {{ verify_keys.stdout_lines | join('\n') }}
