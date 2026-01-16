@@ -50,8 +50,7 @@ elk_servers:
 
 windows_servers:
   hosts:
-    win2012-server:
-      ansible_host: 176.9.141.234
+    176.9.141.234:   # имя хоста = IP, ansible_host не нужен
   vars:
     ansible_connection: winrm
     ansible_winrm_transport: basic
