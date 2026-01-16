@@ -47,3 +47,14 @@ elk_servers:
     elk:
       ansible_host: 192.168.0.82
       ansible_user: vagrant
+
+windows_servers:
+  hosts:
+    win2012-server:
+      ansible_host: 176.9.141.234
+  vars:
+    ansible_connection: winrm
+    ansible_winrm_transport: basic
+    ansible_winrm_port: 5986
+    ansible_winrm_scheme: https
+    ansible_winrm_server_cert_validation: ignore
