@@ -468,4 +468,129 @@ containers/
 
 ---
 
-## Дата обновления: 2026-01-13
+---
+
+## Windows + Ansible (WinRM)
+
+### 20. Для команд всегда указывать где выполнять
+
+**Правило:** При выдаче команд для консоли ВСЕГДА указывать:
+- Какой сервер (IP или имя)
+- Под каким пользователем (Администратор, root, vagrant)
+- Какая консоль (PowerShell, cmd, bash)
+
+**Формат:**
+```
+**На Windows сервере (176.9.141.234) от Администратора:**
+```powershell
+команда
+```
+
+**На Semaphore (vagrant@semaphore):**
+```bash
+команда
+```
+```
+
+---
+
+### 21. Windows WinRM — использовать raw модуль
+
+**Проблема:** Модули `win_ping`, `win_command`, `win_shell` используют PSRP (PowerShell Remoting Protocol), который может не работать на старых Windows Server (2012 R2) или при сетевых ограничениях.
+
+**Решение:** Использовать модуль `raw` с PowerShell командами:
+
+```yaml
+# Вместо win_ping:
+- raw: hostname
+  register: result
+
+# Вместо win_shell:
+- raw: powershell -Command "Get-Service"
+  register: result
+```
+
+**Когда использовать raw:**
+- Windows Server 2012 / 2012 R2
+- Таймауты при использовании win_* модулей
+- Ошибки PSRP / InvalidSelectors
+
+---
+
+### 22. Windows WinRM — настройки подключения
+
+**Рабочая конфигурация для старых Windows:**
+```yaml
+windows_servers:
+  hosts:
+    176.9.141.234:
+  vars:
+    ansible_connection: winrm
+    ansible_winrm_transport: basic
+    ansible_winrm_port: 5985        # HTTP (не HTTPS!)
+    ansible_winrm_scheme: http
+```
+
+**На Windows сервере обязательно:**
+```powershell
+winrm quickconfig -transport:http -force
+winrm set winrm/config/service '@{AllowUnencrypted="true"}'
+winrm set winrm/config/service/auth '@{Basic="true"}'
+```
+
+---
+
+### 23. Windows Firewall — ограничить доступ по IP
+
+**Правило:** После настройки WinRM ОБЯЗАТЕЛЬНО ограничить доступ только для своих IP.
+
+**Важные IP пользователя:**
+- 109.174.1.142 (Semaphore/основной)
+- 212.20.46.209 (домашний)
+
+**Команда:**
+```powershell
+netsh advfirewall firewall add rule name="WinRM HTTP Restricted" dir=in action=allow protocol=TCP localport=5985 remoteip=109.174.1.142,212.20.46.209
+```
+
+---
+
+### 24. PowerShell — использовать точку с запятой
+
+**Правило:** В PowerShell для выполнения нескольких команд использовать `;` (не `&`).
+
+**Неправильно:**
+```powershell
+command1 & command2   # Ошибка: Амперсанд не разрешен
+```
+
+**Правильно:**
+```powershell
+command1; command2
+```
+
+---
+
+### 25. Пароли со спецсимволами в bash
+
+**Проблема:** Символы `!!` в пароле интерпретируются bash как history expansion.
+
+**Решение:** Использовать одинарные кавычки или файл inventory:
+
+```bash
+# Неправильно (!! заменится на последнюю команду):
+-e "ansible_password='pass!!word'"
+
+# Правильно (через inventory файл):
+cat > inv.yml << 'EOF'
+all:
+  hosts:
+    server:
+      ansible_password: "pass!!word"
+EOF
+ansible-playbook -i inv.yml playbook.yml
+```
+
+---
+
+## Дата обновления: 2026-01-18
