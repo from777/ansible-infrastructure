@@ -1,34 +1,27 @@
-# Test Windows WinRM connection
-# Requires: ansible_user and ansible_password from Semaphore Key Store
+# Test Windows WinRM connection using raw module
+# Note: win_* modules have PSRP issues on some servers, using raw instead
 ---
 - name: Test Windows connection via WinRM
   hosts: windows_servers
   gather_facts: no
 
   tasks:
-    - name: Ping Windows host
-      ansible.windows.win_ping:
-      register: ping_result
-
-    - name: Get hostname
-      ansible.windows.win_shell: hostname
+    - name: Test connection (hostname)
+      raw: hostname
       register: hostname_result
 
     - name: Get Windows version
-      ansible.windows.win_shell: |
-        (Get-WmiObject -Class Win32_OperatingSystem).Caption
-        (Get-WmiObject -Class Win32_OperatingSystem).Version
+      raw: powershell -Command "(Get-WmiObject Win32_OperatingSystem).Caption; (Get-WmiObject Win32_OperatingSystem).Version"
       register: winver_result
 
     - name: Get current user
-      ansible.windows.win_shell: whoami
+      raw: whoami
       register: whoami_result
 
     - name: Display all results
       ansible.builtin.debug:
         msg:
           - "=== CONNECTION TEST SUCCESSFUL ==="
-          - "Ping: {{ ping_result.ping }}"
           - "Hostname: {{ hostname_result.stdout | trim }}"
           - "Windows: {{ winver_result.stdout_lines }}"
           - "User: {{ whoami_result.stdout | trim }}"
