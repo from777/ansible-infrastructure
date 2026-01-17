@@ -53,7 +53,7 @@ windows_servers:
     176.9.141.234:   # имя хоста = IP, ansible_host не нужен
   vars:
     ansible_connection: winrm
-    ansible_winrm_transport: ntlm    # поддерживает Unicode (русские имена)
+    ansible_winrm_transport: credssp    # лучшая поддержка Unicode
     ansible_winrm_port: 5986
     ansible_winrm_scheme: https
     ansible_winrm_server_cert_validation: ignore
