@@ -9,9 +9,9 @@
     agent_conf_dir: "C:\\Program Files\\Zabbix Agent 2\\zabbix_agent2.d"
     userparam_content: |
       # Kaspersky monitoring UserParameters
-      UserParameter=kaspersky.db.age,powershell -NoProfile -Command "$av = Get-CimInstance -Namespace 'root/SecurityCenter2' -ClassName AntivirusProduct -ErrorAction SilentlyContinue | Where-Object { $_.displayName -like '*Kaspersky*' } | Sort-Object timestamp -Descending | Select-Object -First 1; if ($av) { $ts = [DateTime]::Parse($av.timestamp); [math]::Round(((Get-Date) - $ts).TotalDays, 1) } else { -1 }"
-      UserParameter=kaspersky.status,powershell -NoProfile -Command "$av = Get-CimInstance -Namespace 'root/SecurityCenter2' -ClassName AntivirusProduct -ErrorAction SilentlyContinue | Where-Object { $_.displayName -like '*Kaspersky*' } | Sort-Object timestamp -Descending | Select-Object -First 1; if ($av) { $av.productState } else { 0 }"
-      UserParameter=kaspersky.db.date,powershell -NoProfile -Command "$av = Get-CimInstance -Namespace 'root/SecurityCenter2' -ClassName AntivirusProduct -ErrorAction SilentlyContinue | Where-Object { $_.displayName -like '*Kaspersky*' } | Sort-Object timestamp -Descending | Select-Object -First 1; if ($av) { ([DateTime]::Parse($av.timestamp)).ToString('yyyy-MM-dd HH:mm') } else { 'N/A' }"
+      UserParameter=kaspersky.db.age,powershell -NoProfile -Command "$f = Get-ChildItem 'C:\ProgramData\Kaspersky Lab\AVP*\Bases' -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($f) { [math]::Round(((Get-Date) - $f.LastWriteTime).TotalDays, 1) } else { -1 }"
+      UserParameter=kaspersky.status,powershell -NoProfile -Command "$av = Get-CimInstance -Namespace 'root/SecurityCenter2' -ClassName AntivirusProduct -ErrorAction SilentlyContinue | Where-Object { $_.displayName -like '*Kaspersky*' } | Select-Object -First 1; if ($av) { $av.productState } else { 0 }"
+      UserParameter=kaspersky.db.date,powershell -NoProfile -Command "$f = Get-ChildItem 'C:\ProgramData\Kaspersky Lab\AVP*\Bases' -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($f) { $f.LastWriteTime.ToString('yyyy-MM-dd HH:mm') } else { 'N/A' }"
 
   tasks:
     - name: Only run on hosts with monitor_kaspersky=true
