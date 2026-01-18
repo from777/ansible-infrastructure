@@ -1,0 +1,49 @@
+# create-windows-host.yml
+# Создаёт один Windows хост в Zabbix если не существует
+# Требуемые переменные:
+#   - windows_host.name: имя хоста (IP)
+#   - windows_host.ip: IP адрес
+---
+- name: "Check if host {{ windows_host.name }} exists"
+  ansible.builtin.uri:
+    url: "{{ zabbix_url }}"
+    method: POST
+    body_format: json
+    body:
+      jsonrpc: "2.0"
+      method: "host.get"
+      params:
+        filter:
+          host: "{{ windows_host.name }}"
+      auth: "{{ auth }}"
+      id: 10
+  register: host_check
+
+- name: "Create host {{ windows_host.name }}"
+  ansible.builtin.uri:
+    url: "{{ zabbix_url }}"
+    method: POST
+    body_format: json
+    body:
+      jsonrpc: "2.0"
+      method: "host.create"
+      params:
+        host: "{{ windows_host.name }}"
+        name: "Windows {{ windows_host.name }}"
+        groups:
+          - groupid: "{{ hostgroup_id }}"
+        interfaces:
+          - type: 1
+            main: 1
+            useip: 1
+            ip: "{{ windows_host.ip }}"
+            dns: ""
+            port: "10050"
+      auth: "{{ auth }}"
+      id: 11
+  when: host_check.json.result | length == 0
+  register: host_created
+
+- name: "Host {{ windows_host.name }} status"
+  ansible.builtin.debug:
+    msg: "{{ 'Created' if host_created.changed | default(false) else 'Already exists' }}"

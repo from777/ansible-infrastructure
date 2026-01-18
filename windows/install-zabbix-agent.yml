@@ -1,0 +1,57 @@
+# install-zabbix-agent.yml
+# Установка Zabbix Agent 2 на Windows серверы
+# Запуск: Task Template в Semaphore с Vault
+---
+- name: Install Zabbix Agent 2 on Windows
+  hosts: windows_servers
+  gather_facts: no
+  vars:
+    zabbix_version: "7.0.7"
+    zabbix_server: "192.168.0.81"
+    zabbix_msi_url: "https://cdn.zabbix.com/zabbix/binaries/stable/7.0/{{ zabbix_version }}/zabbix_agent2-{{ zabbix_version }}-windows-amd64-openssl.msi"
+    install_dir: "C:\\Program Files\\Zabbix Agent 2"
+
+  tasks:
+    - name: Check if Zabbix Agent 2 already installed
+      raw: 'powershell -Command "Get-Service -Name ''Zabbix Agent 2'' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Status"'
+      register: agent_check
+      ignore_errors: yes
+
+    - name: Skip if already running
+      ansible.builtin.debug:
+        msg: "Zabbix Agent 2 already installed and {{ agent_check.stdout | trim }}"
+      when: agent_check.stdout | trim == "Running"
+
+    - name: Get hostname for Zabbix
+      raw: hostname
+      register: win_hostname
+      when: agent_check.stdout | trim != "Running"
+
+    - name: Download Zabbix Agent 2 MSI
+      raw: 'powershell -Command "Invoke-WebRequest -Uri ''{{ zabbix_msi_url }}'' -OutFile ''C:\Temp\zabbix_agent2.msi'' -UseBasicParsing"'
+      when: agent_check.stdout | trim != "Running"
+
+    - name: Create Temp directory if not exists
+      raw: 'powershell -Command "if (-not (Test-Path ''C:\Temp'')) { New-Item -ItemType Directory -Path ''C:\Temp'' }"'
+      when: agent_check.stdout | trim != "Running"
+
+    - name: Install Zabbix Agent 2
+      raw: 'powershell -Command "Start-Process msiexec.exe -ArgumentList ''/i C:\Temp\zabbix_agent2.msi /qn SERVER={{ zabbix_server }} SERVERACTIVE={{ zabbix_server }} HOSTNAME={{ win_hostname.stdout | trim }} ENABLEPATH=1 INSTALLFOLDER=\"{{ install_dir }}\"'' -Wait"'
+      when: agent_check.stdout | trim != "Running"
+
+    - name: Wait for installation
+      raw: 'powershell -Command "Start-Sleep -Seconds 10"'
+      when: agent_check.stdout | trim != "Running"
+
+    - name: Start Zabbix Agent 2 service
+      raw: 'powershell -Command "Start-Service -Name ''Zabbix Agent 2'' -ErrorAction SilentlyContinue"'
+      when: agent_check.stdout | trim != "Running"
+      ignore_errors: yes
+
+    - name: Verify installation
+      raw: 'powershell -Command "Get-Service -Name ''Zabbix Agent 2'' | Select-Object Status, DisplayName | ConvertTo-Json"'
+      register: final_status
+
+    - name: Show result
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: {{ final_status.stdout | trim }}"

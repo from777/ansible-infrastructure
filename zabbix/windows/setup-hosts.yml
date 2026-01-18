@@ -1,0 +1,88 @@
+# setup-windows-hosts.yml
+# Добавляет Windows хосты в Zabbix (без templates)
+# Templates привязываются отдельными playbooks (monitoring-kaspersky.yml)
+# Запускать: при добавлении нового Windows сервера
+---
+- name: Setup Windows hosts in Zabbix
+  hosts: zabbix
+  gather_facts: no
+  connection: local
+  vars:
+    zabbix_url: "http://{{ ansible_host }}/api_jsonrpc.php"
+    zabbix_user: "Admin"
+    zabbix_password: "zabbix"
+
+  tasks:
+    - name: Login to Zabbix API
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "user.login"
+          params:
+            username: "{{ zabbix_user }}"
+            password: "{{ zabbix_password }}"
+          id: 1
+      register: zabbix_auth
+
+    - name: Set auth token
+      ansible.builtin.set_fact:
+        auth: "{{ zabbix_auth.json.result }}"
+
+    # Host Group
+    - name: Check if host group exists
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "hostgroup.get"
+          params:
+            filter:
+              name: "Windows Servers"
+          auth: "{{ auth }}"
+          id: 2
+      register: hostgroup_check
+
+    - name: Create host group Windows Servers
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "hostgroup.create"
+          params:
+            name: "Windows Servers"
+          auth: "{{ auth }}"
+          id: 3
+      when: hostgroup_check.json.result | length == 0
+      register: hostgroup_created
+
+    - name: Set host group ID
+      ansible.builtin.set_fact:
+        hostgroup_id: "{{ hostgroup_check.json.result[0].groupid if hostgroup_check.json.result | length > 0 else hostgroup_created.json.result.groupids[0] }}"
+
+    # Build hosts list from inventory (all windows_servers)
+    - name: Build Windows hosts to ADD
+      ansible.builtin.set_fact:
+        windows_hosts_to_add: "{{ windows_hosts_to_add | default([]) + [{'name': item, 'ip': item}] }}"
+      loop: "{{ groups['windows_servers'] }}"
+
+    - name: Show hosts to add
+      ansible.builtin.debug:
+        msg: "Hosts to ADD: {{ windows_hosts_to_add | default([]) | map(attribute='name') | list }}"
+
+    # Create hosts
+    - name: Check and create Windows hosts
+      ansible.builtin.include_tasks: create-windows-host.yml
+      loop: "{{ windows_hosts_to_add | default([]) }}"
+      loop_control:
+        loop_var: windows_host
+
+    - name: Done
+      ansible.builtin.debug:
+        msg: "Windows hosts synced. Run monitoring-kaspersky.yml to add Kaspersky monitoring."

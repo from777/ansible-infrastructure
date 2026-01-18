@@ -1,0 +1,292 @@
+# monitoring-kaspersky.yml
+# Создаёт template для мониторинга Kaspersky и привязывает к Windows хостам
+# Запускать: после создания хостов в Zabbix и настройки агентов
+---
+- name: Setup Kaspersky monitoring in Zabbix
+  hosts: zabbix
+  gather_facts: no
+  connection: local
+  vars:
+    zabbix_url: "http://{{ ansible_host }}/api_jsonrpc.php"
+    zabbix_user: "Admin"
+    zabbix_password: "zabbix"
+    template_name: "Template Windows Kaspersky"
+    alert_threshold_days: 3
+
+  tasks:
+    - name: Login to Zabbix API
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "user.login"
+          params:
+            username: "{{ zabbix_user }}"
+            password: "{{ zabbix_password }}"
+          id: 1
+      register: zabbix_auth
+
+    - name: Set auth token
+      ansible.builtin.set_fact:
+        auth: "{{ zabbix_auth.json.result }}"
+
+    # Build hosts lists from inventory
+    - name: Build hosts to LINK (monitor_kaspersky=true)
+      ansible.builtin.set_fact:
+        kaspersky_hosts_to_link: "{{ kaspersky_hosts_to_link | default([]) + [item] }}"
+      loop: "{{ groups['windows_servers'] }}"
+      when: hostvars[item].monitor_kaspersky | default(false)
+
+    - name: Show hosts to link
+      ansible.builtin.debug:
+        msg: "Hosts to LINK: {{ kaspersky_hosts_to_link | default([]) }}"
+
+    # Get template group
+    - name: Get Templates template group
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "templategroup.get"
+          params:
+            filter:
+              name: "Templates"
+          auth: "{{ auth }}"
+          id: 2
+      register: templategroup
+
+    - name: Set template group ID
+      ansible.builtin.set_fact:
+        templategroup_id: "{{ templategroup.json.result[0].groupid }}"
+
+    # Create or get Template
+    - name: Check if template exists
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "template.get"
+          params:
+            filter:
+              host: "{{ template_name }}"
+          auth: "{{ auth }}"
+          id: 3
+      register: template_check
+
+    - name: Create template
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "template.create"
+          params:
+            host: "{{ template_name }}"
+            name: "{{ template_name }}"
+            groups:
+              - groupid: "{{ templategroup_id }}"
+          auth: "{{ auth }}"
+          id: 4
+      when: template_check.json.result | length == 0
+
+    - name: Get template ID
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "template.get"
+          params:
+            filter:
+              host: "{{ template_name }}"
+          auth: "{{ auth }}"
+          id: 5
+      register: template_final
+
+    - name: Set template ID
+      ansible.builtin.set_fact:
+        template_id: "{{ template_final.json.result[0].templateid }}"
+
+    # Create Items
+    - name: Check if db.age item exists
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "item.get"
+          params:
+            templateids: "{{ template_id }}"
+            filter:
+              key_: "kaspersky.db.age"
+          auth: "{{ auth }}"
+          id: 6
+      register: item_age_check
+
+    - name: Create item kaspersky.db.age
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "item.create"
+          params:
+            name: "Kaspersky DB Age (days)"
+            key_: "kaspersky.db.age"
+            hostid: "{{ template_id }}"
+            type: 0
+            value_type: 0
+            delay: "1h"
+            units: "days"
+            description: "Возраст антивирусных баз Kaspersky в днях"
+          auth: "{{ auth }}"
+          id: 7
+      when: item_age_check.json.result | length == 0
+
+    - name: Check if status item exists
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "item.get"
+          params:
+            templateids: "{{ template_id }}"
+            filter:
+              key_: "kaspersky.status"
+          auth: "{{ auth }}"
+          id: 8
+      register: item_status_check
+
+    - name: Create item kaspersky.status
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "item.create"
+          params:
+            name: "Kaspersky Status (productState)"
+            key_: "kaspersky.status"
+            hostid: "{{ template_id }}"
+            type: 0
+            value_type: 3
+            delay: "1h"
+            description: "Статус Kaspersky (266240 = включен и обновлён)"
+          auth: "{{ auth }}"
+          id: 9
+      when: item_status_check.json.result | length == 0
+
+    - name: Check if db.date item exists
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "item.get"
+          params:
+            templateids: "{{ template_id }}"
+            filter:
+              key_: "kaspersky.db.date"
+          auth: "{{ auth }}"
+          id: 10
+      register: item_date_check
+
+    - name: Create item kaspersky.db.date
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "item.create"
+          params:
+            name: "Kaspersky DB Update Date"
+            key_: "kaspersky.db.date"
+            hostid: "{{ template_id }}"
+            type: 0
+            value_type: 1
+            delay: "1h"
+            description: "Дата последнего обновления баз Kaspersky"
+          auth: "{{ auth }}"
+          id: 11
+      when: item_date_check.json.result | length == 0
+
+    # Create Trigger (delete and recreate for idempotency)
+    - name: Get existing trigger
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "trigger.get"
+          params:
+            templateids: "{{ template_id }}"
+            search:
+              description: "Kaspersky database"
+          auth: "{{ auth }}"
+          id: 12
+      register: trigger_check
+
+    - name: Delete existing trigger
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "trigger.delete"
+          params:
+            - "{{ trigger_check.json.result[0].triggerid }}"
+          auth: "{{ auth }}"
+          id: 13
+      when: trigger_check.json.result | length > 0
+      ignore_errors: yes
+
+    - name: Create trigger for outdated database
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "trigger.create"
+          params:
+            description: "Kaspersky database outdated (>{$KASPERSKY_THRESHOLD} days)"
+            expression: "last(/{{ template_name }}/kaspersky.db.age)>{$KASPERSKY_THRESHOLD}"
+            priority: 3
+            manual_close: 1
+          auth: "{{ auth }}"
+          id: 14
+
+    # Link template to hosts
+    - name: Link template to hosts with monitor_kaspersky=true
+      ansible.builtin.include_tasks: ../tasks/link-template-with-macro.yml
+      loop: "{{ kaspersky_hosts_to_link | default([]) }}"
+      loop_control:
+        loop_var: host_name
+      vars:
+        target_template_id: "{{ template_id }}"
+        macro_name: "{$KASPERSKY_THRESHOLD}"
+        macro_value: "{{ alert_threshold_days }}"
+
+    - name: Done
+      ansible.builtin.debug:
+        msg:
+          - "Template '{{ template_name }}' configured"
+          - "Linked to: {{ kaspersky_hosts_to_link | default([]) }}"
+          - "Alert threshold: {{ alert_threshold_days }} days"
