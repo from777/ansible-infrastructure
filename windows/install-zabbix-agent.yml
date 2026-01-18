@@ -25,58 +25,49 @@
       raw: 'powershell -Command "Stop-Service -Name ''Zabbix Agent'' -Force -ErrorAction SilentlyContinue"'
       ignore_errors: yes
 
-    # Удаление через msiexec (более надёжно чем WMI)
-    - name: Find Zabbix Agent 2 uninstall GUID
-      raw: 'powershell -Command "Get-ChildItem HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall | Get-ItemProperty | Where-Object { $_.DisplayName -like ''*Zabbix Agent 2*'' } | Select-Object -ExpandProperty PSChildName"'
-      register: zabbix2_guid
-      ignore_errors: yes
-
-    - name: Uninstall old Zabbix Agent 2 via msiexec
-      raw: 'powershell -Command "Start-Process msiexec.exe -ArgumentList ''/x {{ zabbix2_guid.stdout | trim }} /qn'' -Wait"'
-      when: zabbix2_guid.stdout | default('') | trim | length > 0
-      ignore_errors: yes
-
-    - name: Find Zabbix Agent (old) uninstall GUID
-      raw: 'powershell -Command "Get-ChildItem HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall | Get-ItemProperty | Where-Object { $_.DisplayName -like ''*Zabbix Agent*'' -and $_.DisplayName -notlike ''*Agent 2*'' } | Select-Object -ExpandProperty PSChildName"'
-      register: zabbix_old_guid
-      ignore_errors: yes
-
-    - name: Uninstall old Zabbix Agent via msiexec
-      raw: 'powershell -Command "Start-Process msiexec.exe -ArgumentList ''/x {{ zabbix_old_guid.stdout | trim }} /qn'' -Wait"'
-      when: zabbix_old_guid.stdout | default('') | trim | length > 0
-      ignore_errors: yes
-
     - name: Remove old Zabbix Agent 2 folder
-      raw: 'powershell -Command "Remove-Item -Path ''C:\\Program Files\\Zabbix Agent 2'' -Recurse -Force -ErrorAction SilentlyContinue"'
+      raw: 'powershell -Command "Remove-Item -Path ''C:\Program Files\Zabbix Agent 2'' -Recurse -Force -ErrorAction SilentlyContinue"'
       ignore_errors: yes
 
     - name: Remove old Zabbix Agent folder
-      raw: 'powershell -Command "Remove-Item -Path ''C:\\Program Files\\Zabbix Agent'' -Recurse -Force -ErrorAction SilentlyContinue"'
+      raw: 'powershell -Command "Remove-Item -Path ''C:\Program Files\Zabbix Agent'' -Recurse -Force -ErrorAction SilentlyContinue"'
       ignore_errors: yes
 
-    - name: Wait after uninstall
-      raw: 'powershell -Command "Start-Sleep -Seconds 5"'
+    - name: Wait after cleanup
+      raw: 'powershell -Command "Start-Sleep -Seconds 3"'
 
     # --- УСТАНОВКА НОВОГО АГЕНТА ---
     - name: Create Temp directory
-      raw: 'powershell -Command "if (-not (Test-Path ''C:\\Temp'')) { New-Item -ItemType Directory -Path ''C:\\Temp'' }"'
+      raw: 'powershell -Command "if (-not (Test-Path ''C:\Temp'')) { New-Item -ItemType Directory -Path ''C:\Temp'' }"'
 
-    - name: Download Zabbix Agent 2 MSI
-      raw: 'powershell -Command "Invoke-WebRequest -Uri ''{{ zabbix_msi_url }}'' -OutFile ''C:\\Temp\\zabbix_agent2.msi'' -UseBasicParsing"'
+    # Включаем TLS 1.2 для старых Windows (2012 R2)
+    - name: Enable TLS 1.2 and download Zabbix Agent 2 MSI
+      raw: 'powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri ''{{ zabbix_msi_url }}'' -OutFile ''C:\Temp\zabbix_agent2.msi'' -UseBasicParsing"'
 
     - name: Install Zabbix Agent 2
-      raw: 'powershell -Command "Start-Process msiexec.exe -ArgumentList ''/i C:\\Temp\\zabbix_agent2.msi /qn SERVER={{ zabbix_server }} SERVERACTIVE={{ zabbix_server }} HOSTNAME={{ win_hostname.stdout | trim }} ENABLEPATH=1'' -Wait"'
+      raw: 'powershell -Command "Start-Process msiexec.exe -ArgumentList ''/i C:\Temp\zabbix_agent2.msi /qn SERVER={{ zabbix_server }} SERVERACTIVE={{ zabbix_server }} HOSTNAME={{ win_hostname.stdout | trim }} ENABLEPATH=1 /L*V C:\Temp\zabbix_install.log'' -Wait"'
 
     - name: Wait for installation
       raw: 'powershell -Command "Start-Sleep -Seconds 10"'
 
     - name: Start Zabbix Agent 2 service
-      raw: 'powershell -Command "Start-Service -Name ''Zabbix Agent 2''"'
+      raw: 'powershell -Command "Start-Service -Name ''Zabbix Agent 2'' -ErrorAction SilentlyContinue"'
+      ignore_errors: yes
 
     - name: Verify installation
-      raw: 'powershell -Command "Get-Service -Name ''Zabbix Agent 2'' | Select-Object Status, DisplayName | ConvertTo-Json"'
+      raw: 'powershell -Command "Get-Service -Name ''Zabbix Agent 2'' -ErrorAction SilentlyContinue | Select-Object Status, DisplayName | ConvertTo-Json"'
       register: final_status
+      ignore_errors: yes
+
+    # Если служба не запустилась - показать лог
+    - name: Get install log if service failed
+      raw: 'powershell -Command "if ((Get-Service -Name ''Zabbix Agent 2'' -ErrorAction SilentlyContinue).Status -ne ''Running'') { Get-Content ''C:\Temp\zabbix_install.log'' -Tail 50 }"'
+      register: install_log
+      ignore_errors: yes
 
     - name: Show result
       ansible.builtin.debug:
-        msg: "{{ inventory_hostname }} ({{ win_hostname.stdout | trim }}): {{ final_status.stdout | trim }}"
+        msg:
+          - "Host: {{ inventory_hostname }} ({{ win_hostname.stdout | trim }})"
+          - "Status: {{ final_status.stdout | default('SERVICE NOT FOUND') | trim }}"
+          - "Install log (last 50 lines if failed): {{ install_log.stdout | default('') | trim }}"
