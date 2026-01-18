@@ -1,6 +1,9 @@
 # monitoring-kaspersky.yml
 # Создаёт template для мониторинга Kaspersky и привязывает к Windows хостам
-# Запускать: после создания хостов в Zabbix и настройки агентов
+#
+# Хосты для привязки указывать через CLI Arguments в Task Template:
+#   -e "link_hosts=['192.168.0.248','192.168.0.90','192.168.0.243']"
+# Если не указано — только создаёт template без привязки
 ---
 - name: Setup Kaspersky monitoring in Zabbix
   hosts: zabbix
@@ -12,6 +15,7 @@
     zabbix_password: "zabbix"
     template_name: "Template Windows Kaspersky"
     alert_threshold_days: 3
+    link_hosts: []  # список хостов для привязки, передаётся через -e
 
   tasks:
     - name: Login to Zabbix API
@@ -32,16 +36,9 @@
       ansible.builtin.set_fact:
         auth: "{{ zabbix_auth.json.result }}"
 
-    # Build hosts lists from inventory
-    - name: Build hosts to LINK (monitor_kaspersky=true)
-      ansible.builtin.set_fact:
-        kaspersky_hosts_to_link: "{{ kaspersky_hosts_to_link | default([]) + [item] }}"
-      loop: "{{ groups['windows_servers'] }}"
-      when: hostvars[item].monitor_kaspersky | default(false)
-
     - name: Show hosts to link
       ansible.builtin.debug:
-        msg: "Hosts to LINK: {{ kaspersky_hosts_to_link | default([]) }}"
+        msg: "Hosts to LINK: {{ link_hosts }}"
 
     # Get template group
     - name: Get Templates template group
@@ -266,27 +263,29 @@
           jsonrpc: "2.0"
           method: "trigger.create"
           params:
-            description: "Kaspersky database outdated (>{$KASPERSKY_THRESHOLD} days)"
-            expression: "last(/{{ template_name }}/kaspersky.db.age)>{$KASPERSKY_THRESHOLD}"
+            description: "Kaspersky database outdated (>{{ alert_threshold_days }} days)"
+            expression: "last(/{{ template_name }}/kaspersky.db.age)>{{ alert_threshold_days }}"
             priority: 3
             manual_close: 1
           auth: "{{ auth }}"
           id: 14
 
-    # Link template to hosts
-    - name: Link template to hosts with monitor_kaspersky=true
+    # Link template to hosts (only if link_hosts provided)
+    - name: Link template to hosts
       ansible.builtin.include_tasks: ../tasks/link-template-with-macro.yml
-      loop: "{{ kaspersky_hosts_to_link | default([]) }}"
+      loop: "{{ link_hosts }}"
       loop_control:
         loop_var: host_name
       vars:
         target_template_id: "{{ template_id }}"
         macro_name: "{$KASPERSKY_THRESHOLD}"
         macro_value: "{{ alert_threshold_days }}"
+      when: link_hosts | length > 0
 
     - name: Done
       ansible.builtin.debug:
         msg:
           - "Template '{{ template_name }}' configured"
-          - "Linked to: {{ kaspersky_hosts_to_link | default([]) }}"
-          - "Alert threshold: {{ alert_threshold_days }} days"
+          - "Items: kaspersky.db.age, kaspersky.status, kaspersky.db.date"
+          - "Trigger: alert if db.age > {{ alert_threshold_days }} days"
+          - "Linked to: {{ link_hosts if link_hosts | length > 0 else 'NONE (use -e link_hosts=[...] to link)' }}"

@@ -593,4 +593,41 @@ ansible-playbook -i inv.yml playbook.yml
 
 ---
 
+### 26. Хосты НЕ фильтровать в playbook — использовать Limit в Task
+
+**Принцип:** Playbook НЕ должен сам решать на каких хостах работать. Список хостов задаётся в настройках Task в Semaphore через поле **Limit** (это `--limit` в ansible-playbook).
+
+**Неправильно:**
+```yaml
+# Плейбук сам фильтрует хосты по флагу
+- name: Build hosts to link
+  set_fact:
+    hosts_to_link: "{{ hosts_to_link + [item] }}"
+  loop: "{{ groups['windows_servers'] }}"
+  when: hostvars[item].monitor_kaspersky | default(false)  # ← НЕПРАВИЛЬНО
+```
+
+**Правильно:**
+```yaml
+# Плейбук работает со ВСЕМИ хостами которые ему передали
+# Фильтрация — через Limit в настройках Task
+- name: Process all hosts
+  loop: "{{ groups['windows_servers'] }}"  # или ansible_play_hosts
+```
+
+**Как работает:**
+1. Playbook: `hosts: windows_servers` (указывает группу)
+2. Task в Semaphore: Limit = `192.168.0.248,192.168.0.90` (ограничивает хосты)
+3. Ansible запускается с `--limit 192.168.0.248,192.168.0.90`
+4. Playbook работает ТОЛЬКО с указанными хостами
+
+**Исключение:** Плейбуки синхронизации (sync) которые должны удалять orphans — им нужен полный список из inventory. Такие плейбуки помечать в названии: `sync-*.yml`
+
+**Зачем:**
+- Гибкость: можно запустить на одном хосте для теста
+- Единообразие: один плейбук, разные Task Templates с разными Limit
+- Безопасность: случайно не затронешь лишние хосты
+
+---
+
 ## Дата обновления: 2026-01-18

@@ -1,6 +1,7 @@
 # configure-kaspersky-monitoring.yml
 # Настройка UserParameter для мониторинга Kaspersky через Zabbix Agent 2
 # Запускать ПОСЛЕ install-zabbix-agent.yml
+# Хосты указывать через Limit в Task Template
 ---
 - name: Configure Kaspersky monitoring on Zabbix Agent 2
   hosts: windows_servers
@@ -14,40 +15,31 @@
       UserParameter=kaspersky.db.date,powershell -NoProfile -Command "$f = Get-ChildItem 'C:\ProgramData\Kaspersky Lab\AVP*\Bases' -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($f) { $f.LastWriteTime.ToString('yyyy-MM-dd HH:mm') } else { 'N/A' }"
 
   tasks:
-    - name: Only run on hosts with monitor_kaspersky=true
-      when: monitor_kaspersky | default(false)
-      block:
-        - name: Check if Zabbix Agent 2 installed
-          raw: 'powershell -Command "Test-Path ''{{ agent_conf_dir }}''"'
-          register: agent_dir_check
+    - name: Check if Zabbix Agent 2 installed
+      raw: 'powershell -Command "Test-Path ''{{ agent_conf_dir }}''"'
+      register: agent_dir_check
 
-        - name: Fail if agent not installed
-          ansible.builtin.fail:
-            msg: "Zabbix Agent 2 not installed on {{ inventory_hostname }}. Run install-zabbix-agent.yml first."
-          when: "'False' in agent_dir_check.stdout"
+    - name: Fail if agent not installed
+      ansible.builtin.fail:
+        msg: "Zabbix Agent 2 not installed on {{ inventory_hostname }}. Run install-zabbix-agent.yml first."
+      when: "'False' in agent_dir_check.stdout"
 
-        - name: Create kaspersky.conf UserParameter file
-          raw: |
-            powershell -Command "
-            @'
-            {{ userparam_content }}
-            '@ | Set-Content -Path '{{ agent_conf_dir }}\kaspersky.conf' -Encoding UTF8
-            "
-          register: conf_created
+    - name: Create kaspersky.conf UserParameter file
+      raw: |
+        powershell -Command "
+        @'
+        {{ userparam_content }}
+        '@ | Set-Content -Path '{{ agent_conf_dir }}\kaspersky.conf' -Encoding UTF8
+        "
 
-        - name: Restart Zabbix Agent 2 to apply config
-          raw: 'powershell -Command "Restart-Service -Name ''Zabbix Agent 2'' -Force"'
+    - name: Restart Zabbix Agent 2 to apply config
+      raw: 'powershell -Command "Restart-Service -Name ''Zabbix Agent 2'' -Force"'
 
-        - name: Verify UserParameter works
-          raw: 'powershell -Command "Start-Sleep -Seconds 3; & ''C:\Program Files\Zabbix Agent 2\zabbix_agent2.exe'' -t kaspersky.db.age 2>&1"'
-          register: test_result
-          ignore_errors: yes
+    - name: Verify UserParameter works
+      raw: 'powershell -Command "Start-Sleep -Seconds 3; & ''C:\Program Files\Zabbix Agent 2\zabbix_agent2.exe'' -t kaspersky.db.age 2>&1"'
+      register: test_result
+      ignore_errors: yes
 
-        - name: Show test result
-          ansible.builtin.debug:
-            msg: "{{ inventory_hostname }}: kaspersky.db.age = {{ test_result.stdout | trim }}"
-
-    - name: Skip hosts without monitor_kaspersky
+    - name: Show test result
       ansible.builtin.debug:
-        msg: "Skipped {{ inventory_hostname }} (monitor_kaspersky={{ monitor_kaspersky | default(false) }})"
-      when: not (monitor_kaspersky | default(false))
+        msg: "{{ inventory_hostname }}: kaspersky.db.age = {{ test_result.stdout | trim }}"
