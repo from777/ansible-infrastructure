@@ -7,7 +7,7 @@
   hosts: windows_servers
   gather_facts: no
   vars:
-    zabbix_version: "7.0.7"
+    zabbix_version: "7.0.22"
     zabbix_server: "192.168.0.81"
     zabbix_msi_url: "https://cdn.zabbix.com/zabbix/binaries/stable/7.0/{{ zabbix_version }}/zabbix_agent2-{{ zabbix_version }}-windows-amd64-openssl.msi"
 
@@ -25,20 +25,33 @@
       raw: 'powershell -Command "Stop-Service -Name ''Zabbix Agent'' -Force -ErrorAction SilentlyContinue"'
       ignore_errors: yes
 
-    - name: Find and uninstall old Zabbix Agent 2
-      raw: 'powershell -Command "$app = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -like ''*Zabbix Agent 2*'' }; if ($app) { $app.Uninstall() }"'
+    # Удаление через msiexec (более надёжно чем WMI)
+    - name: Find Zabbix Agent 2 uninstall GUID
+      raw: 'powershell -Command "Get-ChildItem HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall | Get-ItemProperty | Where-Object { $_.DisplayName -like ''*Zabbix Agent 2*'' } | Select-Object -ExpandProperty PSChildName"'
+      register: zabbix2_guid
       ignore_errors: yes
 
-    - name: Find and uninstall old Zabbix Agent
-      raw: 'powershell -Command "$app = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -like ''*Zabbix Agent*'' -and $_.Name -notlike ''*Agent 2*'' }; if ($app) { $app.Uninstall() }"'
+    - name: Uninstall old Zabbix Agent 2 via msiexec
+      raw: 'powershell -Command "Start-Process msiexec.exe -ArgumentList ''/x {{ zabbix2_guid.stdout | trim }} /qn'' -Wait"'
+      when: zabbix2_guid.stdout | default('') | trim | length > 0
+      ignore_errors: yes
+
+    - name: Find Zabbix Agent (old) uninstall GUID
+      raw: 'powershell -Command "Get-ChildItem HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall | Get-ItemProperty | Where-Object { $_.DisplayName -like ''*Zabbix Agent*'' -and $_.DisplayName -notlike ''*Agent 2*'' } | Select-Object -ExpandProperty PSChildName"'
+      register: zabbix_old_guid
+      ignore_errors: yes
+
+    - name: Uninstall old Zabbix Agent via msiexec
+      raw: 'powershell -Command "Start-Process msiexec.exe -ArgumentList ''/x {{ zabbix_old_guid.stdout | trim }} /qn'' -Wait"'
+      when: zabbix_old_guid.stdout | default('') | trim | length > 0
       ignore_errors: yes
 
     - name: Remove old Zabbix Agent 2 folder
-      raw: 'powershell -Command "Remove-Item -Path ''C:\Program Files\Zabbix Agent 2'' -Recurse -Force -ErrorAction SilentlyContinue"'
+      raw: 'powershell -Command "Remove-Item -Path ''C:\\Program Files\\Zabbix Agent 2'' -Recurse -Force -ErrorAction SilentlyContinue"'
       ignore_errors: yes
 
     - name: Remove old Zabbix Agent folder
-      raw: 'powershell -Command "Remove-Item -Path ''C:\Program Files\Zabbix Agent'' -Recurse -Force -ErrorAction SilentlyContinue"'
+      raw: 'powershell -Command "Remove-Item -Path ''C:\\Program Files\\Zabbix Agent'' -Recurse -Force -ErrorAction SilentlyContinue"'
       ignore_errors: yes
 
     - name: Wait after uninstall
@@ -46,13 +59,13 @@
 
     # --- УСТАНОВКА НОВОГО АГЕНТА ---
     - name: Create Temp directory
-      raw: 'powershell -Command "if (-not (Test-Path ''C:\Temp'')) { New-Item -ItemType Directory -Path ''C:\Temp'' }"'
+      raw: 'powershell -Command "if (-not (Test-Path ''C:\\Temp'')) { New-Item -ItemType Directory -Path ''C:\\Temp'' }"'
 
     - name: Download Zabbix Agent 2 MSI
-      raw: 'powershell -Command "Invoke-WebRequest -Uri ''{{ zabbix_msi_url }}'' -OutFile ''C:\Temp\zabbix_agent2.msi'' -UseBasicParsing"'
+      raw: 'powershell -Command "Invoke-WebRequest -Uri ''{{ zabbix_msi_url }}'' -OutFile ''C:\\Temp\\zabbix_agent2.msi'' -UseBasicParsing"'
 
     - name: Install Zabbix Agent 2
-      raw: 'powershell -Command "Start-Process msiexec.exe -ArgumentList ''/i C:\Temp\zabbix_agent2.msi /qn SERVER={{ zabbix_server }} SERVERACTIVE={{ zabbix_server }} HOSTNAME={{ win_hostname.stdout | trim }} ENABLEPATH=1'' -Wait"'
+      raw: 'powershell -Command "Start-Process msiexec.exe -ArgumentList ''/i C:\\Temp\\zabbix_agent2.msi /qn SERVER={{ zabbix_server }} SERVERACTIVE={{ zabbix_server }} HOSTNAME={{ win_hostname.stdout | trim }} ENABLEPATH=1'' -Wait"'
 
     - name: Wait for installation
       raw: 'powershell -Command "Start-Sleep -Seconds 10"'
