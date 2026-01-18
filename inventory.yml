@@ -51,9 +51,13 @@ elk_servers:
 windows_servers:
   hosts:
     176.9.141.234:   # имя хоста = IP, ansible_host не нужен
+      monitor_kaspersky: false
     192.168.0.248:
+      monitor_kaspersky: true   # при изменении запустить: monitoring-kaspersky.yml
     192.168.0.90:
+      monitor_kaspersky: true   # при изменении запустить: monitoring-kaspersky.yml
     192.168.0.243:
+      monitor_kaspersky: true   # при изменении запустить: monitoring-kaspersky.yml
   vars:
     ansible_connection: winrm
     ansible_winrm_transport: basic

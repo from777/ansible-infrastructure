@@ -1,0 +1,78 @@
+# diagnostics.yml
+# Диагностика Windows серверов: Zabbix Agent, Kaspersky, системная информация
+# Запуск: Task Template в Semaphore
+---
+- name: Windows Server Diagnostics
+  hosts: windows_servers
+  gather_facts: no
+
+  tasks:
+    - name: Get hostname
+      raw: hostname
+      register: hostname_result
+
+    - name: Check Zabbix Agent service
+      raw: powershell -Command "Get-Service -Name 'Zabbix Agent' -ErrorAction SilentlyContinue | Select-Object -Property Status, DisplayName | ConvertTo-Json"
+      register: zabbix_agent_result
+      ignore_errors: yes
+
+    - name: Check Zabbix Agent 2 service
+      raw: powershell -Command "Get-Service -Name 'Zabbix Agent 2' -ErrorAction SilentlyContinue | Select-Object -Property Status, DisplayName | ConvertTo-Json"
+      register: zabbix_agent2_result
+      ignore_errors: yes
+
+    - name: Check Kaspersky services
+      raw: powershell -Command "Get-Service | Where-Object { $_.DisplayName -like '*Kaspersky*' } | Select-Object -Property Status, Name, DisplayName | ConvertTo-Json"
+      register: kaspersky_services
+
+    - name: Check Kaspersky processes
+      raw: powershell -Command "Get-Process | Where-Object { $_.ProcessName -like '*avp*' -or $_.ProcessName -like '*kasp*' } | Select-Object -Property ProcessName, Id | ConvertTo-Json"
+      register: kaspersky_processes
+
+    - name: Find Kaspersky database files
+      raw: |
+        powershell -Command "
+        $paths = @(
+          'C:\ProgramData\Kaspersky Lab',
+          'C:\Program Files\Kaspersky Lab',
+          'C:\Program Files (x86)\Kaspersky Lab'
+        )
+        foreach ($path in $paths) {
+          if (Test-Path $path) {
+            $bases = Get-ChildItem -Path $path -Recurse -Include '*.kdc','*.dat' -ErrorAction SilentlyContinue |
+              Where-Object { $_.DirectoryName -like '*Bases*' -or $_.DirectoryName -like '*bases*' } |
+              Sort-Object LastWriteTime -Descending |
+              Select-Object -First 5 FullName, LastWriteTime, @{N='AgeDays';E={[math]::Round(((Get-Date) - $_.LastWriteTime).TotalDays, 1)}}
+            if ($bases) { $bases | ConvertTo-Json -Depth 3 }
+          }
+        }
+        "
+      register: kaspersky_bases
+
+    - name: Check WMI AntiVirus info (SecurityCenter2)
+      raw: powershell -Command "Get-CimInstance -Namespace 'root/SecurityCenter2' -ClassName AntivirusProduct -ErrorAction SilentlyContinue | Select-Object displayName, productState, timestamp | ConvertTo-Json"
+      register: antivirus_wmi
+      ignore_errors: yes
+
+    - name: Display diagnostics results
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "HOST: {{ hostname_result.stdout | trim }}"
+          - "IP: {{ inventory_hostname }}"
+          - "=============================================="
+          - ""
+          - "--- ZABBIX AGENT ---"
+          - "Zabbix Agent: {{ zabbix_agent_result.stdout | default('NOT INSTALLED') | trim }}"
+          - "Zabbix Agent 2: {{ zabbix_agent2_result.stdout | default('NOT INSTALLED') | trim }}"
+          - ""
+          - "--- KASPERSKY ---"
+          - "Services: {{ kaspersky_services.stdout | default('NONE') | trim }}"
+          - "Processes: {{ kaspersky_processes.stdout | default('NONE') | trim }}"
+          - ""
+          - "--- KASPERSKY DATABASES ---"
+          - "{{ kaspersky_bases.stdout | default('NOT FOUND') }}"
+          - ""
+          - "--- WMI ANTIVIRUS ---"
+          - "{{ antivirus_wmi.stdout | default('NOT AVAILABLE') }}"
+          - "=============================================="
