@@ -22,32 +22,22 @@
       ignore_errors: yes
 
     - name: Check Kaspersky services
-      raw: powershell -Command "Get-Service | Where-Object { $_.DisplayName -like '*Kaspersky*' } | Select-Object -Property Status, Name, DisplayName | ConvertTo-Json"
+      raw: 'powershell -Command "Get-Service | Where-Object { $_.DisplayName -like ''*Kaspersky*'' } | Select-Object -Property Status, Name, DisplayName | ConvertTo-Json"'
       register: kaspersky_services
 
     - name: Check Kaspersky processes
-      raw: powershell -Command "Get-Process | Where-Object { $_.ProcessName -like '*avp*' -or $_.ProcessName -like '*kasp*' } | Select-Object -Property ProcessName, Id | ConvertTo-Json"
+      raw: 'powershell -Command "Get-Process | Where-Object { $_.ProcessName -like ''*avp*'' -or $_.ProcessName -like ''*kasp*'' } | Select-Object -Property ProcessName, Id | ConvertTo-Json"'
       register: kaspersky_processes
 
     - name: Find Kaspersky database files
-      raw: |
-        powershell -Command "
-        $paths = @(
-          'C:\ProgramData\Kaspersky Lab',
-          'C:\Program Files\Kaspersky Lab',
-          'C:\Program Files (x86)\Kaspersky Lab'
-        )
-        foreach ($path in $paths) {
-          if (Test-Path $path) {
-            $bases = Get-ChildItem -Path $path -Recurse -Include '*.kdc','*.dat' -ErrorAction SilentlyContinue |
-              Where-Object { $_.DirectoryName -like '*Bases*' -or $_.DirectoryName -like '*bases*' } |
-              Sort-Object LastWriteTime -Descending |
-              Select-Object -First 5 FullName, LastWriteTime, @{N='AgeDays';E={[math]::Round(((Get-Date) - $_.LastWriteTime).TotalDays, 1)}}
-            if ($bases) { $bases | ConvertTo-Json -Depth 3 }
-          }
-        }
-        "
+      raw: 'powershell -Command "Get-ChildItem -Path ''C:\ProgramData\Kaspersky Lab'' -Recurse -Include ''*.kdc'',''*.dat'' -ErrorAction SilentlyContinue | Where-Object { $_.DirectoryName -like ''*Bases*'' } | Sort-Object LastWriteTime -Descending | Select-Object -First 3 FullName, LastWriteTime | ConvertTo-Json"'
       register: kaspersky_bases
+      ignore_errors: yes
+
+    - name: Get newest base file age in days
+      raw: 'powershell -Command "$f = Get-ChildItem -Path ''C:\ProgramData\Kaspersky Lab'' -Recurse -Include ''*.kdc'',''*.dat'' -ErrorAction SilentlyContinue | Where-Object { $_.DirectoryName -like ''*Bases*'' } | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($f) { [math]::Round(((Get-Date) - $f.LastWriteTime).TotalDays, 1) } else { -1 }"'
+      register: kaspersky_age
+      ignore_errors: yes
 
     - name: Check WMI AntiVirus info (SecurityCenter2)
       raw: powershell -Command "Get-CimInstance -Namespace 'root/SecurityCenter2' -ClassName AntivirusProduct -ErrorAction SilentlyContinue | Select-Object displayName, productState, timestamp | ConvertTo-Json"
@@ -71,8 +61,9 @@
           - "Processes: {{ kaspersky_processes.stdout | default('NONE') | trim }}"
           - ""
           - "--- KASPERSKY DATABASES ---"
-          - "{{ kaspersky_bases.stdout | default('NOT FOUND') }}"
+          - "Age (days): {{ kaspersky_age.stdout | default('-1') | trim }}"
+          - "Files: {{ kaspersky_bases.stdout | default('NOT FOUND') | trim }}"
           - ""
           - "--- WMI ANTIVIRUS ---"
-          - "{{ antivirus_wmi.stdout | default('NOT AVAILABLE') }}"
+          - "{{ antivirus_wmi.stdout | default('NOT AVAILABLE') | trim }}"
           - "=============================================="
