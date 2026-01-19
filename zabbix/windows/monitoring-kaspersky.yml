@@ -275,6 +275,54 @@
           auth: "{{ auth }}"
           id: 14
 
+    # Trigger for status (266240 = OK, anything else = problem)
+    - name: Get existing status trigger
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "trigger.get"
+          params:
+            templateids: "{{ template_id }}"
+            search:
+              description: "Kaspersky not running"
+          auth: "{{ auth }}"
+          id: 15
+      register: status_trigger_check
+
+    - name: Delete existing status trigger
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "trigger.delete"
+          params:
+            - "{{ status_trigger_check.json.result[0].triggerid }}"
+          auth: "{{ auth }}"
+          id: 16
+      when: status_trigger_check.json.result | length > 0
+      ignore_errors: yes
+
+    - name: Create trigger for Kaspersky status
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "trigger.create"
+          params:
+            description: "Kaspersky not running or outdated (status != 266240)"
+            expression: "last(/{{ template_name }}/kaspersky.status)<>266240"
+            priority: 4
+            manual_close: 1
+          auth: "{{ auth }}"
+          id: 17
+
     # Link template to hosts from inventory
     - name: Link template to hosts
       ansible.builtin.include_tasks: ../tasks/link-template-with-macro.yml
@@ -292,5 +340,7 @@
         msg:
           - "Template '{{ template_name }}' configured"
           - "Items: kaspersky.db.age, kaspersky.status, kaspersky.db.date"
-          - "Trigger: alert if db.age > {{ alert_threshold_days }} days"
+          - "Triggers:"
+          - "  1. DB outdated: alert if db.age > {{ alert_threshold_days }} days (priority: Average)"
+          - "  2. Status bad: alert if status != 266240 (priority: High)"
           - "Linked to: {{ kaspersky_hosts | default([]) | join(', ') if kaspersky_hosts | default([]) | length > 0 else 'NONE (no hosts with monitor_kaspersky=true)' }}"
