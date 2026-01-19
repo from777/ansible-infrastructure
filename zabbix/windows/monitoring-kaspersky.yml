@@ -1,9 +1,8 @@
 # monitoring-kaspersky.yml
 # Создаёт template для мониторинга Kaspersky и привязывает к Windows хостам
 #
-# Хосты для привязки указывать через CLI Arguments в Task Template:
-#   -e "link_hosts=['192.168.0.248','192.168.0.90','192.168.0.243']"
-# Если не указано — только создаёт template без привязки
+# Хосты берутся из inventory по флагу monitor_kaspersky: true
+# В настройках Task: Inventory = твой inventory, Limit = пусто
 ---
 - name: Setup Kaspersky monitoring in Zabbix
   hosts: zabbix
@@ -15,9 +14,19 @@
     zabbix_password: "zabbix"
     template_name: "Template Windows Kaspersky"
     alert_threshold_days: 3
-    link_hosts: []  # список хостов для привязки, передаётся через -e
 
   tasks:
+    # Собираем список хостов с monitor_kaspersky: true
+    - name: Build list of hosts to monitor
+      ansible.builtin.set_fact:
+        kaspersky_hosts: "{{ kaspersky_hosts | default([]) + [item] }}"
+      loop: "{{ groups['windows_servers'] }}"
+      when: hostvars[item].monitor_kaspersky | default(false)
+
+    - name: Show hosts to monitor
+      ansible.builtin.debug:
+        msg: "Hosts with monitor_kaspersky=true: {{ kaspersky_hosts | default([]) }}"
+
     - name: Login to Zabbix API
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
@@ -35,10 +44,6 @@
     - name: Set auth token
       ansible.builtin.set_fact:
         auth: "{{ zabbix_auth.json.result }}"
-
-    - name: Show hosts to link
-      ansible.builtin.debug:
-        msg: "Hosts to LINK: {{ link_hosts }}"
 
     # Get template group
     - name: Get Templates template group
@@ -270,17 +275,17 @@
           auth: "{{ auth }}"
           id: 14
 
-    # Link template to hosts (only if link_hosts provided)
+    # Link template to hosts from inventory
     - name: Link template to hosts
       ansible.builtin.include_tasks: ../tasks/link-template-with-macro.yml
-      loop: "{{ link_hosts }}"
+      loop: "{{ kaspersky_hosts | default([]) }}"
       loop_control:
         loop_var: host_name
       vars:
         target_template_id: "{{ template_id }}"
         macro_name: "{$KASPERSKY_THRESHOLD}"
         macro_value: "{{ alert_threshold_days }}"
-      when: link_hosts | length > 0
+      when: kaspersky_hosts | default([]) | length > 0
 
     - name: Done
       ansible.builtin.debug:
@@ -288,4 +293,4 @@
           - "Template '{{ template_name }}' configured"
           - "Items: kaspersky.db.age, kaspersky.status, kaspersky.db.date"
           - "Trigger: alert if db.age > {{ alert_threshold_days }} days"
-          - "Linked to: {{ link_hosts if link_hosts | length > 0 else 'NONE (use -e link_hosts=[...] to link)' }}"
+          - "Linked to: {{ kaspersky_hosts | default([]) | join(', ') if kaspersky_hosts | default([]) | length > 0 else 'NONE (no hosts with monitor_kaspersky=true)' }}"

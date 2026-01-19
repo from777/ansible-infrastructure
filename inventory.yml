@@ -51,9 +51,13 @@ elk_servers:
 windows_servers:
   hosts:
     176.9.141.234:   # VPS
+      monitor_kaspersky: false
     192.168.0.248:   # DESKTOP-UOHL2UI
+      monitor_kaspersky: true
     192.168.0.90:    # DESKTOP-JT6FBIH
+      monitor_kaspersky: true
     192.168.0.243:   # DESKTOP-1N503TN
+      monitor_kaspersky: true
   vars:
     ansible_connection: winrm
     ansible_winrm_transport: basic
