@@ -7,12 +7,7 @@
   hosts: windows_servers
   gather_facts: no
   vars:
-    agent_conf_dir: "C:\\Program Files\\Zabbix Agent 2\\zabbix_agent2.d"
-    userparam_content: |
-      # Kaspersky monitoring UserParameters
-      UserParameter=kaspersky.db.age,powershell -NoProfile -Command "$f = Get-ChildItem 'C:\ProgramData\Kaspersky Lab\AVP*\Bases' -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($f) { [math]::Round(((Get-Date) - $f.LastWriteTime).TotalDays, 1) } else { -1 }"
-      UserParameter=kaspersky.status,powershell -NoProfile -Command "$av = Get-CimInstance -Namespace 'root/SecurityCenter2' -ClassName AntivirusProduct -ErrorAction SilentlyContinue | Where-Object { $_.displayName -like '*Kaspersky*' } | Select-Object -First 1; if ($av) { $av.productState } else { 0 }"
-      UserParameter=kaspersky.db.date,powershell -NoProfile -Command "$f = Get-ChildItem 'C:\ProgramData\Kaspersky Lab\AVP*\Bases' -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($f) { $f.LastWriteTime.ToString('yyyy-MM-dd HH:mm') } else { 'N/A' }"
+    agent_conf_dir: 'C:\Program Files\Zabbix Agent 2\zabbix_agent2.d'
 
   tasks:
     - name: Check if Zabbix Agent 2 installed
@@ -24,19 +19,26 @@
         msg: "Zabbix Agent 2 not installed on {{ inventory_hostname }}. Run install-zabbix-agent.yml first."
       when: "'False' in agent_dir_check.stdout"
 
+    # Создаём файл через echo с экранированием
     - name: Create kaspersky.conf UserParameter file
       raw: |
         powershell -Command "
-        @'
-        {{ userparam_content }}
-        '@ | Set-Content -Path '{{ agent_conf_dir }}\kaspersky.conf' -Encoding UTF8
+        Set-Content -Path '{{ agent_conf_dir }}\kaspersky.conf' -Value @'
+        # Kaspersky monitoring UserParameters
+        UserParameter=kaspersky.db.age,powershell -NoProfile -Command \"`$f = Get-ChildItem 'C:\ProgramData\Kaspersky Lab\AVP*\Bases' -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if (`$f) { [math]::Round(((Get-Date) - `$f.LastWriteTime).TotalDays, 1) } else { -1 }\"
+        UserParameter=kaspersky.status,powershell -NoProfile -Command \"(`$p = Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntivirusProduct -ErrorAction SilentlyContinue | Where-Object { `$_.displayName -like '*Kaspersky*' }); if (`$p) { `$p.productState } else { 0 }\"
+        UserParameter=kaspersky.db.date,powershell -NoProfile -Command \"`$f = Get-ChildItem 'C:\ProgramData\Kaspersky Lab\AVP*\Bases' -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if (`$f) { `$f.LastWriteTime.ToString('yyyy-MM-dd HH:mm') } else { 'N/A' }\"
+        '@
         "
 
     - name: Restart Zabbix Agent 2 to apply config
       raw: 'powershell -Command "Restart-Service -Name ''Zabbix Agent 2'' -Force"'
 
+    - name: Wait for agent restart
+      raw: 'powershell -Command "Start-Sleep -Seconds 5"'
+
     - name: Verify UserParameter works
-      raw: 'powershell -Command "Start-Sleep -Seconds 3; & ''C:\Program Files\Zabbix Agent 2\zabbix_agent2.exe'' -t kaspersky.db.age 2>&1"'
+      raw: 'powershell -Command "& ''C:\Program Files\Zabbix Agent 2\zabbix_agent2.exe'' -t kaspersky.db.age 2>&1"'
       register: test_result
       ignore_errors: yes
 
