@@ -1,7 +1,5 @@
 # configure-kaspersky-monitoring.yml
 # Настройка UserParameter для мониторинга Kaspersky через Zabbix Agent 2
-# Запускать ПОСЛЕ install-zabbix-agent.yml
-# Хосты указывать через Limit в Task Template
 ---
 - name: Configure Kaspersky monitoring on Zabbix Agent 2
   hosts: windows_servers
@@ -9,6 +7,11 @@
   vars:
     agent_dir: 'C:\Program Files\Zabbix Agent 2'
     scripts_dir: 'C:\Program Files\Zabbix Agent 2\scripts'
+    # Base64 encoded scripts
+    script_db_age_b64: "JGYgPSBHZXQtQ2hpbGRJdGVtICdDOlxQcm9ncmFtRGF0YVxLYXNwZXJza3kgTGFiXEFWUCpcQmFzZXMnIC1GaWxlIC1FcnJvckFjdGlvbiBTaWxlbnRseUNvbnRpbnVlIHwgU29ydC1PYmplY3QgTGFzdFdyaXRlVGltZSAtRGVzY2VuZGluZyB8IFNlbGVjdC1PYmplY3QgLUZpcnN0IDENCmlmICgkZikgeyBbbWF0aF06OlJvdW5kKCgoR2V0LURhdGUpIC0gJGYuTGFzdFdyaXRlVGltZSkuVG90YWxEYXlzLCAxKSB9IGVsc2UgeyAtMSB9"
+    script_status_b64: "JGF2ID0gR2V0LUNpbUluc3RhbmNlIC1OYW1lc3BhY2Ugcm9vdC9TZWN1cml0eUNlbnRlcjIgLUNsYXNzTmFtZSBBbnRpdmlydXNQcm9kdWN0IC1FcnJvckFjdGlvbiBTaWxlbnRseUNvbnRpbnVlIHwgV2hlcmUtT2JqZWN0IHsgJF8uZGlzcGxheU5hbWUgLWxpa2UgJypLYXNwZXJza3kqJyB9IHwgU2VsZWN0LU9iamVjdCAtRmlyc3QgMQ0KaWYgKCRhdikgeyAkYXYucHJvZHVjdFN0YXRlIH0gZWxzZSB7IDAgfQ=="
+    script_db_date_b64: "JGYgPSBHZXQtQ2hpbGRJdGVtICdDOlxQcm9ncmFtRGF0YVxLYXNwZXJza3kgTGFiXEFWUCpcQmFzZXMnIC1GaWxlIC1FcnJvckFjdGlvbiBTaWxlbnRseUNvbnRpbnVlIHwgU29ydC1PYmplY3QgTGFzdFdyaXRlVGltZSAtRGVzY2VuZGluZyB8IFNlbGVjdC1PYmplY3QgLUZpcnN0IDENCmlmICgkZikgeyAkZi5MYXN0V3JpdGVUaW1lLlRvU3RyaW5nKCd5eXl5LU1NLWRkIEhIOm1tJykgfSBlbHNlIHsgJ04vQScgfQ=="
+    kaspersky_conf_b64: "IyBLYXNwZXJza3kgbW9uaXRvcmluZw0KVXNlclBhcmFtZXRlcj1rYXNwZXJza3kuZGIuYWdlLHBvd2Vyc2hlbGwgLU5vUHJvZmlsZSAtRXhlY3V0aW9uUG9saWN5IEJ5cGFzcyAtRmlsZSAiQzpcUHJvZ3JhbSBGaWxlc1xaYWJiaXggQWdlbnQgMlxzY3JpcHRzXGthc3BlcnNreS1kYi1hZ2UucHMxIg0KVXNlclBhcmFtZXRlcj1rYXNwZXJza3kuc3RhdHVzLHBvd2Vyc2hlbGwgLU5vUHJvZmlsZSAtRXhlY3V0aW9uUG9saWN5IEJ5cGFzcyAtRmlsZSAiQzpcUHJvZ3JhbSBGaWxlc1xaYWJiaXggQWdlbnQgMlxzY3JpcHRzXGthc3BlcnNreS1zdGF0dXMucHMxIg0KVXNlclBhcmFtZXRlcj1rYXNwZXJza3kuZGIuZGF0ZSxwb3dlcnNoZWxsIC1Ob1Byb2ZpbGUgLUV4ZWN1dGlvblBvbGljeSBCeXBhc3MgLUZpbGUgIkM6XFByb2dyYW0gRmlsZXNcWmFiYml4IEFnZW50IDJcc2NyaXB0c1xrYXNwZXJza3ktZGItZGF0ZS5wczEi"
 
   tasks:
     - name: Check if Zabbix Agent 2 installed
@@ -21,44 +24,19 @@
       when: "'False' in agent_dir_check.stdout"
 
     - name: Create scripts directory
-      raw: 'powershell -Command "New-Item -ItemType Directory -Path ''{{ scripts_dir }}'' -Force"'
+      raw: 'powershell -Command "New-Item -ItemType Directory -Path ''{{ scripts_dir }}'' -Force | Out-Null"'
 
-    # Скрипт kaspersky-db-age.ps1
     - name: Create kaspersky-db-age.ps1
-      raw: |
-        powershell -Command "$script = @'
-        $f = Get-ChildItem 'C:\ProgramData\Kaspersky Lab\AVP*\Bases' -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-        if ($f) { [math]::Round(((Get-Date) - $f.LastWriteTime).TotalDays, 1) } else { -1 }
-        '@; $script | Out-File -FilePath '{{ scripts_dir }}\kaspersky-db-age.ps1' -Encoding UTF8 -Force"
+      raw: 'powershell -Command "[IO.File]::WriteAllText(''{{ scripts_dir }}\kaspersky-db-age.ps1'', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(''{{ script_db_age_b64 }}'')))"'
 
-    # Скрипт kaspersky-status.ps1
     - name: Create kaspersky-status.ps1
-      raw: |
-        powershell -Command "$script = @'
-        $av = Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntivirusProduct -ErrorAction SilentlyContinue | Where-Object { $_.displayName -like '*Kaspersky*' } | Select-Object -First 1
-        if ($av) { $av.productState } else { 0 }
-        '@; $script | Out-File -FilePath '{{ scripts_dir }}\kaspersky-status.ps1' -Encoding UTF8 -Force"
+      raw: 'powershell -Command "[IO.File]::WriteAllText(''{{ scripts_dir }}\kaspersky-status.ps1'', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(''{{ script_status_b64 }}'')))"'
 
-    # Скрипт kaspersky-db-date.ps1
     - name: Create kaspersky-db-date.ps1
-      raw: |
-        powershell -Command "$script = @'
-        $f = Get-ChildItem 'C:\ProgramData\Kaspersky Lab\AVP*\Bases' -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-        if ($f) { $f.LastWriteTime.ToString('yyyy-MM-dd HH:mm') } else { 'N/A' }
-        '@; $script | Out-File -FilePath '{{ scripts_dir }}\kaspersky-db-date.ps1' -Encoding UTF8 -Force"
+      raw: 'powershell -Command "[IO.File]::WriteAllText(''{{ scripts_dir }}\kaspersky-db-date.ps1'', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(''{{ script_db_date_b64 }}'')))"'
 
-    # Создаём kaspersky.conf с UserParameter
-    - name: Create kaspersky.conf line 1
-      raw: 'powershell -Command "''# Kaspersky monitoring'' | Out-File -FilePath ''{{ agent_dir }}\zabbix_agent2.d\kaspersky.conf'' -Encoding UTF8 -Force"'
-
-    - name: Create kaspersky.conf line 2
-      raw: 'powershell -Command "''UserParameter=kaspersky.db.age,powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\Program Files\Zabbix Agent 2\scripts\kaspersky-db-age.ps1\"'' | Add-Content -Path ''{{ agent_dir }}\zabbix_agent2.d\kaspersky.conf'' -Encoding UTF8"'
-
-    - name: Create kaspersky.conf line 3
-      raw: 'powershell -Command "''UserParameter=kaspersky.status,powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\Program Files\Zabbix Agent 2\scripts\kaspersky-status.ps1\"'' | Add-Content -Path ''{{ agent_dir }}\zabbix_agent2.d\kaspersky.conf'' -Encoding UTF8"'
-
-    - name: Create kaspersky.conf line 4
-      raw: 'powershell -Command "''UserParameter=kaspersky.db.date,powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\Program Files\Zabbix Agent 2\scripts\kaspersky-db-date.ps1\"'' | Add-Content -Path ''{{ agent_dir }}\zabbix_agent2.d\kaspersky.conf'' -Encoding UTF8"'
+    - name: Create kaspersky.conf
+      raw: 'powershell -Command "[IO.File]::WriteAllText(''{{ agent_dir }}\zabbix_agent2.d\kaspersky.conf'', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(''{{ kaspersky_conf_b64 }}'')))"'
 
     - name: Restart Zabbix Agent 2
       raw: 'powershell -Command "Restart-Service -Name ''Zabbix Agent 2'' -Force"'
@@ -67,10 +45,18 @@
       raw: 'powershell -Command "Start-Sleep -Seconds 5"'
 
     - name: Test kaspersky.db.age
-      raw: 'powershell -Command "& ''{{ agent_dir }}\zabbix_agent2.exe'' -t kaspersky.db.age 2>&1"'
-      register: test_result
+      raw: 'powershell -Command "& ''{{ agent_dir }}\zabbix_agent2.exe'' -t kaspersky.db.age"'
+      register: test_age
       ignore_errors: yes
 
-    - name: Show test result
+    - name: Test kaspersky.status
+      raw: 'powershell -Command "& ''{{ agent_dir }}\zabbix_agent2.exe'' -t kaspersky.status"'
+      register: test_status
+      ignore_errors: yes
+
+    - name: Show results
       ansible.builtin.debug:
-        msg: "{{ inventory_hostname }}: {{ test_result.stdout | trim }}"
+        msg:
+          - "{{ inventory_hostname }}:"
+          - "  db.age: {{ test_age.stdout | default('ERROR') | trim }}"
+          - "  status: {{ test_status.stdout | default('ERROR') | trim }}"
