@@ -1,0 +1,156 @@
+# setup-alert-action.yml
+# Создаёт Action для отправки алертов в Telegram для ВСЕХ хостов
+# Запускать после setup-telegram.yml
+---
+- name: Setup Alert Action for Telegram
+  hosts: zabbix
+  gather_facts: no
+  connection: local
+  vars:
+    zabbix_url: "http://{{ ansible_host }}/api_jsonrpc.php"
+    zabbix_user: "Admin"
+    zabbix_password: "zabbix"
+    action_name: "All Alerts to Telegram"
+
+  tasks:
+    - name: Login to Zabbix API
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "user.login"
+          params:
+            username: "{{ zabbix_user }}"
+            password: "{{ zabbix_password }}"
+          id: 1
+      register: zabbix_auth
+
+    - name: Set auth token
+      ansible.builtin.set_fact:
+        auth: "{{ zabbix_auth.json.result }}"
+
+    # Получить Telegram media type ID
+    - name: Get Telegram media type
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "mediatype.get"
+          params:
+            filter:
+              name: "Telegram"
+          auth: "{{ auth }}"
+          id: 2
+      register: telegram_mediatype
+
+    - name: Fail if Telegram not configured
+      ansible.builtin.fail:
+        msg: "Telegram media type not found! Run setup-telegram.yml first."
+      when: telegram_mediatype.json.result | length == 0
+
+    - name: Set Telegram media type ID
+      ansible.builtin.set_fact:
+        telegram_mediatypeid: "{{ telegram_mediatype.json.result[0].mediatypeid }}"
+
+    # Получить Admin user ID
+    - name: Get Admin user
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "user.get"
+          params:
+            filter:
+              username: "Admin"
+          auth: "{{ auth }}"
+          id: 3
+      register: admin_user
+
+    - name: Set Admin user ID
+      ansible.builtin.set_fact:
+        admin_userid: "{{ admin_user.json.result[0].userid }}"
+
+    # Удалить существующий action (идемпотентность)
+    - name: Get existing action
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "action.get"
+          params:
+            filter:
+              name: "{{ action_name }}"
+          auth: "{{ auth }}"
+          id: 4
+      register: existing_action
+
+    - name: Delete existing action
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "action.delete"
+          params:
+            - "{{ existing_action.json.result[0].actionid }}"
+          auth: "{{ auth }}"
+          id: 5
+      when: existing_action.json.result | length > 0
+
+    # Создать Action для всех триггеров
+    - name: Create alert action
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "action.create"
+          params:
+            name: "{{ action_name }}"
+            eventsource: 0
+            status: 0
+            esc_period: "1m"
+            filter:
+              evaltype: 0
+              conditions:
+                - conditiontype: 4
+                  operator: 5
+                  value: "3"
+            operations:
+              - operationtype: 0
+                esc_period: "0s"
+                esc_step_from: 1
+                esc_step_to: 1
+                opmessage:
+                  mediatypeid: "{{ telegram_mediatypeid }}"
+                  default_msg: 1
+                opmessage_usr:
+                  - userid: "{{ admin_userid }}"
+            recovery_operations:
+              - operationtype: 0
+                opmessage:
+                  mediatypeid: "{{ telegram_mediatypeid }}"
+                  default_msg: 1
+                opmessage_usr:
+                  - userid: "{{ admin_userid }}"
+          auth: "{{ auth }}"
+          id: 6
+      register: created_action
+
+    - name: Done
+      ansible.builtin.debug:
+        msg:
+          - "Action '{{ action_name }}' created"
+          - "Condition: Trigger severity >= Average (3)"
+          - "Operation: Send to Admin via Telegram"
+          - "Recovery: Send resolved notification"
