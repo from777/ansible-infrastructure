@@ -630,26 +630,34 @@ ansible-playbook -i inv.yml playbook.yml
 
 ---
 
-### 27. Структура inventory = структура папок
+### 27. Путь к плейбуку определяет Limit в Semaphore
 
-**Правило:** Имя группы в inventory ДОЛЖНО совпадать с именем папки в корне проекта.
+**Правило:** Имена папок в пути к плейбуку определяют какие группы хостов доступны в Limit. Каждая папка в пути, совпадающая с группой в inventory, добавляет свои хосты.
 
-| Папка | Группа в inventory | hosts: в плейбуках |
-|-------|-------------------|-------------------|
-| `mikrotik/` | `mikrotik` | `hosts: mikrotik` |
-| `zabbix/` | `zabbix` | `hosts: zabbix` |
-| `elk/` | `elk` | `hosts: elk` |
-| `windows/` | `windows` | `hosts: windows` |
+**Примеры:**
 
-**Если папки нет в inventory — она служебная:**
+| Путь к плейбуку | Папки-группы в пути | Limit показывает хосты |
+|-----------------|---------------------|------------------------|
+| `mikrotik/backup.yml` | mikrotik | группа `mikrotik` |
+| `zabbix/provision.yml` | zabbix | группа `zabbix` |
+| `zabbix/mikrotik/setup-hosts.yml` | zabbix, mikrotik | группы `zabbix` + `mikrotik` |
+| `zabbix/windows/setup-hosts.yml` | zabbix, windows | группы `zabbix` + `windows` |
+
+**Логика:**
+- Папка `mikrotik/` — плейбуки выполняются **на** роутерах MikroTik
+- Папка `zabbix/` — плейбуки выполняются **на** Zabbix сервере
+- Папка `zabbix/mikrotik/` — настройка мониторинга MikroTik **в** Zabbix (нужны оба: Zabbix API + данные из mikrotik)
+
+**Если папка не соответствует группе в inventory — она служебная:**
 - `backups/` — бэкапы, нет группы
 - `host_vars/` — переменные хостов, нет группы
 - `shared/` — общие таски, нет группы
+- `tasks/` — переиспользуемые таски, нет группы
 
 **При создании новой папки с плейбуками:**
-1. Создать группу с таким же именем в `inventory.yml`
-2. Добавить хосты в эту группу
-3. В плейбуках указывать `hosts: <имя_папки>`
+1. Если имя папки = группа в inventory → хосты этой группы будут в Limit
+2. Вложенные папки добавляют свои группы к Limit
+3. Служебные папки (shared, tasks) не влияют на Limit
 
 ---
 
