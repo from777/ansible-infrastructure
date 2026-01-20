@@ -20,7 +20,7 @@
     - name: Build list of hosts to monitor
       ansible.builtin.set_fact:
         kaspersky_hosts: "{{ kaspersky_hosts | default([]) + [item] }}"
-      loop: "{{ groups['windows_servers'] }}"
+      loop: "{{ groups['windows'] }}"
       when: hostvars[item].monitor_kaspersky | default(false)
 
     - name: Show hosts to monitor

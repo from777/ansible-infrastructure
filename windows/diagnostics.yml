@@ -3,7 +3,7 @@
 # Запуск: Task Template в Semaphore
 ---
 - name: Windows Server Diagnostics
-  hosts: windows_servers
+  hosts: windows
   gather_facts: no
 
   tasks:

@@ -70,7 +70,7 @@
     - name: Build Windows hosts to ADD
       ansible.builtin.set_fact:
         windows_hosts_to_add: "{{ windows_hosts_to_add | default([]) + [{'name': item, 'ip': item}] }}"
-      loop: "{{ groups['windows_servers'] }}"
+      loop: "{{ groups['windows'] }}"
 
     - name: Show hosts to add
       ansible.builtin.debug:

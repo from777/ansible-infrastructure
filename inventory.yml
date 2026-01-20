@@ -36,19 +36,19 @@ mikrotik:
         - admin
         - ansible
 
-zabbix_servers:
+zabbix:
   hosts:
-    zabbix:
+    zabbix-server:
       ansible_host: 192.168.0.81
       ansible_user: vagrant
 
-elk_servers:
+elk:
   hosts:
-    elk:
+    elk-server:
       ansible_host: 192.168.0.82
       ansible_user: vagrant
 
-windows_servers:
+windows:
   hosts:
     176.9.141.234:   # VPS
       monitor_kaspersky: false

@@ -2,7 +2,7 @@
 # Note: win_* modules have PSRP issues on some servers, using raw instead
 ---
 - name: Test Windows connection via WinRM
-  hosts: windows_servers
+  hosts: windows
   gather_facts: no
 
   tasks:
