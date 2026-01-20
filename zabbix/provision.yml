@@ -1,7 +1,7 @@
 # provision.yml
 ---
 - name: Install Zabbix Server with PostgreSQL
-  hosts: all
+  hosts: zabbix
   become: yes
 
   vars:

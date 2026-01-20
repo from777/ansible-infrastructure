@@ -8,7 +8,7 @@
   gather_facts: no
   vars:
     zabbix_version: "7.0.22"
-    zabbix_server: "192.168.0.81"
+    # zabbix_server берётся из inventory (windows.vars.zabbix_server)
     zabbix_msi_url: "https://cdn.zabbix.com/zabbix/binaries/stable/7.0/{{ zabbix_version }}/zabbix_agent2-{{ zabbix_version }}-windows-amd64-openssl.msi"
 
   tasks:

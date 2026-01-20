@@ -1,7 +1,7 @@
 вон # backup.yml
 ---
 - name: Backup Zabbix PostgreSQL database
-  hosts: all
+  hosts: zabbix
   become: yes
 
   vars:
