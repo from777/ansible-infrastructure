@@ -150,7 +150,7 @@
       when: item_age_check.json.result | length > 0
       ignore_errors: yes
 
-    - name: Create item kaspersky.db.age (trapper)
+    - name: Create item kaspersky.db.age (agent)
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
         method: POST
@@ -162,8 +162,9 @@
             name: "Kaspersky DB Age (days)"
             key_: "kaspersky.db.age"
             hostid: "{{ template_id }}"
-            type: 2
-            value_type: 0
+            type: 0
+            value_type: 3
+            delay: "1h"
             units: "days"
             description: "Возраст антивирусных баз Kaspersky в днях"
           auth: "{{ auth }}"
@@ -200,7 +201,7 @@
       when: item_status_check.json.result | length > 0
       ignore_errors: yes
 
-    - name: Create item kaspersky.status (trapper)
+    - name: Create item kaspersky.status (agent)
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
         method: POST
@@ -212,8 +213,9 @@
             name: "Kaspersky Status (productState)"
             key_: "kaspersky.status"
             hostid: "{{ template_id }}"
-            type: 2
+            type: 0
             value_type: 3
+            delay: "1h"
             description: "Статус Kaspersky (266240 = включен и обновлён)"
           auth: "{{ auth }}"
           id: 9
@@ -249,7 +251,7 @@
       when: item_date_check.json.result | length > 0
       ignore_errors: yes
 
-    - name: Create item kaspersky.db.date (trapper)
+    - name: Create item kaspersky.db.date (agent)
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
         method: POST
@@ -261,8 +263,9 @@
             name: "Kaspersky DB Update Date"
             key_: "kaspersky.db.date"
             hostid: "{{ template_id }}"
-            type: 2
+            type: 0
             value_type: 1
+            delay: "1h"
             description: "Дата последнего обновления баз Kaspersky"
           auth: "{{ auth }}"
           id: 11
