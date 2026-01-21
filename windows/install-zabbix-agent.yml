@@ -1,6 +1,5 @@
 # install-zabbix-agent.yml
 # Установка Zabbix Agent 2 на Windows серверы из ZIP архива
-# ZIP структура: bin/zabbix_agent2.exe, conf/zabbix_agent2.conf, conf/zabbix_agent2.d/
 #
 # Зависимости: нет
 # Хосты: windows
@@ -43,7 +42,7 @@
       ignore_errors: yes
 
     - name: Wait after cleanup
-      raw: 'timeout /t 2 /nobreak >nul'
+      raw: 'powershell -Command "Start-Sleep -Seconds 2"'
 
     # ========== DOWNLOAD AND EXTRACT ==========
     - name: Create temp directory
@@ -54,7 +53,6 @@
 
     - name: Download Zabbix Agent 2 ZIP
       raw: 'powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri ''{{ zabbix_zip_url }}'' -OutFile ''{{ temp_dir }}\zabbix_agent2.zip'' -UseBasicParsing"'
-      register: download_result
 
     - name: Remove old extracted folder if exists
       raw: 'powershell -Command "Remove-Item -Path ''{{ temp_dir }}\{{ zip_name }}'' -Recurse -Force -ErrorAction SilentlyContinue"'
@@ -63,58 +61,62 @@
       raw: 'powershell -Command "Expand-Archive -Path ''{{ temp_dir }}\zabbix_agent2.zip'' -DestinationPath ''{{ temp_dir }}'' -Force"'
 
     # ========== INSTALL ==========
-    - name: Create agent directory
-      raw: 'powershell -Command "New-Item -ItemType Directory -Path ''{{ agent_dir }}'' -Force | Out-Null"'
-
-    - name: Create bin directory
-      raw: 'powershell -Command "New-Item -ItemType Directory -Path ''{{ agent_dir }}\bin'' -Force | Out-Null"'
-
-    - name: Create conf directory
-      raw: 'powershell -Command "New-Item -ItemType Directory -Path ''{{ agent_dir }}\conf'' -Force | Out-Null"'
-
-    - name: Create zabbix_agent2.d directory
-      raw: 'powershell -Command "New-Item -ItemType Directory -Path ''{{ agent_dir }}\conf\zabbix_agent2.d'' -Force | Out-Null"'
-
-    - name: Create plugins.d directory
-      raw: 'powershell -Command "New-Item -ItemType Directory -Path ''{{ agent_dir }}\conf\zabbix_agent2.d\plugins.d'' -Force | Out-Null"'
+    - name: Create agent directories
+      raw: 'powershell -Command "New-Item -ItemType Directory -Path ''{{ agent_dir }}\bin'' -Force | Out-Null; New-Item -ItemType Directory -Path ''{{ agent_dir }}\conf\zabbix_agent2.d\plugins.d'' -Force | Out-Null"'
 
     - name: Copy zabbix_agent2.exe
       raw: 'powershell -Command "Copy-Item -Path ''{{ temp_dir }}\{{ zip_name }}\bin\zabbix_agent2.exe'' -Destination ''{{ agent_dir }}\bin\'' -Force"'
 
+    - name: Verify exe copied
+      raw: 'powershell -Command "Test-Path ''{{ agent_dir }}\bin\zabbix_agent2.exe''"'
+      register: exe_check
+
+    - name: Fail if exe not found
+      ansible.builtin.fail:
+        msg: "Failed to copy zabbix_agent2.exe to {{ agent_dir }}\\bin\\"
+      when: "'False' in exe_check.stdout"
+
     # ========== CONFIG ==========
     - name: Create zabbix_agent2.conf
-      raw: |
-        powershell -Command "$conf = @'
-        LogFile={{ agent_dir }}\zabbix_agent2.log
-        LogFileSize=10
-        Server={{ zabbix_server }}
-        ServerActive={{ zabbix_server }}
-        Hostname={{ clean_hostname }}
-        ControlSocket=\\.\pipe\agent.sock
-        Include={{ agent_dir }}\conf\zabbix_agent2.d\*.conf
-        '@; $conf | Out-File -FilePath '{{ agent_dir }}\conf\zabbix_agent2.conf' -Encoding ASCII -Force"
+      raw: 'powershell -Command "Set-Content -Path ''{{ agent_dir }}\conf\zabbix_agent2.conf'' -Value ''LogFile={{ agent_dir }}\zabbix_agent2.log`r`nLogFileSize=10`r`nServer={{ zabbix_server }}`r`nServerActive={{ zabbix_server }}`r`nHostname={{ clean_hostname }}`r`nControlSocket=\\.\pipe\agent.sock`r`nInclude={{ agent_dir }}\conf\zabbix_agent2.d\*.conf'' -Encoding ASCII"'
+
+    - name: Verify config created
+      raw: 'powershell -Command "Test-Path ''{{ agent_dir }}\conf\zabbix_agent2.conf''"'
+      register: conf_check
+
+    - name: Show config content
+      raw: 'powershell -Command "Get-Content ''{{ agent_dir }}\conf\zabbix_agent2.conf''"'
+      register: conf_content
+
+    - name: Debug config
+      ansible.builtin.debug:
+        msg: "Config content: {{ conf_content.stdout }}"
 
     # ========== SERVICE ==========
     - name: Install Zabbix Agent 2 as Windows service
-      raw: 'powershell -Command "Start-Process -FilePath ''{{ agent_dir }}\bin\zabbix_agent2.exe'' -ArgumentList ''--config'',''{{ agent_dir }}\conf\zabbix_agent2.conf'',''--install'' -Wait -NoNewWindow -PassThru | Select-Object -ExpandProperty ExitCode"'
+      raw: 'powershell -Command "& ''{{ agent_dir }}\bin\zabbix_agent2.exe'' --config ''{{ agent_dir }}\conf\zabbix_agent2.conf'' --install 2>&1"'
       register: install_service
 
+    - name: Debug service install
+      ansible.builtin.debug:
+        msg: "Install result: {{ install_service.stdout | default('') }} {{ install_service.stderr | default('') }}"
+
     - name: Start Zabbix Agent 2 service
-      raw: 'powershell -Command "Start-Service -Name ''Zabbix Agent 2''"'
+      raw: 'powershell -Command "Start-Service -Name ''Zabbix Agent 2'' -ErrorAction Stop"'
       register: start_service
       ignore_errors: yes
 
     - name: Wait for service to start
-      raw: 'timeout /t 3 /nobreak >nul'
+      raw: 'powershell -Command "Start-Sleep -Seconds 3"'
 
     # ========== VERIFY ==========
     - name: Get service status
-      raw: 'powershell -Command "Get-Service -Name ''Zabbix Agent 2'' | Select-Object Status,DisplayName | Format-List"'
+      raw: 'powershell -Command "Get-Service -Name ''Zabbix Agent 2'' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Status"'
       register: final_status
       ignore_errors: yes
 
     - name: Get agent log (last 5 lines)
-      raw: 'powershell -Command "if (Test-Path ''{{ agent_dir }}\zabbix_agent2.log'') { Get-Content ''{{ agent_dir }}\zabbix_agent2.log'' -Tail 5 }"'
+      raw: 'powershell -Command "if (Test-Path ''{{ agent_dir }}\zabbix_agent2.log'') { Get-Content ''{{ agent_dir }}\zabbix_agent2.log'' -Tail 5 } else { ''no log file'' }"'
       register: agent_log
       ignore_errors: yes
 
@@ -124,10 +126,10 @@
           - "=== {{ inventory_hostname }} ({{ clean_hostname }}) ==="
           - "Zabbix Server: {{ zabbix_server }}"
           - "Install dir: {{ agent_dir }}"
-          - "Service: {{ final_status.stdout | default('NOT FOUND') | trim }}"
-          - "Log: {{ agent_log.stdout | default('no log') | trim }}"
+          - "Service Status: {{ final_status.stdout | default('NOT FOUND') | trim }}"
+          - "Agent log: {{ agent_log.stdout | default('no log') | trim }}"
 
     # ========== CLEANUP TEMP ==========
     - name: Remove temp files
-      raw: 'powershell -Command "Remove-Item -Path ''{{ temp_dir }}\zabbix_agent2.zip'' -Force -ErrorAction SilentlyContinue; Remove-Item -Path ''{{ temp_dir }}\{{ zip_name }}'' -Recurse -Force -ErrorAction SilentlyContinue"'
+      raw: 'powershell -Command "Remove-Item -Path ''{{ temp_dir }}\zabbix_agent2.zip'',''{{ temp_dir }}\{{ zip_name }}'' -Recurse -Force -ErrorAction SilentlyContinue"'
       ignore_errors: yes
