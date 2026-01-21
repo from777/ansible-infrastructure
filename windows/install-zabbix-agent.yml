@@ -176,17 +176,14 @@
         msg: "{{ conf_content.stdout }}"
 
     # ========== FINAL CHECK BEFORE SERVICE INSTALL ==========
-    - name: Final check - registry key should NOT exist
-      raw: 'reg query "HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\Zabbix Agent 2" 2>&1 || echo "Key not found - OK"'
-      register: final_reg_check
-
-    - name: Delete registry key again if exists
+    - name: Final cleanup - delete registry key again just in case
       raw: 'reg delete "HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\Zabbix Agent 2" /f 2>&1'
+      register: final_reg_cleanup
       ignore_errors: yes
 
-    - name: DEBUG - Final registry check
+    - name: DEBUG - Final registry cleanup
       ansible.builtin.debug:
-        msg: "{{ final_reg_check.stdout }}"
+        msg: "{{ final_reg_cleanup.stdout | default('no output') }}"
 
     # ========== SERVICE ==========
     - name: Install Zabbix Agent 2 as Windows service
