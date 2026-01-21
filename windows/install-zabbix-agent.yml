@@ -37,6 +37,10 @@
       raw: 'sc.exe delete "Zabbix Agent 2"'
       ignore_errors: yes
 
+    - name: Delete EventLog registry key (leftover from previous install)
+      raw: 'powershell -Command "Remove-Item -Path ''HKLM:\SYSTEM\CurrentControlSet\Services\EventLog\Application\Zabbix Agent 2'' -Recurse -Force -ErrorAction SilentlyContinue"'
+      ignore_errors: yes
+
     - name: Remove old agent folder
       raw: 'powershell -Command "Remove-Item -Path ''{{ agent_dir }}'' -Recurse -Force -ErrorAction SilentlyContinue"'
       ignore_errors: yes
