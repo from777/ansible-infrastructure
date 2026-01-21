@@ -661,4 +661,66 @@ ansible-playbook -i inv.yml playbook.yml
 
 ---
 
-## Дата обновления: 2026-01-20
+### 28. Описание в начале каждого playbook
+
+**Правило:** Каждый playbook ОБЯЗАТЕЛЬНО должен начинаться с комментария-описания:
+
+```yaml
+# имя-файла.yml
+# Краткое описание что делает плейбук (1-2 строки)
+#
+# Зависимости: какие плейбуки запустить ДО этого (если есть)
+# Хосты: на каких хостах выполняется (группа из inventory)
+# Переменные: какие переменные нужны (vault, extra vars, и т.д.)
+---
+```
+
+**Пример:**
+```yaml
+# monitoring-kaspersky.yml
+# Создаёт template для мониторинга Kaspersky и привязывает к Windows хостам
+#
+# Зависимости: setup-telegram.yml, setup-alert-action.yml
+# Хосты: zabbix (выполняется на Zabbix сервере)
+# Переменные: zabbix_user, zabbix_password (из group_vars/all.yml)
+---
+```
+
+**Минимальный вариант для простых плейбуков:**
+```yaml
+# backup.yml
+# Создаёт бэкап конфигурации роутера
+---
+```
+
+---
+
+### 29. Креды для API выносить в group_vars
+
+**Правило:** Логины/пароли/токены для API НЕ хардкодить в каждом плейбуке. Выносить в `group_vars/all.yml` или использовать Vault.
+
+**Неправильно:**
+```yaml
+# В каждом плейбуке повторяется:
+vars:
+  zabbix_user: "Admin"
+  zabbix_password: "zabbix"
+```
+
+**Правильно:**
+```yaml
+# group_vars/all.yml:
+zabbix_user: "Admin"
+zabbix_password: "zabbix"  # или через Vault
+
+# В плейбуке — без vars, берётся автоматически из group_vars
+```
+
+**Где хранить креды:**
+- `group_vars/all.yml` — общие для всех (zabbix_user, tg_token)
+- `group_vars/<group>.yml` — специфичные для группы
+- Ansible Vault — для production (зашифрованные)
+
+---
+
+## Дата обновления: 2026-01-21
