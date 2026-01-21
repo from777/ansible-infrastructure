@@ -159,8 +159,9 @@
         msg: "{{ exe_check.stdout | trim }}"
 
     # ========== CONFIG ==========
+    # Hostname = inventory_hostname (IP) чтобы совпадать с именем хоста в Zabbix
     - name: Create zabbix_agent2.conf
-      raw: 'powershell -Command "Set-Content -Path ''{{ agent_dir }}\conf\zabbix_agent2.conf'' -Value ''LogFile={{ agent_dir }}\zabbix_agent2.log`r`nLogFileSize=10`r`nServer={{ zabbix_server }}`r`nServerActive={{ zabbix_server }}`r`nHostname={{ clean_hostname }}`r`nControlSocket=\\.\pipe\agent.sock`r`nInclude={{ agent_dir }}\conf\zabbix_agent2.d\*.conf'' -Encoding ASCII; Write-Host ''Created config''"'
+      raw: 'powershell -Command "Set-Content -Path ''{{ agent_dir }}\conf\zabbix_agent2.conf'' -Value ''LogFile={{ agent_dir }}\zabbix_agent2.log`r`nLogFileSize=10`r`nServer={{ zabbix_server }}`r`nServerActive={{ zabbix_server }}`r`nHostname={{ inventory_hostname }}`r`nControlSocket=\\.\pipe\agent.sock`r`nInclude={{ agent_dir }}\conf\zabbix_agent2.d\*.conf'' -Encoding ASCII; Write-Host ''Created config''"'
       register: config_result
 
     - name: DEBUG - config result
@@ -229,7 +230,9 @@
       ansible.builtin.debug:
         msg:
           - "============================================"
-          - "HOST: {{ inventory_hostname }} ({{ clean_hostname }})"
+          - "HOST: {{ inventory_hostname }}"
+          - "WINDOWS HOSTNAME: {{ clean_hostname }}"
+          - "ZABBIX HOSTNAME: {{ inventory_hostname }} (same as IP for Zabbix match)"
           - "ZABBIX SERVER: {{ zabbix_server }}"
           - "INSTALL DIR: {{ agent_dir }}"
           - "SERVICE STATUS: {{ final_status.stdout | default('NOT FOUND') | trim }}"
