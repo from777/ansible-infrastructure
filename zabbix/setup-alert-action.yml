@@ -8,8 +8,7 @@
   connection: local
   vars:
     zabbix_url: "http://{{ ansible_host }}/api_jsonrpc.php"
-    zabbix_user: "Admin"
-    zabbix_password: "zabbix"
+    # zabbix_user и zabbix_password берутся из inventory.yml
     action_name: "All Alerts to Telegram"
 
   tasks:
