@@ -116,8 +116,10 @@
       ansible.builtin.set_fact:
         template_id: "{{ template_final.json.result[0].templateid }}"
 
-    # Create Items
-    - name: Check if db.age item exists
+    # Delete and recreate Items as Zabbix Trapper (type: 2)
+    # Trapper items receive data from zabbix_sender, scripts, etc.
+
+    - name: Get existing db.age item
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
         method: POST
@@ -133,7 +135,22 @@
           id: 6
       register: item_age_check
 
-    - name: Create item kaspersky.db.age
+    - name: Delete existing db.age item
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "item.delete"
+          params:
+            - "{{ item_age_check.json.result[0].itemid }}"
+          auth: "{{ auth }}"
+          id: 61
+      when: item_age_check.json.result | length > 0
+      ignore_errors: yes
+
+    - name: Create item kaspersky.db.age (trapper)
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
         method: POST
@@ -145,16 +162,14 @@
             name: "Kaspersky DB Age (days)"
             key_: "kaspersky.db.age"
             hostid: "{{ template_id }}"
-            type: 0
+            type: 2
             value_type: 0
-            delay: "1h"
             units: "days"
             description: "Возраст антивирусных баз Kaspersky в днях"
           auth: "{{ auth }}"
           id: 7
-      when: item_age_check.json.result | length == 0
 
-    - name: Check if status item exists
+    - name: Get existing status item
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
         method: POST
@@ -170,7 +185,22 @@
           id: 8
       register: item_status_check
 
-    - name: Create item kaspersky.status
+    - name: Delete existing status item
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "item.delete"
+          params:
+            - "{{ item_status_check.json.result[0].itemid }}"
+          auth: "{{ auth }}"
+          id: 81
+      when: item_status_check.json.result | length > 0
+      ignore_errors: yes
+
+    - name: Create item kaspersky.status (trapper)
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
         method: POST
@@ -182,15 +212,13 @@
             name: "Kaspersky Status (productState)"
             key_: "kaspersky.status"
             hostid: "{{ template_id }}"
-            type: 0
+            type: 2
             value_type: 3
-            delay: "1h"
             description: "Статус Kaspersky (266240 = включен и обновлён)"
           auth: "{{ auth }}"
           id: 9
-      when: item_status_check.json.result | length == 0
 
-    - name: Check if db.date item exists
+    - name: Get existing db.date item
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
         method: POST
@@ -206,7 +234,22 @@
           id: 10
       register: item_date_check
 
-    - name: Create item kaspersky.db.date
+    - name: Delete existing db.date item
+      ansible.builtin.uri:
+        url: "{{ zabbix_url }}"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "item.delete"
+          params:
+            - "{{ item_date_check.json.result[0].itemid }}"
+          auth: "{{ auth }}"
+          id: 101
+      when: item_date_check.json.result | length > 0
+      ignore_errors: yes
+
+    - name: Create item kaspersky.db.date (trapper)
       ansible.builtin.uri:
         url: "{{ zabbix_url }}"
         method: POST
@@ -218,13 +261,11 @@
             name: "Kaspersky DB Update Date"
             key_: "kaspersky.db.date"
             hostid: "{{ template_id }}"
-            type: 0
+            type: 2
             value_type: 1
-            delay: "1h"
             description: "Дата последнего обновления баз Kaspersky"
           auth: "{{ auth }}"
           id: 11
-      when: item_date_check.json.result | length == 0
 
     # Create Trigger (delete and recreate for idempotency)
     - name: Get existing trigger
