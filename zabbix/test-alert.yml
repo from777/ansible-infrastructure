@@ -12,7 +12,7 @@
 - name: Test Alert via zabbix_sender
   hosts: zabbix
   gather_facts: no
-  connection: local
+  # Выполняется на Zabbix сервере по SSH (там установлен zabbix_sender)
   vars:
     test_host: "192.168.0.243"
     test_item: "kaspersky.status"
@@ -35,12 +35,11 @@
       ansible.builtin.command:
         cmd: >
           zabbix_sender
-          -z {{ ansible_host }}
+          -z localhost
           -s "{{ test_host }}"
           -k "{{ test_item }}"
           -o "{{ bad_value }}"
       register: send_bad
-      delegate_to: localhost
 
     - name: Show send result
       ansible.builtin.debug:
@@ -58,12 +57,11 @@
       ansible.builtin.command:
         cmd: >
           zabbix_sender
-          -z {{ ansible_host }}
+          -z localhost
           -s "{{ test_host }}"
           -k "{{ test_item }}"
           -o "{{ good_value }}"
       register: send_good
-      delegate_to: localhost
 
     - name: Show recovery result
       ansible.builtin.debug:
