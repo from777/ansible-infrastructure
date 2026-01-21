@@ -12,7 +12,7 @@
   vars:
     zabbix_version: "7.0.22"
     agent_dir: 'C:\Program Files\Zabbix Agent 2'
-    zabbix_zip_url: "https://cdn.zabbix.com/zabbix/binaries/stable/7.0/{{ zabbix_version }}/zabbix_agent2-{{ zabbix_version }}-windows-amd64-openssl.zip"
+    zabbix_zip_url: "https://cdn.zabbix.com/zabbix/binaries/stable/7.0/{{ zabbix_version }}/zabbix_agent2-{{ zabbix_version }}-windows-amd64-openssl-static.zip"
 
   tasks:
     - name: Get hostname for Zabbix
