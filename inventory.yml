@@ -41,6 +41,7 @@ zabbix:
     zabbix-server:
       ansible_host: 192.168.0.81
       ansible_user: vagrant
+      ansible_password: vagrant
   vars:
     zabbix_user: "Admin"
     zabbix_password: "zabbix"
