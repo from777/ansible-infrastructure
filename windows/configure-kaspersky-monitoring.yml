@@ -166,13 +166,6 @@
       ansible.builtin.debug:
         msg: "{{ kaspersky_conf_content.stdout }}"
 
-    - name: Check first bytes of kaspersky.conf (BOM check)
-      raw: 'powershell -Command "$bytes = [IO.File]::ReadAllBytes(''{{ agent_dir }}\conf\zabbix_agent2.d\kaspersky.conf''); Write-Host ''First 10 bytes:'' ($bytes[0..9] -join '','')"'
-      register: conf_bytes
-
-    - name: DEBUG - First bytes (BOM = 239,187,191)
-      ansible.builtin.debug:
-        msg: "{{ conf_bytes.stdout | trim }} (BOM would be 239,187,191 at start)"
 
     # ========== RESTART AGENT ==========
     - name: Get service status before restart
