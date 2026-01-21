@@ -50,12 +50,14 @@
 
     - name: Remove old ZIP if exists
       raw: 'powershell -Command "Remove-Item -Path ''{{ temp_dir }}\zabbix_agent2.zip'' -Force -ErrorAction SilentlyContinue"'
+      ignore_errors: yes
 
     - name: Download Zabbix Agent 2 ZIP
       raw: 'powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri ''{{ zabbix_zip_url }}'' -OutFile ''{{ temp_dir }}\zabbix_agent2.zip'' -UseBasicParsing"'
 
     - name: Remove old extracted folder if exists
       raw: 'powershell -Command "Remove-Item -Path ''{{ temp_dir }}\{{ zip_name }}'' -Recurse -Force -ErrorAction SilentlyContinue"'
+      ignore_errors: yes
 
     - name: Extract ZIP to temp
       raw: 'powershell -Command "Expand-Archive -Path ''{{ temp_dir }}\zabbix_agent2.zip'' -DestinationPath ''{{ temp_dir }}'' -Force"'
