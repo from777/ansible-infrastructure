@@ -39,7 +39,7 @@
         msg: "{{ stop_result.stdout | default('no output') }}"
 
     - name: Uninstall Zabbix Agent 2 service via exe
-      raw: 'powershell -Command "if (Test-Path ''{{ agent_dir }}\bin\zabbix_agent2.exe'') { & ''{{ agent_dir }}\bin\zabbix_agent2.exe'' --uninstall 2>&1 } else { Write-Host ''exe not found, skip uninstall'' }"'
+      raw: 'powershell -Command "if (Test-Path ''{{ agent_dir }}\bin\zabbix_agent2.exe'') { & ''{{ agent_dir }}\bin\zabbix_agent2.exe'' --config ''{{ agent_dir }}\conf\zabbix_agent2.conf'' --uninstall 2>&1 } else { Write-Host ''exe not found, skip uninstall'' }"'
       register: uninstall_result
       ignore_errors: yes
 
@@ -57,7 +57,7 @@
         msg: "{{ sc_result.stdout | default('no output') }}"
 
     - name: Delete EventLog registry key
-      raw: 'powershell -Command "$path = ''HKLM:\SYSTEM\CurrentControlSet\Services\EventLog\Application\Zabbix Agent 2''; if (Test-Path $path) { Remove-Item -Path $path -Recurse -Force; Write-Host ''Deleted registry key'' } else { Write-Host ''Registry key not found'' }"'
+      raw: 'reg delete "HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\Zabbix Agent 2" /f 2>&1'
       register: reg_result
       ignore_errors: yes
 
@@ -177,8 +177,12 @@
 
     # ========== FINAL CHECK BEFORE SERVICE INSTALL ==========
     - name: Final check - registry key should NOT exist
-      raw: 'powershell -Command "$exists = Test-Path ''HKLM:\SYSTEM\CurrentControlSet\Services\EventLog\Application\Zabbix Agent 2''; Write-Host ''Registry key exists:'' $exists; if ($exists) { Write-Host ''WARNING: Key still exists, trying to delete again''; Remove-Item -Path ''HKLM:\SYSTEM\CurrentControlSet\Services\EventLog\Application\Zabbix Agent 2'' -Recurse -Force -ErrorAction SilentlyContinue }"'
+      raw: 'reg query "HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\Zabbix Agent 2" 2>&1 || echo "Key not found - OK"'
       register: final_reg_check
+
+    - name: Delete registry key again if exists
+      raw: 'reg delete "HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\Zabbix Agent 2" /f 2>&1'
+      ignore_errors: yes
 
     - name: DEBUG - Final registry check
       ansible.builtin.debug:
