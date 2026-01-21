@@ -75,7 +75,7 @@
 
     # ========== CREATE KASPERSKY SCRIPTS ==========
     - name: Create kaspersky-db-age.ps1
-      raw: 'powershell -Command "$enc = [System.Text.UTF8Encoding]::new($false); [IO.File]::WriteAllText(''{{ scripts_dir }}\kaspersky-db-age.ps1'', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(''{{ script_db_age_b64 }}'')), $enc); Write-Host ''Created kaspersky-db-age.ps1''"'
+      raw: 'powershell -Command "[IO.File]::WriteAllBytes(''{{ scripts_dir }}\kaspersky-db-age.ps1'', [Convert]::FromBase64String(''{{ script_db_age_b64 }}'')); Write-Host ''Created kaspersky-db-age.ps1''"'
       register: script_age_result
 
     - name: DEBUG - kaspersky-db-age.ps1 result
@@ -91,7 +91,7 @@
         msg: "{{ script_age_check.stdout | trim }}"
 
     - name: Create kaspersky-status.ps1
-      raw: 'powershell -Command "$enc = [System.Text.UTF8Encoding]::new($false); [IO.File]::WriteAllText(''{{ scripts_dir }}\kaspersky-status.ps1'', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(''{{ script_status_b64 }}'')), $enc); Write-Host ''Created kaspersky-status.ps1''"'
+      raw: 'powershell -Command "[IO.File]::WriteAllBytes(''{{ scripts_dir }}\kaspersky-status.ps1'', [Convert]::FromBase64String(''{{ script_status_b64 }}'')); Write-Host ''Created kaspersky-status.ps1''"'
       register: script_status_result
 
     - name: DEBUG - kaspersky-status.ps1 result
@@ -107,7 +107,7 @@
         msg: "{{ script_status_check.stdout | trim }}"
 
     - name: Create kaspersky-db-date.ps1
-      raw: 'powershell -Command "$enc = [System.Text.UTF8Encoding]::new($false); [IO.File]::WriteAllText(''{{ scripts_dir }}\kaspersky-db-date.ps1'', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(''{{ script_db_date_b64 }}'')), $enc); Write-Host ''Created kaspersky-db-date.ps1''"'
+      raw: 'powershell -Command "[IO.File]::WriteAllBytes(''{{ scripts_dir }}\kaspersky-db-date.ps1'', [Convert]::FromBase64String(''{{ script_db_date_b64 }}'')); Write-Host ''Created kaspersky-db-date.ps1''"'
       register: script_date_result
 
     - name: DEBUG - kaspersky-db-date.ps1 result
@@ -151,7 +151,7 @@
       when: conf_dir_create is defined
 
     - name: Create kaspersky.conf
-      raw: 'powershell -Command "$enc = [System.Text.UTF8Encoding]::new($false); [IO.File]::WriteAllText(''{{ agent_dir }}\conf\zabbix_agent2.d\kaspersky.conf'', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(''{{ kaspersky_conf_b64 }}'')), $enc); Write-Host ''Created kaspersky.conf''"'
+      raw: 'powershell -Command "[IO.File]::WriteAllBytes(''{{ agent_dir }}\conf\zabbix_agent2.d\kaspersky.conf'', [Convert]::FromBase64String(''{{ kaspersky_conf_b64 }}'')); Write-Host ''Created kaspersky.conf''"'
       register: kaspersky_conf_result
 
     - name: DEBUG - kaspersky.conf result
