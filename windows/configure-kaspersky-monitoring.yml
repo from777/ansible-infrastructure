@@ -1,63 +1,252 @@
 # configure-kaspersky-monitoring.yml
 # Настройка UserParameter для мониторинга Kaspersky через Zabbix Agent 2
+#
+# Зависимости: install-zabbix-agent.yml (агент должен быть установлен)
+# Хосты: windows
+# Путь установки агента: C:\Zabbix (соответствует install-zabbix-agent.yml)
 ---
 - name: Configure Kaspersky monitoring on Zabbix Agent 2
   hosts: windows
   gather_facts: no
   vars:
-    agent_dir: 'C:\Program Files\Zabbix Agent 2'
-    scripts_dir: 'C:\Program Files\Zabbix Agent 2\scripts'
+    agent_dir: 'C:\Zabbix'
+    scripts_dir: 'C:\Zabbix\scripts'
     # Base64 encoded scripts - используют WMI SecurityCenter2 вместо файлов (самозащита Kaspersky)
     # Используем InvariantCulture для вывода числа с точкой (не запятой)
     script_db_age_b64: "JGF2ID0gR2V0LUNpbUluc3RhbmNlIC1OYW1lc3BhY2Ugcm9vdC9TZWN1cml0eUNlbnRlcjIgLUNsYXNzTmFtZSBBbnRpdmlydXNQcm9kdWN0IC1FcnJvckFjdGlvbiBTaWxlbnRseUNvbnRpbnVlIHwgV2hlcmUtT2JqZWN0IHsgJF8uZGlzcGxheU5hbWUgLWxpa2UgJypLYXNwZXJza3kqJyB9IHwgU2VsZWN0LU9iamVjdCAtRmlyc3QgMQppZiAoJGF2IC1hbmQgJGF2LnRpbWVzdGFtcCkgewogICAgJHRzID0gW0RhdGVUaW1lXTo6UGFyc2VFeGFjdCgkYXYudGltZXN0YW1wLCAnZGRkLCBkZCBNTU0geXl5eSBISDptbTpzcyBHTVQnLCBbU3lzdGVtLkdsb2JhbGl6YXRpb24uQ3VsdHVyZUluZm9dOjpJbnZhcmlhbnRDdWx0dXJlKQogICAgJGRheXMgPSBbbWF0aF06OlJvdW5kKCgoR2V0LURhdGUpIC0gJHRzKS5Ub3RhbERheXMsIDEpCiAgICAkZGF5cy5Ub1N0cmluZyhbU3lzdGVtLkdsb2JhbGl6YXRpb24uQ3VsdHVyZUluZm9dOjpJbnZhcmlhbnRDdWx0dXJlKQp9IGVsc2UgeyAtMSB9Cg=="
     script_status_b64: "JGF2ID0gR2V0LUNpbUluc3RhbmNlIC1OYW1lc3BhY2Ugcm9vdC9TZWN1cml0eUNlbnRlcjIgLUNsYXNzTmFtZSBBbnRpdmlydXNQcm9kdWN0IC1FcnJvckFjdGlvbiBTaWxlbnRseUNvbnRpbnVlIHwgV2hlcmUtT2JqZWN0IHsgJF8uZGlzcGxheU5hbWUgLWxpa2UgJypLYXNwZXJza3kqJyB9IHwgU2VsZWN0LU9iamVjdCAtRmlyc3QgMQ0KaWYgKCRhdikgeyAkYXYucHJvZHVjdFN0YXRlIH0gZWxzZSB7IDAgfQ=="
     script_db_date_b64: "JGF2ID0gR2V0LUNpbUluc3RhbmNlIC1OYW1lc3BhY2Ugcm9vdC9TZWN1cml0eUNlbnRlcjIgLUNsYXNzTmFtZSBBbnRpdmlydXNQcm9kdWN0IC1FcnJvckFjdGlvbiBTaWxlbnRseUNvbnRpbnVlIHwgV2hlcmUtT2JqZWN0IHsgJF8uZGlzcGxheU5hbWUgLWxpa2UgJypLYXNwZXJza3kqJyB9IHwgU2VsZWN0LU9iamVjdCAtRmlyc3QgMQppZiAoJGF2IC1hbmQgJGF2LnRpbWVzdGFtcCkgewogICAgJHRzID0gW0RhdGVUaW1lXTo6UGFyc2VFeGFjdCgkYXYudGltZXN0YW1wLCAnZGRkLCBkZCBNTU0geXl5eSBISDptbTpzcyBHTVQnLCBbU3lzdGVtLkdsb2JhbGl6YXRpb24uQ3VsdHVyZUluZm9dOjpJbnZhcmlhbnRDdWx0dXJlKQogICAgJHRzLlRvU3RyaW5nKCd5eXl5LU1NLWRkIEhIOm1tJykKfSBlbHNlIHsgJ04vQScgfQo="
-    kaspersky_conf_b64: "IyBLYXNwZXJza3kgbW9uaXRvcmluZw0KVXNlclBhcmFtZXRlcj1rYXNwZXJza3kuZGIuYWdlLHBvd2Vyc2hlbGwgLU5vUHJvZmlsZSAtRXhlY3V0aW9uUG9saWN5IEJ5cGFzcyAtRmlsZSAiQzpcUHJvZ3JhbSBGaWxlc1xaYWJiaXggQWdlbnQgMlxzY3JpcHRzXGthc3BlcnNreS1kYi1hZ2UucHMxIg0KVXNlclBhcmFtZXRlcj1rYXNwZXJza3kuc3RhdHVzLHBvd2Vyc2hlbGwgLU5vUHJvZmlsZSAtRXhlY3V0aW9uUG9saWN5IEJ5cGFzcyAtRmlsZSAiQzpcUHJvZ3JhbSBGaWxlc1xaYWJiaXggQWdlbnQgMlxzY3JpcHRzXGthc3BlcnNreS1zdGF0dXMucHMxIg0KVXNlclBhcmFtZXRlcj1rYXNwZXJza3kuZGIuZGF0ZSxwb3dlcnNoZWxsIC1Ob1Byb2ZpbGUgLUV4ZWN1dGlvblBvbGljeSBCeXBhc3MgLUZpbGUgIkM6XFByb2dyYW0gRmlsZXNcWmFiYml4IEFnZW50IDJcc2NyaXB0c1xrYXNwZXJza3ktZGItZGF0ZS5wczEi"
+    # Base64 kaspersky.conf с путями C:\Zabbix\scripts\
+    kaspersky_conf_b64: "IyBLYXNwZXJza3kgbW9uaXRvcmluZw0KVXNlclBhcmFtZXRlcj1rYXNwZXJza3kuZGIuYWdlLHBvd2Vyc2hlbGwgLU5vUHJvZmlsZSAtRXhlY3V0aW9uUG9saWN5IEJ5cGFzcyAtRmlsZSAiQzpcWmFiYml4XHNjcmlwdHNca2FzcGVyc2t5LWRiLWFnZS5wczEiDQpVc2VyUGFyYW1ldGVyPWthc3BlcnNreS5zdGF0dXMscG93ZXJzaGVsbCAtTm9Qcm9maWxlIC1FeGVjdXRpb25Qb2xpY3kgQnlwYXNzIC1GaWxlICJDOlxaYWJiaXhcc2NyaXB0c1xrYXNwZXJza3ktc3RhdHVzLnBzMSINClVzZXJQYXJhbWV0ZXI9a2FzcGVyc2t5LmRiLmRhdGUscG93ZXJzaGVsbCAtTm9Qcm9maWxlIC1FeGVjdXRpb25Qb2xpY3kgQnlwYXNzIC1GaWxlICJDOlxaYWJiaXhcc2NyaXB0c1xrYXNwZXJza3ktZGItZGF0ZS5wczEi"
 
   tasks:
-    - name: Check if Zabbix Agent 2 installed
-      raw: 'powershell -Command "Test-Path ''{{ agent_dir }}''"'
+    - name: Show configuration
+      ansible.builtin.debug:
+        msg:
+          - "============================================"
+          - "HOST: {{ inventory_hostname }}"
+          - "AGENT DIR: {{ agent_dir }}"
+          - "SCRIPTS DIR: {{ scripts_dir }}"
+          - "============================================"
+
+    # ========== CHECK AGENT INSTALLED ==========
+    - name: Check if Zabbix Agent 2 directory exists
+      raw: 'powershell -Command "if (Test-Path ''{{ agent_dir }}'') { Write-Host ''EXISTS'' } else { Write-Host ''NOT_FOUND'' }"'
       register: agent_dir_check
+
+    - name: DEBUG - Agent directory check
+      ansible.builtin.debug:
+        msg: "Agent directory {{ agent_dir }}: {{ agent_dir_check.stdout | trim }}"
 
     - name: Fail if agent not installed
       ansible.builtin.fail:
-        msg: "Zabbix Agent 2 not installed on {{ inventory_hostname }}. Run install-zabbix-agent.yml first."
-      when: "'False' in agent_dir_check.stdout"
+        msg: "Zabbix Agent 2 not installed on {{ inventory_hostname }}. Directory {{ agent_dir }} not found. Run install-zabbix-agent.yml first."
+      when: "'NOT_FOUND' in agent_dir_check.stdout"
 
+    - name: Check if zabbix_agent2.exe exists
+      raw: 'powershell -Command "if (Test-Path ''{{ agent_dir }}\bin\zabbix_agent2.exe'') { Write-Host ''EXISTS'' } else { Write-Host ''NOT_FOUND'' }"'
+      register: exe_check
+
+    - name: DEBUG - Agent exe check
+      ansible.builtin.debug:
+        msg: "Agent exe {{ agent_dir }}\\bin\\zabbix_agent2.exe: {{ exe_check.stdout | trim }}"
+
+    - name: Fail if exe not found
+      ansible.builtin.fail:
+        msg: "zabbix_agent2.exe not found in {{ agent_dir }}\\bin\\. Agent installation is broken."
+      when: "'NOT_FOUND' in exe_check.stdout"
+
+    # ========== CREATE SCRIPTS DIRECTORY ==========
     - name: Create scripts directory
-      raw: 'powershell -Command "New-Item -ItemType Directory -Path ''{{ scripts_dir }}'' -Force | Out-Null"'
+      raw: 'powershell -Command "New-Item -ItemType Directory -Path ''{{ scripts_dir }}'' -Force | Out-Null; Write-Host ''Created scripts directory''"'
+      register: scripts_dir_result
 
+    - name: DEBUG - Scripts directory result
+      ansible.builtin.debug:
+        msg: "{{ scripts_dir_result.stdout | default('no output') }}"
+
+    - name: Verify scripts directory exists
+      raw: 'powershell -Command "if (Test-Path ''{{ scripts_dir }}'') { Write-Host ''EXISTS'' } else { Write-Host ''NOT_FOUND'' }"'
+      register: scripts_dir_check
+
+    - name: DEBUG - Scripts directory verify
+      ansible.builtin.debug:
+        msg: "Scripts directory {{ scripts_dir }}: {{ scripts_dir_check.stdout | trim }}"
+
+    # ========== CREATE KASPERSKY SCRIPTS ==========
     - name: Create kaspersky-db-age.ps1
-      raw: 'powershell -Command "[IO.File]::WriteAllText(''{{ scripts_dir }}\kaspersky-db-age.ps1'', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(''{{ script_db_age_b64 }}'')))"'
+      raw: 'powershell -Command "[IO.File]::WriteAllText(''{{ scripts_dir }}\kaspersky-db-age.ps1'', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(''{{ script_db_age_b64 }}'')), [Text.Encoding]::UTF8); Write-Host ''Created kaspersky-db-age.ps1''"'
+      register: script_age_result
+
+    - name: DEBUG - kaspersky-db-age.ps1 result
+      ansible.builtin.debug:
+        msg: "{{ script_age_result.stdout | default('no output') }}"
+
+    - name: Verify kaspersky-db-age.ps1 exists
+      raw: 'powershell -Command "if (Test-Path ''{{ scripts_dir }}\kaspersky-db-age.ps1'') { Write-Host ''EXISTS - size:'' (Get-Item ''{{ scripts_dir }}\kaspersky-db-age.ps1'').Length ''bytes'' } else { Write-Host ''NOT_FOUND'' }"'
+      register: script_age_check
+
+    - name: DEBUG - kaspersky-db-age.ps1 verify
+      ansible.builtin.debug:
+        msg: "{{ script_age_check.stdout | trim }}"
 
     - name: Create kaspersky-status.ps1
-      raw: 'powershell -Command "[IO.File]::WriteAllText(''{{ scripts_dir }}\kaspersky-status.ps1'', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(''{{ script_status_b64 }}'')))"'
+      raw: 'powershell -Command "[IO.File]::WriteAllText(''{{ scripts_dir }}\kaspersky-status.ps1'', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(''{{ script_status_b64 }}'')), [Text.Encoding]::UTF8); Write-Host ''Created kaspersky-status.ps1''"'
+      register: script_status_result
+
+    - name: DEBUG - kaspersky-status.ps1 result
+      ansible.builtin.debug:
+        msg: "{{ script_status_result.stdout | default('no output') }}"
+
+    - name: Verify kaspersky-status.ps1 exists
+      raw: 'powershell -Command "if (Test-Path ''{{ scripts_dir }}\kaspersky-status.ps1'') { Write-Host ''EXISTS - size:'' (Get-Item ''{{ scripts_dir }}\kaspersky-status.ps1'').Length ''bytes'' } else { Write-Host ''NOT_FOUND'' }"'
+      register: script_status_check
+
+    - name: DEBUG - kaspersky-status.ps1 verify
+      ansible.builtin.debug:
+        msg: "{{ script_status_check.stdout | trim }}"
 
     - name: Create kaspersky-db-date.ps1
-      raw: 'powershell -Command "[IO.File]::WriteAllText(''{{ scripts_dir }}\kaspersky-db-date.ps1'', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(''{{ script_db_date_b64 }}'')))"'
+      raw: 'powershell -Command "[IO.File]::WriteAllText(''{{ scripts_dir }}\kaspersky-db-date.ps1'', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(''{{ script_db_date_b64 }}'')), [Text.Encoding]::UTF8); Write-Host ''Created kaspersky-db-date.ps1''"'
+      register: script_date_result
+
+    - name: DEBUG - kaspersky-db-date.ps1 result
+      ansible.builtin.debug:
+        msg: "{{ script_date_result.stdout | default('no output') }}"
+
+    - name: Verify kaspersky-db-date.ps1 exists
+      raw: 'powershell -Command "if (Test-Path ''{{ scripts_dir }}\kaspersky-db-date.ps1'') { Write-Host ''EXISTS - size:'' (Get-Item ''{{ scripts_dir }}\kaspersky-db-date.ps1'').Length ''bytes'' } else { Write-Host ''NOT_FOUND'' }"'
+      register: script_date_check
+
+    - name: DEBUG - kaspersky-db-date.ps1 verify
+      ansible.builtin.debug:
+        msg: "{{ script_date_check.stdout | trim }}"
+
+    # ========== LIST ALL SCRIPTS ==========
+    - name: List scripts directory
+      raw: 'powershell -Command "Get-ChildItem ''{{ scripts_dir }}'' | Select-Object Name,Length | Format-Table -AutoSize"'
+      register: scripts_list
+
+    - name: DEBUG - Scripts list
+      ansible.builtin.debug:
+        msg: "{{ scripts_list.stdout }}"
+
+    # ========== CREATE KASPERSKY.CONF ==========
+    - name: Check if conf directory exists
+      raw: 'powershell -Command "if (Test-Path ''{{ agent_dir }}\conf\zabbix_agent2.d'') { Write-Host ''EXISTS'' } else { Write-Host ''NOT_FOUND'' }"'
+      register: conf_dir_check
+
+    - name: DEBUG - Conf directory check
+      ansible.builtin.debug:
+        msg: "Conf directory {{ agent_dir }}\\conf\\zabbix_agent2.d: {{ conf_dir_check.stdout | trim }}"
+
+    - name: Create conf directory if not exists
+      raw: 'powershell -Command "New-Item -ItemType Directory -Path ''{{ agent_dir }}\conf\zabbix_agent2.d'' -Force | Out-Null; Write-Host ''Created conf directory''"'
+      register: conf_dir_create
+      when: "'NOT_FOUND' in conf_dir_check.stdout"
+
+    - name: DEBUG - Conf directory create result
+      ansible.builtin.debug:
+        msg: "{{ conf_dir_create.stdout | default('directory already exists') }}"
+      when: conf_dir_create is defined
 
     - name: Create kaspersky.conf
-      raw: 'powershell -Command "[IO.File]::WriteAllText(''{{ agent_dir }}\zabbix_agent2.d\kaspersky.conf'', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(''{{ kaspersky_conf_b64 }}'')))"'
+      raw: 'powershell -Command "[IO.File]::WriteAllText(''{{ agent_dir }}\conf\zabbix_agent2.d\kaspersky.conf'', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(''{{ kaspersky_conf_b64 }}'')), [Text.Encoding]::UTF8); Write-Host ''Created kaspersky.conf''"'
+      register: kaspersky_conf_result
+
+    - name: DEBUG - kaspersky.conf result
+      ansible.builtin.debug:
+        msg: "{{ kaspersky_conf_result.stdout | default('no output') }}"
+
+    - name: Show kaspersky.conf content
+      raw: 'powershell -Command "Get-Content ''{{ agent_dir }}\conf\zabbix_agent2.d\kaspersky.conf''"'
+      register: kaspersky_conf_content
+
+    - name: DEBUG - kaspersky.conf content
+      ansible.builtin.debug:
+        msg: "{{ kaspersky_conf_content.stdout }}"
+
+    # ========== RESTART AGENT ==========
+    - name: Get service status before restart
+      raw: 'powershell -Command "Get-Service -Name ''Zabbix Agent 2'' -ErrorAction SilentlyContinue | Select-Object Name,Status | Format-List"'
+      register: service_before
+
+    - name: DEBUG - Service status before restart
+      ansible.builtin.debug:
+        msg: "{{ service_before.stdout | default('SERVICE NOT FOUND') }}"
 
     - name: Restart Zabbix Agent 2
-      raw: 'powershell -Command "Restart-Service -Name ''Zabbix Agent 2'' -Force"'
+      raw: 'powershell -Command "Restart-Service -Name ''Zabbix Agent 2'' -Force; Write-Host ''Restart command completed''"'
+      register: restart_result
+
+    - name: DEBUG - Restart result
+      ansible.builtin.debug:
+        msg: "{{ restart_result.stdout | default('no output') }}"
 
     - name: Wait for agent restart
-      raw: 'powershell -Command "Start-Sleep -Seconds 5"'
+      raw: 'powershell -Command "Start-Sleep -Seconds 5; Write-Host ''Waited 5 seconds''"'
 
-    - name: Test kaspersky.db.age
-      raw: 'powershell -Command "& ''{{ agent_dir }}\zabbix_agent2.exe'' -t kaspersky.db.age"'
+    - name: Get service status after restart
+      raw: 'powershell -Command "Get-Service -Name ''Zabbix Agent 2'' -ErrorAction SilentlyContinue | Select-Object Name,Status | Format-List"'
+      register: service_after
+
+    - name: DEBUG - Service status after restart
+      ansible.builtin.debug:
+        msg: "{{ service_after.stdout | default('SERVICE NOT FOUND') }}"
+
+    # ========== TEST USERPARAMETERS ==========
+    - name: Test kaspersky.db.age via agent
+      raw: 'powershell -Command "& ''{{ agent_dir }}\bin\zabbix_agent2.exe'' -c ''{{ agent_dir }}\conf\zabbix_agent2.conf'' -t kaspersky.db.age 2>&1"'
       register: test_age
       ignore_errors: yes
 
-    - name: Test kaspersky.status
-      raw: 'powershell -Command "& ''{{ agent_dir }}\zabbix_agent2.exe'' -t kaspersky.status"'
+    - name: DEBUG - kaspersky.db.age test
+      ansible.builtin.debug:
+        msg: "{{ test_age.stdout | default('ERROR: no output') }}"
+
+    - name: Test kaspersky.status via agent
+      raw: 'powershell -Command "& ''{{ agent_dir }}\bin\zabbix_agent2.exe'' -c ''{{ agent_dir }}\conf\zabbix_agent2.conf'' -t kaspersky.status 2>&1"'
       register: test_status
       ignore_errors: yes
 
-    - name: Show results
+    - name: DEBUG - kaspersky.status test
+      ansible.builtin.debug:
+        msg: "{{ test_status.stdout | default('ERROR: no output') }}"
+
+    - name: Test kaspersky.db.date via agent
+      raw: 'powershell -Command "& ''{{ agent_dir }}\bin\zabbix_agent2.exe'' -c ''{{ agent_dir }}\conf\zabbix_agent2.conf'' -t kaspersky.db.date 2>&1"'
+      register: test_date
+      ignore_errors: yes
+
+    - name: DEBUG - kaspersky.db.date test
+      ansible.builtin.debug:
+        msg: "{{ test_date.stdout | default('ERROR: no output') }}"
+
+    # ========== CHECK AGENT LOG FOR ERRORS ==========
+    - name: Get last 10 lines of agent log
+      raw: 'powershell -Command "if (Test-Path ''{{ agent_dir }}\zabbix_agent2.log'') { Get-Content ''{{ agent_dir }}\zabbix_agent2.log'' -Tail 10 } else { Write-Host ''no log file'' }"'
+      register: agent_log
+      ignore_errors: yes
+
+    - name: DEBUG - Agent log (last 10 lines)
+      ansible.builtin.debug:
+        msg: "{{ agent_log.stdout | default('no log') }}"
+
+    # ========== FINAL RESULT ==========
+    - name: FINAL RESULT
       ansible.builtin.debug:
         msg:
-          - "{{ inventory_hostname }}:"
+          - "============================================"
+          - "HOST: {{ inventory_hostname }}"
+          - "SCRIPTS:"
+          - "  kaspersky-db-age.ps1: {{ script_age_check.stdout | trim }}"
+          - "  kaspersky-status.ps1: {{ script_status_check.stdout | trim }}"
+          - "  kaspersky-db-date.ps1: {{ script_date_check.stdout | trim }}"
+          - "CONFIG:"
+          - "  kaspersky.conf: {{ agent_dir }}\\conf\\zabbix_agent2.d\\kaspersky.conf"
+          - "SERVICE: {{ service_after.stdout | default('NOT FOUND') | trim }}"
+          - "TESTS:"
           - "  db.age: {{ test_age.stdout | default('ERROR') | trim }}"
           - "  status: {{ test_status.stdout | default('ERROR') | trim }}"
+          - "  db.date: {{ test_date.stdout | default('ERROR') | trim }}"
+          - "============================================"
