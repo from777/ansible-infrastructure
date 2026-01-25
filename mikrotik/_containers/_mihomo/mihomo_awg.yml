@@ -19,10 +19,10 @@
         container_config: "custom_config.yaml"
 
 - name: "01: Network (Bridge + NAT + DNS)"
-  ansible.builtin.import_playbook: ../shared/01_network.yml
+  ansible.builtin.import_playbook: ../_shared/01_network.yml
 
 - name: "02: SMB mount"
-  ansible.builtin.import_playbook: ../shared/02_smb_mount.yml
+  ansible.builtin.import_playbook: ../_shared/02_smb_mount.yml
 
 - name: "03: Configs"
   ansible.builtin.import_playbook: 03_configs_awg.yml

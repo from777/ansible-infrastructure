@@ -20,7 +20,7 @@
     ansible_command_timeout: 120
     smb_base: "{{ usb_partition }}/smb_share"
   vars_files:
-    - shared/vars_common.yml
+    - _shared/vars_common.yml
 
   tasks:
     # ===== ВАЛИДАЦИЯ =====
@@ -33,9 +33,9 @@
       ansible.builtin.debug:
         msg: "Удаляем контейнер: {{ container_name }}"
 
-    # ===== ОЧИСТКА КОНТЕЙНЕРА (повторное использование shared/tasks/cleanup.yml) =====
+    # ===== ОЧИСТКА КОНТЕЙНЕРА (повторное использование _shared/_tasks/cleanup.yml) =====
     - name: Очистка контейнера
-      ansible.builtin.include_tasks: shared/tasks/cleanup.yml
+      ansible.builtin.include_tasks: _shared/_tasks/cleanup.yml
 
     # ===== УДАЛИТЬ ПАПКУ КОНФИГОВ =====
     - name: Удалить папку конфигов

@@ -781,6 +781,10 @@ zabbix/                      # группа zabbix
 - `zabbix/mikrotik/setup-hosts.yml` → группы `zabbix` + `mikrotik`
 - `linux/_install/nginx.yml` → только группа `linux`
 
+**Исключения (не переименовывать):**
+- `old`, `host_vars_old` — временные папки-корзины, будут удалены
+- `host_vars/`, `group_vars/` — стандартные ansible папки
+
 **При переименовании папок:**
 1. Claude спрашивает подтверждение перед изменением типа папки
 2. Claude показывает список файлов которые будут изменены

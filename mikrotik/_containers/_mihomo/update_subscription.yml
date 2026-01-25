@@ -21,7 +21,7 @@
     configs_path: "{{ playbook_dir }}/../configs"
     scripts_path: "{{ playbook_dir }}/../scripts"
   vars_files:
-    - ../shared/vars_common.yml
+    - ../_shared/vars_common.yml
     - vars.yml
 
   tasks:
@@ -34,7 +34,7 @@
 
     - name: Fail если SMB не смонтирован
       ansible.builtin.fail:
-        msg: "SMB не смонтирован! Сначала запусти ../shared/02_smb_mount.yml"
+        msg: "SMB не смонтирован! Сначала запусти ../_shared/02_smb_mount.yml"
       when: not smb_mounted.stat.exists
 
     # ===== СКАЧИВАНИЕ =====

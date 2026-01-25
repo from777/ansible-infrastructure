@@ -21,7 +21,7 @@ container_image: "wiktorbgu/mihomo-mikrotik:latest"
 subscription_url: "https://raw.githubusercontent.com/miladtahanian/multi-proxy-config-fetcher/refs/heads/main/configs/proxy_configs.txt"
 
 # ============================================================
-# СЕТЬ (наследуется из shared/vars_common.yml)
+# СЕТЬ (наследуется из _shared/vars_common.yml)
 # ============================================================
 # container_gateway: "192.168.254.1"
 # docker_bridge: "Bridge-Docker"
@@ -35,7 +35,7 @@ subscription_url: "https://raw.githubusercontent.com/miladtahanian/multi-proxy-c
 # container_config: определяется в основном плейбуке
 
 # ============================================================
-# SMB (наследуется из shared/vars_common.yml)
+# SMB (наследуется из _shared/vars_common.yml)
 # ============================================================
 # smb_mount_point: "/mnt/mikrotik_smb"
 # usb_partition: "usb1-part1"

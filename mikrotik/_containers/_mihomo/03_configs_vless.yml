@@ -1,18 +1,24 @@
-# 03_configs_awg.yml - Копирование конфигов для AWG режима
+# 03_configs_vless.yml - Копирование конфигов для VLESS режима
+# Парсит proxies.txt и генерирует proxies.yaml для mihomo
 ---
-- name: "03: Copy AWG configs to container"
+- name: "03: Copy VLESS configs to container"
   hosts: mikrotik
   gather_facts: no
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
+    ansible_command_timeout: 120
     smb_path: "{{ smb_mount_point }}/docker_configs/{{ container_name }}"
     # Путь к общим конфигам (awg, vless, srv)
     configs_path: "{{ playbook_dir }}/../configs"
     # Путь к специфичным конфигам mihomo
     mihomo_configs_path: "{{ playbook_dir }}/configs"
+    # Путь к скриптам
+    scripts_path: "{{ playbook_dir }}/../scripts"
+    # Используем VLESS конфиг
+    container_config: "custom_config_vless.yaml"
   vars_files:
-    - ../shared/vars_common.yml
+    - ../_shared/vars_common.yml
     - vars.yml
 
   tasks:
@@ -28,6 +34,13 @@
         msg: "SMB не смонтирован! Сначала запусти 02_smb_mount.yml"
       when: not smb_mounted.stat.exists
 
+    # ===== УДАЛИТЬ AWG КОНФИГИ (чтобы образ не создавал AWG провайдер) =====
+    - name: "03: Удалить папку awg (отключаем AWG режим)"
+      ansible.builtin.file:
+        path: "{{ smb_path }}/awg"
+        state: absent
+      delegate_to: localhost
+
     # ===== СТРУКТУРА ПАПОК =====
     - name: "03: Создать структуру папок"
       ansible.builtin.file:
@@ -36,55 +49,80 @@
         mode: '0755'
       loop:
         - "{{ smb_path }}"
-        - "{{ smb_path }}/awg"
         - "{{ smb_path }}/srv"
         - "{{ smb_path }}/template"
         - "{{ smb_path }}/ui"
       delegate_to: localhost
 
-    # ===== AWG КОНФИГИ =====
-    - name: "03: Найти AWG конфиги"
-      ansible.builtin.find:
-        paths: "{{ configs_path }}/awg"
-        patterns: "*.conf"
-      register: awg_files
+    # ===== СКАЧИВАНИЕ / ЧТЕНИЕ ПРОКСИ =====
+    - name: "03: Скачать прокси по URL"
+      ansible.builtin.get_url:
+        url: "{{ subscription_url }}"
+        dest: "/tmp/subscription_proxies.txt"
+        timeout: 60
+        force: yes
       delegate_to: localhost
+      when: subscription_url is defined and subscription_url | length > 0
+      register: download_result
 
-    - name: "03: Копировать AWG конфиги"
-      ansible.builtin.copy:
-        src: "{{ item.path }}"
-        dest: "{{ smb_path }}/awg/"
-        mode: '0644'
-      loop: "{{ awg_files.files }}"
-      loop_control:
-        label: "{{ item.path | basename }}"
+    - name: "03: Проверить локальный proxies.txt"
+      ansible.builtin.stat:
+        path: "{{ configs_path }}/vless/proxies.txt"
+      register: proxies_txt
       delegate_to: localhost
-      when: awg_files.files | length > 0
+      when: subscription_url is not defined or subscription_url | length == 0
 
-    # ===== SRV КОНФИГИ =====
-    - name: "03: Найти SRV конфиги"
-      ansible.builtin.find:
-        paths: "{{ configs_path }}/srv"
-        patterns: "*.yaml"
-      register: srv_files
-      delegate_to: localhost
+    - name: "03: Fail если нет ни URL ни локального файла"
+      ansible.builtin.fail:
+        msg: |
+          Не задан subscription_url и не найден configs/vless/proxies.txt!
+          Либо задай subscription_url в vars.yml, либо создай локальный файл.
+      when:
+        - (subscription_url is not defined or subscription_url | length == 0)
+        - not proxies_txt.stat.exists
 
-    - name: "03: Копировать SRV конфиги"
-      ansible.builtin.copy:
-        src: "{{ item.path }}"
-        dest: "{{ smb_path }}/srv/"
-        mode: '0644'
-      loop: "{{ srv_files.files }}"
-      loop_control:
-        label: "{{ item.path | basename }}"
+    - name: "03: Определить источник прокси"
+      ansible.builtin.set_fact:
+        proxy_source: "{{ '/tmp/subscription_proxies.txt' if (subscription_url is defined and subscription_url | length > 0) else configs_path + '/vless/proxies.txt' }}"
+
+    - name: "03: Показать источник"
+      ansible.builtin.debug:
+        msg: "Источник прокси: {{ 'URL: ' + subscription_url if (subscription_url is defined and subscription_url | length > 0) else 'Локальный файл' }}"
+
+    # ===== ПАРСИНГ VLESS/VMESS URL =====
+    - name: "03: Парсить VLESS/VMess URL"
+      ansible.builtin.command:
+        cmd: >
+          python3 {{ scripts_path }}/parse_proxy_urls.py
+          {{ proxy_source }}
+          {{ smb_path }}/srv/proxies.yaml
       delegate_to: localhost
-      when: srv_files.files | length > 0
+      register: parse_result
+      changed_when: true
+
+    - name: "03: Результат парсинга"
+      ansible.builtin.debug:
+        msg: "{{ parse_result.stdout }}"
+
+    - name: "03: Удалить временный файл"
+      ansible.builtin.file:
+        path: /tmp/subscription_proxies.txt
+        state: absent
+      delegate_to: localhost
+      when: subscription_url is defined and subscription_url | length > 0
 
     # ===== CUSTOM CONFIG =====
-    - name: "03: Копировать custom_config.yaml"
+    - name: "03: Копировать custom_config_vless.yaml"
       ansible.builtin.copy:
-        src: "{{ mihomo_configs_path }}/custom_config.yaml"
-        dest: "{{ smb_path }}/custom_config.yaml"
+        src: "{{ mihomo_configs_path }}/templates/custom_config_vless.yaml"
+        dest: "{{ smb_path }}/custom_config_vless.yaml"
+        mode: '0644'
+      delegate_to: localhost
+
+    - name: "03: Копировать как config.yaml (для базового образа mihomo)"
+      ansible.builtin.copy:
+        src: "{{ mihomo_configs_path }}/templates/custom_config_vless.yaml"
+        dest: "{{ smb_path }}/config.yaml"
         mode: '0644'
       delegate_to: localhost
 
@@ -176,18 +214,16 @@
         - (existing_geoip.files | default([])) | length == 0
 
     # ===== РЕЗУЛЬТАТ =====
-    - name: "03: Проверить файлы"
-      ansible.builtin.find:
-        paths: "{{ smb_path }}"
-        recurse: yes
-        file_type: file
-      register: all_files
+    - name: "03: Показать сгенерированные прокси"
+      ansible.builtin.command:
+        cmd: head -50 {{ smb_path }}/srv/proxies.yaml
       delegate_to: localhost
+      register: proxies_preview
+      changed_when: false
 
     - name: "03: Результат"
       ansible.builtin.debug:
         msg: |
-          Скопировано файлов: {{ all_files.files | length }}
-          AWG: {{ awg_files.files | length }} конфигов
-          SRV: {{ srv_files.files | length }} конфигов
-          UI: {{ 'OK' if ui_exists.stat.exists else 'скачан' }}
+          CONFIG: {{ container_config }}
+          Proxies preview:
+          {{ proxies_preview.stdout }}

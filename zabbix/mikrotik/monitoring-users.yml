@@ -200,7 +200,7 @@
 
     # Link template to hosts and set host macros
     - name: Link template and set allowed_users macro
-      ansible.builtin.include_tasks: ../tasks/link-template-with-macro.yml
+      ansible.builtin.include_tasks: ../_tasks/link-template-with-macro.yml
       loop: "{{ users_hosts_to_link | default([]) }}"
       loop_control:
         loop_var: host_name
@@ -211,7 +211,7 @@
 
     # Unlink template from hosts with monitor_users=false
     - name: Unlink template from hosts
-      ansible.builtin.include_tasks: ../tasks/unlink-template-from-host.yml
+      ansible.builtin.include_tasks: ../_tasks/unlink-template-from-host.yml
       loop: "{{ users_hosts_to_unlink | default([]) }}"
       loop_control:
         loop_var: host_name

@@ -1,5 +1,5 @@
 # create_veth.yml - Создание veth интерфейса и добавление в bridge
-# Использование: include_tasks: ../shared/tasks/create_veth.yml
+# Использование: include_tasks: ../_shared/_tasks/create_veth.yml
 # Требуемые переменные: container_name, container_ip или auto_container_ip, container_gateway, docker_bridge
 ---
 - name: Создать veth интерфейс

@@ -9,25 +9,25 @@
     ansible_command_timeout: 120
     smb_base: "{{ usb_partition }}/smb_share"
   vars_files:
-    - ../shared/vars_common.yml
+    - ../_shared/vars_common.yml
     - vars.yml
 
   tasks:
-    # ===== ПРОВЕРКИ (повторное использование shared/tasks/checks.yml) =====
+    # ===== ПРОВЕРКИ (повторное использование _shared/_tasks/checks.yml) =====
     - name: Проверки
-      ansible.builtin.include_tasks: ../shared/tasks/checks.yml
+      ansible.builtin.include_tasks: ../_shared/_tasks/checks.yml
 
-    # ===== ОЧИСТКА СТАРОГО КОНТЕЙНЕРА (повторное использование shared/tasks/cleanup.yml) =====
+    # ===== ОЧИСТКА СТАРОГО КОНТЕЙНЕРА (повторное использование _shared/_tasks/cleanup.yml) =====
     - name: Очистка старого контейнера
-      ansible.builtin.include_tasks: ../shared/tasks/cleanup.yml
+      ansible.builtin.include_tasks: ../_shared/_tasks/cleanup.yml
 
-    # ===== АВТООПРЕДЕЛЕНИЕ IP (повторное использование shared/tasks/auto_ip.yml) =====
+    # ===== АВТООПРЕДЕЛЕНИЕ IP (повторное использование _shared/_tasks/auto_ip.yml) =====
     - name: Автоопределение IP
-      ansible.builtin.include_tasks: ../shared/tasks/auto_ip.yml
+      ansible.builtin.include_tasks: ../_shared/_tasks/auto_ip.yml
 
-    # ===== СОЗДАНИЕ VETH (повторное использование shared/tasks/create_veth.yml) =====
+    # ===== СОЗДАНИЕ VETH (повторное использование _shared/_tasks/create_veth.yml) =====
     - name: Создание veth
-      ansible.builtin.include_tasks: ../shared/tasks/create_veth.yml
+      ansible.builtin.include_tasks: ../_shared/_tasks/create_veth.yml
 
     # ===== MOUNT =====
     - name: Удалить старый mount (пересоздаём с правильным путём)

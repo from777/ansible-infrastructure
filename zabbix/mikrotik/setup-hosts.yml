@@ -86,14 +86,14 @@
 
     # Create hosts
     - name: Check and create MikroTik hosts
-      ansible.builtin.include_tasks: ../tasks/create-zabbix-host.yml
+      ansible.builtin.include_tasks: ../_tasks/create-zabbix-host.yml
       loop: "{{ mikrotik_hosts_to_add | default([]) }}"
       loop_control:
         loop_var: mikrotik_host
 
     # Delete hosts with zabbix_monitor=false
     - name: Delete MikroTik hosts with zabbix_monitor=false
-      ansible.builtin.include_tasks: ../tasks/delete-zabbix-host.yml
+      ansible.builtin.include_tasks: ../_tasks/delete-zabbix-host.yml
       loop: "{{ mikrotik_hosts_to_delete | default([]) }}"
       loop_control:
         loop_var: host_to_delete
@@ -127,7 +127,7 @@
         msg: "Orphan hosts to DELETE: {{ orphan_hosts | default([]) }}"
 
     - name: Delete orphan hosts
-      ansible.builtin.include_tasks: ../tasks/delete-zabbix-host.yml
+      ansible.builtin.include_tasks: ../_tasks/delete-zabbix-host.yml
       loop: "{{ orphan_hosts | default([]) }}"
       loop_control:
         loop_var: host_to_delete

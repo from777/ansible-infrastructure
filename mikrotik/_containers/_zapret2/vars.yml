@@ -29,14 +29,14 @@ nfqws2_strategy_quic: "--payload=quic_initial --lua-desync=fake:blob=fake_defaul
 nfqws2_strategy: "--filter-tcp=443 {{ nfqws2_strategy_https }}"
 
 # ============================================================
-# СЕТЬ (наследуется из shared/vars_common.yml)
+# СЕТЬ (наследуется из _shared/vars_common.yml)
 # ============================================================
 # container_gateway: "192.168.254.1"
 # docker_bridge: "Bridge-Docker"
 # container_network: "192.168.254"
 
 # ============================================================
-# SMB (наследуется из shared/vars_common.yml)
+# SMB (наследуется из _shared/vars_common.yml)
 # ============================================================
 # smb_mount_point: "/mnt/mikrotik_smb"
 # usb_partition: "usb1-part1"

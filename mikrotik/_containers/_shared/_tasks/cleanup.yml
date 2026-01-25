@@ -1,5 +1,5 @@
 # cleanup.yml - Остановка и удаление старого контейнера
-# Использование: include_tasks: ../shared/tasks/cleanup.yml
+# Использование: include_tasks: ../_shared/_tasks/cleanup.yml
 # Требуемые переменные: container_name, docker_bridge, smb_mount_point
 ---
 - name: Очистить unknown порты из bridge

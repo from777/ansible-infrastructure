@@ -10,7 +10,7 @@
     ansible_command_timeout: 120
     usb_disk: "usb1"
   vars_files:
-    - shared/vars_common.yml
+    - _shared/vars_common.yml
 
   tasks:
     - name: Получить информацию о дисках

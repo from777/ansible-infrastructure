@@ -368,7 +368,7 @@
 
     # Link template to hosts from inventory
     - name: Link template to hosts
-      ansible.builtin.include_tasks: ../tasks/link-template-with-macro.yml
+      ansible.builtin.include_tasks: ../_tasks/link-template-with-macro.yml
       loop: "{{ kaspersky_hosts | default([]) }}"
       loop_control:
         loop_var: host_name
