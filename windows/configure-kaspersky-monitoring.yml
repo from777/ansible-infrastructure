@@ -1,9 +1,7 @@
-# configure-kaspersky-monitoring.yml
-# Настройка UserParameter для мониторинга Kaspersky через Zabbix Agent 2
-#
-# Зависимости: install-zabbix-agent.yml (агент должен быть установлен)
-# Хосты: windows
-# Путь установки агента: C:\Zabbix (соответствует install-zabbix-agent.yml)
+# @file configure-kaspersky-monitoring.yml
+# @desc Настройка UserParameter для мониторинга Kaspersky через Zabbix Agent 2
+# @hosts windows
+# @deps windows/install-zabbix-agent.yml
 ---
 - name: Configure Kaspersky monitoring on Zabbix Agent 2
   hosts: windows

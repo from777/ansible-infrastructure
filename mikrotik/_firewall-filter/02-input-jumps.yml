@@ -1,6 +1,6 @@
-# 02-input-jumps.yml
-# Jump правила для chain=input
-# Определяют порядок обработки трафика К роутеру
+# @file 02-input-jumps.yml
+# @desc Jump правила для chain=input (порядок обработки трафика К роутеру)
+# @hosts mikrotik
 ---
 - name: Add input jump rules
   hosts: mikrotik

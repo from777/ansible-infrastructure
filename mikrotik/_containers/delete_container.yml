@@ -1,15 +1,7 @@
-# delete_container.yml - Универсальное удаление контейнера
-#
-# Использование:
-#   ansible-playbook delete_container.yml -l Mik_Tim -e container_name="Mihomo"
-#   ansible-playbook delete_container.yml -l Mik_Tim -e container_name="Zapret2"
-#
-# Параметры:
-#   container_name: имя контейнера (обязательно)
-#   delete_routing_table: true/false (по умолчанию false)
-#   routing_table_name: имя таблицы (если delete_routing_table=true)
-#   delete_mangle: true/false (по умолчанию false)
-#
+# @file delete_container.yml
+# @desc Универсальное удаление контейнера по имени
+# @hosts mikrotik
+# @vars container_name (обязательно, extra var: -e container_name="Mihomo")
 ---
 - name: "Delete container"
   hosts: mikrotik

@@ -1,5 +1,6 @@
-# tasks/create-zabbix-host.yml
-# Создаёт один хост в Zabbix если не существует
+# @file create-zabbix-host.yml
+# @desc Создаёт один хост в Zabbix если не существует
+# @vars mikrotik_host.name, mikrotik_host.ip, mikrotik_host.group
 ---
 - name: "Check if host {{ mikrotik_host.name }} exists"
   ansible.builtin.uri:

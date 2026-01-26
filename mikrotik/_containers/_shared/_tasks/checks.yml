@@ -1,6 +1,6 @@
-# checks.yml - Общие проверки перед созданием контейнера
-# Использование: include_tasks: ../_shared/_tasks/checks.yml
-# Требуемые переменные: usb_partition, docker_bridge
+# @file checks.yml
+# @desc Общие проверки перед созданием контейнера (USB, bridge)
+# @vars usb_partition, docker_bridge
 ---
 - name: Проверить USB
   community.routeros.command:

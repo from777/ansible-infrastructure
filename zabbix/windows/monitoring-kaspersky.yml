@@ -1,8 +1,7 @@
-# monitoring-kaspersky.yml
-# Создаёт template для мониторинга Kaspersky и привязывает к Windows хостам
-#
-# Хосты берутся из inventory по флагу monitor_kaspersky: true
-# В настройках Task: Inventory = твой inventory, Limit = пусто
+# @file monitoring-kaspersky.yml
+# @desc Мониторинг Kaspersky: template + привязка к Windows хостам
+# @hosts zabbix
+# @deps zabbix/windows/setup-hosts.yml
 ---
 - name: Setup Kaspersky monitoring in Zabbix
   hosts: zabbix

@@ -1,5 +1,6 @@
-# tasks/link-template-to-host.yml
-# Привязывает template к хосту если ещё не привязан
+# @file link-template-to-host.yml
+# @desc Привязывает template к хосту если ещё не привязан
+# @vars host_name, target_template_id
 ---
 - name: "Get host {{ host_name }}"
   ansible.builtin.uri:

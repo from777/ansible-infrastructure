@@ -1,6 +1,6 @@
-# firewall-raw.yml
-# Настройка RAW правил фаервола MikroTik
-# RAW таблица обрабатывает пакеты ДО connection tracking - меньше нагрузки на CPU
+# @file firewall-raw.yml
+# @desc Настройка RAW правил фаервола MikroTik (обработка пакетов до connection tracking)
+# @hosts mikrotik
 ---
 - name: Configure MikroTik firewall RAW rules
   hosts: mikrotik

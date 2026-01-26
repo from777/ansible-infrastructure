@@ -1,5 +1,6 @@
-# tasks/unlink-template-from-host.yml
-# Отлинковывает template от хоста
+# @file unlink-template-from-host.yml
+# @desc Отлинковывает template от хоста
+# @vars host_name, target_template_id
 ---
 - name: "Get host {{ host_name }}"
   ansible.builtin.uri:

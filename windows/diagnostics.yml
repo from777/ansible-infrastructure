@@ -1,6 +1,6 @@
-# diagnostics.yml
-# Диагностика Windows серверов: Zabbix Agent, Kaspersky, системная информация
-# Запуск: Task Template в Semaphore
+# @file diagnostics.yml
+# @desc Диагностика Windows серверов: Zabbix Agent, Kaspersky, системная информация
+# @hosts windows
 ---
 - name: Windows Server Diagnostics
   hosts: windows

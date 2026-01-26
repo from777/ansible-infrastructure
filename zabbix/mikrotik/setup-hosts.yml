@@ -1,7 +1,7 @@
-# setup-mikrotik-hosts.yml
-# Добавляет хосты MikroTik в Zabbix (без templates)
-# Templates привязываются отдельными playbooks monitoring-*.yml
-# Запускать: при добавлении нового роутера
+# @file setup-hosts.yml
+# @desc Добавляет хосты MikroTik в Zabbix (без templates)
+# @hosts zabbix
+# @notes Templates привязываются отдельными playbooks monitoring-*.yml
 ---
 - name: Setup MikroTik hosts in Zabbix
   hosts: zabbix

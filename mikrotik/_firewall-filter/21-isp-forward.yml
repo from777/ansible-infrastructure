@@ -1,11 +1,6 @@
-# 21-isp-forward.yml
-# Правила для chain=ISP-Forward
-# Трафик из WAN (интернета) внутрь сети
-#
-# Разрешаем только:
-# - established/related (ответы на наши запросы)
-# - DST-NAT (проброс портов)
-# Всё остальное блокируем (защита от атак из интернета)
+# @file 21-isp-forward.yml
+# @desc Правила ISP-Forward: трафик из WAN внутрь (только established и DST-NAT)
+# @hosts mikrotik
 ---
 - name: Configure ISP-Forward chain
   hosts: mikrotik

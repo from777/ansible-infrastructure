@@ -1,7 +1,7 @@
-# setup-alerts.yml
-# Создаёт Action для отправки алертов MikroTik в Telegram
-# Удаляет старый action и создаёт заново для чистой настройки
-# Запускать: после setup-telegram.yml
+# @file setup-alerts.yml
+# @desc Создаёт Action для отправки алертов MikroTik в Telegram
+# @hosts zabbix
+# @deps setup-telegram.yml
 ---
 - name: Setup MikroTik alerts in Zabbix
   hosts: zabbix

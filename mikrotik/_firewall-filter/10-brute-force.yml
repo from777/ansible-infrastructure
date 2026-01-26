@@ -1,5 +1,6 @@
-# 10-brute-force.yml
-# Защита от перебора паролей (brute-force)
+# @file 10-brute-force.yml
+# @desc Защита от перебора паролей (brute-force)
+# @hosts mikrotik
 ---
 - name: Configure Brute-force protection
   hosts: mikrotik

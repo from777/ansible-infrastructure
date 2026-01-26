@@ -1,6 +1,6 @@
-# cyberok-script.yml
-# Загружает скрипт update-cyberok-list с GitHub и импортирует на роутер
-# При каждом запуске обновляет скрипт до актуальной версии
+# @file cyberok-script.yml
+# @desc Загружает скрипт update-cyberok-list с GitHub и импортирует на роутер
+# @hosts mikrotik
 ---
 - name: Install CyberOK update script
   hosts: mikrotik

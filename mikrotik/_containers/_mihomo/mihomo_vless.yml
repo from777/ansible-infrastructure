@@ -1,14 +1,7 @@
-# mihomo_vless.yml - Установка mihomo в режиме VLESS/VMess
-#
-# Использование:
-#   ansible-playbook mihomo_vless.yml -l Mik_Tim
-#   ansible-playbook mihomo_vless.yml -l Mik_Tim -e subscription_url="https://другой-url.com/proxies.txt"
-#
-# Особенности:
-# - Парсит configs/vless/proxies.txt или скачивает по subscription_url
-# - Генерирует proxies.yaml из vless:// и vmess:// URL
-# - Использует url-test для автовыбора лучшего прокси
-#
+# @file mihomo_vless.yml
+# @desc Установка mihomo в режиме VLESS/VMess: парсинг прокси, генерация конфига
+# @hosts mikrotik
+# @deps _containers/_shared/01_network.yml, _containers/_shared/02_smb_mount.yml
 ---
 - name: "Set VLESS config"
   hosts: mikrotik

@@ -1,10 +1,7 @@
-# 23-vpn-forward.yml
-# Правила для chain=VPN-Forward
-# Трафик из VPN наружу
-#
-# VPN клиентам разрешаем выход в интернет
-#
-# Автоматически пропускается если нет interface-list VPN-OUT
+# @file 23-vpn-forward.yml
+# @desc Правила VPN-Forward: VPN клиентам разрешаем выход в интернет
+# @hosts mikrotik
+# @notes Пропускается если нет interface-list VPN-OUT
 ---
 - name: Configure VPN-Forward chain
   hosts: mikrotik

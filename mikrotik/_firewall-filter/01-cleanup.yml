@@ -1,10 +1,8 @@
-# 01-cleanup.yml
-# Удаляет ВСЕ старые правила кроме SAFE-ACCESS
-# После этого можно добавлять новые правила в правильном порядке
-#
-# !!! ВНИМАНИЕ !!!
-# Этот плейбук удалит все правила firewall кроме SAFE-ACCESS!
-# Убедись что SAFE-ACCESS правило на месте перед запуском!
+# @file 01-cleanup.yml
+# @desc Удаление ВСЕХ старых правил firewall кроме SAFE-ACCESS
+# @hosts mikrotik
+# @deps 00-safe-access.yml
+# @notes ВНИМАНИЕ: удалит все правила! Убедись что SAFE-ACCESS на месте
 ---
 - name: Remove old firewall rules
   hosts: mikrotik

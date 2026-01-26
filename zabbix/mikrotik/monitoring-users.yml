@@ -1,8 +1,7 @@
-# monitoring-users.yml
-# Мониторинг пользователей с full-доступом на MikroTik
-# Триггер срабатывает если появился пользователь НЕ из списка allowed_users
-# Список allowed_users задаётся в inventory.yml для каждого хоста
-# Запускать: после setup-mikrotik-hosts.yml
+# @file monitoring-users.yml
+# @desc Мониторинг пользователей с full-доступом на MikroTik (триггер на неизвестных)
+# @hosts zabbix
+# @deps zabbix/mikrotik/setup-hosts.yml
 ---
 - name: Setup Users monitoring in Zabbix
   hosts: zabbix

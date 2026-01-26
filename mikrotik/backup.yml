@@ -1,3 +1,6 @@
+# @file backup.yml
+# @desc Создаёт бэкап конфигурации MikroTik роутера в файл .rsc
+# @hosts mikrotik
 ---
 - name: Backup MikroTik configuration
   hosts: mikrotik

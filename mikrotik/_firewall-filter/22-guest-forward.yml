@@ -1,13 +1,7 @@
-# 22-guest-forward.yml
-# Правила для chain=GUEST-Forward
-# Трафик из гостевой сети наружу
-#
-# Гостям разрешаем только выход в интернет (WAN)
-# Блокируем доступ к локальным сетям (RFC1918)
-# Это изолирует гостей от основной сети
-#
-# Автоматически пропускается если нет interface-list GUEST
-# Правила BlackList добавляются только если есть соответствующие connection-mark
+# @file 22-guest-forward.yml
+# @desc Правила GUEST-Forward: гости только в интернет, блок RFC1918
+# @hosts mikrotik
+# @notes Пропускается если нет interface-list GUEST
 ---
 - name: Configure GUEST-Forward chain
   hosts: mikrotik

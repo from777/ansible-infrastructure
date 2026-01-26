@@ -1,5 +1,6 @@
-# test-single-rule.yml
-# Тестовый плейбук - добавляет одно правило и проверяет результат
+# @file test-single-rule.yml
+# @desc Тестовый плейбук — добавляет одно правило и проверяет результат
+# @hosts mikrotik
 ---
 - name: Test single rule add
   hosts: mikrotik

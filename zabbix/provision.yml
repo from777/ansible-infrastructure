@@ -1,4 +1,6 @@
-# provision.yml
+# @file provision.yml
+# @desc Установка Zabbix Server с PostgreSQL
+# @hosts zabbix
 ---
 - name: Install Zabbix Server with PostgreSQL
   hosts: zabbix

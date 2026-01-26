@@ -1,9 +1,6 @@
-# 20-lan-forward.yml
-# Правила для chain=LAN-Forward
-# Трафик из LAN наружу (в интернет или другие сети)
-#
-# LAN - доверенная сеть, разрешаем весь исходящий трафик
-# Но сначала проверяем connection-state для оптимизации
+# @file 20-lan-forward.yml
+# @desc Правила LAN-Forward: трафик из LAN наружу (разрешаем весь исходящий)
+# @hosts mikrotik
 ---
 - name: Configure LAN-Forward chain
   hosts: mikrotik

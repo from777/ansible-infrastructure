@@ -1,15 +1,7 @@
-# firewall-full.yml
-# Главный плейбук - вызывает все остальные в правильном порядке
-#
-# ПРАВИЛЬНЫЙ ПОРЯДОК:
-# 1. Защита доступа (SAFE-ACCESS)
-# 2. Очистка старых правил
-# 3. Правила В цепочках (LAN-Input, ISP-Input и т.д.)
-# 4. Jump правила в эти цепочки
-# 5. Drop all - В САМОМ КОНЦЕ!
-#
-# !!! ВНИМАНИЕ !!!
-# 01-cleanup.yml удаляет ВСЕ старые правила!
+# @file firewall-full.yml
+# @desc Главный плейбук firewall — вызывает все остальные в правильном порядке
+# @hosts mikrotik
+# @notes Порядок: safe-access → cleanup → правила цепочек → jumps → drop-all
 ---
 # === ПРОВЕРКА ГОТОВНОСТИ ===
 - import_playbook: 00-preflight-check.yml

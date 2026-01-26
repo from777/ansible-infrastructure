@@ -1,15 +1,6 @@
-# update_subscription.yml - Быстрое обновление списка прокси без пересоздания контейнера
-#
-# Использование:
-#   ansible-playbook update_subscription.yml -l Mik_Tim
-#
-# С другим URL:
-#   ansible-playbook update_subscription.yml -l Mik_Tim -e subscription_url="https://другой-url.com/proxies.txt"
-#
-# С локальным файлом (игнорировать URL):
-#   ansible-playbook update_subscription.yml -l Mik_Tim -e subscription_url=""
-#
-# После обновления mihomo автоматом перечитает proxies.yaml через health-check
+# @file update_subscription.yml
+# @desc Быстрое обновление списка прокси без пересоздания контейнера
+# @hosts mikrotik
 ---
 - name: "Update proxy subscription"
   hosts: mikrotik

@@ -1,5 +1,6 @@
-# Test Windows WinRM connection using raw module
-# Note: win_* modules have PSRP issues on some servers, using raw instead
+# @file test_connection.yml
+# @desc Тест WinRM подключения к Windows серверам через raw модуль
+# @hosts windows
 ---
 - name: Test Windows connection via WinRM
   hosts: windows

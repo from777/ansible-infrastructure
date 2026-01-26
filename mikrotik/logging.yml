@@ -1,4 +1,6 @@
-# logging.yml
+# @file logging.yml
+# @desc Настройка отправки логов MikroTik на ELK сервер
+# @hosts mikrotik
 ---
 - name: Configure MikroTik logging to ELK
   hosts: mikrotik

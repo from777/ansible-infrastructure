@@ -1,5 +1,6 @@
-# container_mode.yml - Включение container mode на MikroTik
-# Требует физического power cycle роутера!
+# @file container_mode.yml
+# @desc Включение container mode на MikroTik (требует power cycle роутера)
+# @hosts mikrotik
 ---
 - name: "Enable container mode"
   hosts: mikrotik

@@ -1,6 +1,6 @@
-# 03_config.yml - Подготовка конфига для Zapret2
-# Zapret2 особенный: конфиг создаётся ПОСЛЕ первого запуска контейнера
-# Этот плейбук просто проверяет SMB и создаёт папку
+# @file 03_config.yml
+# @desc Подготовка папки для конфига Zapret2 (конфиг создаётся после первого запуска)
+# @hosts mikrotik
 ---
 - name: "03: Prepare for Zapret2 config"
   hosts: mikrotik

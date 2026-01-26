@@ -1,5 +1,6 @@
-# 05_routing.yml - Настройка routing table для Zapret2
-# Создаёт routing table для перенаправления трафика через контейнер
+# @file 05_routing.yml
+# @desc Настройка routing table для перенаправления трафика через Zapret2
+# @hosts mikrotik
 ---
 - name: "05: Zapret2 Routing"
   hosts: mikrotik

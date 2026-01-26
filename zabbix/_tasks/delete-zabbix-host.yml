@@ -1,5 +1,6 @@
-# tasks/delete-zabbix-host.yml
-# Удаляет хост из Zabbix если существует
+# @file delete-zabbix-host.yml
+# @desc Удаляет хост из Zabbix если существует
+# @vars host_to_delete
 ---
 - name: "Check if host {{ host_to_delete }} exists"
   ansible.builtin.uri:

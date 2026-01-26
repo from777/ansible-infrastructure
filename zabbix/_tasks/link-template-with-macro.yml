@@ -1,10 +1,6 @@
-# tasks/link-template-with-macro.yml
-# Привязывает template к хосту и устанавливает host macro
-# Требуемые переменные:
-#   - host_name: имя хоста
-#   - target_template_id: ID шаблона
-#   - macro_name: имя макроса (например {$ALLOWED_USERS})
-#   - macro_value: значение макроса
+# @file link-template-with-macro.yml
+# @desc Привязывает template к хосту и устанавливает host macro
+# @vars host_name, target_template_id, macro_name, macro_value
 ---
 - name: "Get host {{ host_name }}"
   ansible.builtin.uri:

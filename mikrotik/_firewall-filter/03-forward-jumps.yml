@@ -1,6 +1,6 @@
-# 03-forward-jumps.yml
-# Jump правила для chain=forward
-# Определяют порядок обработки трафика ЧЕРЕЗ роутер
+# @file 03-forward-jumps.yml
+# @desc Jump правила для chain=forward (порядок обработки трафика ЧЕРЕЗ роутер)
+# @hosts mikrotik
 ---
 - name: Add forward jump rules
   hosts: mikrotik

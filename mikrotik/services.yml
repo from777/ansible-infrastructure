@@ -1,4 +1,6 @@
-# services.yml
+# @file services.yml
+# @desc Отключение ненужных сервисов MikroTik (ftp, telnet, www, api)
+# @hosts mikrotik
 ---
 - name: Configure MikroTik services
   hosts: mikrotik

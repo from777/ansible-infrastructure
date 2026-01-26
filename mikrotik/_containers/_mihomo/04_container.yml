@@ -1,4 +1,7 @@
-# 04_container.yml - Создание контейнера mihomo
+# @file 04_container.yml
+# @desc Создание контейнера mihomo (проверки, очистка, veth, запуск)
+# @hosts mikrotik
+# @deps _shared/01_network.yml, _shared/02_smb_mount.yml
 ---
 - name: "04: Container"
   hosts: mikrotik

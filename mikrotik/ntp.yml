@@ -1,4 +1,6 @@
-# ntp.yml
+# @file ntp.yml
+# @desc Настройка NTP клиента и часового пояса
+# @hosts mikrotik
 ---
 - name: Configure MikroTik NTP
   hosts: mikrotik

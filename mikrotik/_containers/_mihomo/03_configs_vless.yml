@@ -1,5 +1,6 @@
-# 03_configs_vless.yml - Копирование конфигов для VLESS режима
-# Парсит proxies.txt и генерирует proxies.yaml для mihomo
+# @file 03_configs_vless.yml
+# @desc Копирование VLESS конфигов и генерация proxies.yaml
+# @hosts mikrotik
 ---
 - name: "03: Copy VLESS configs to container"
   hosts: mikrotik

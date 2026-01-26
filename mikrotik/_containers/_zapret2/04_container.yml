@@ -1,7 +1,6 @@
-# 04_container.yml - Создание контейнера Zapret2
-# Особенности:
-# - Не использует mount/envlist — образ сам устанавливает zapret2
-# - Config пишется ПОСЛЕ первого запуска через SMB
+# @file 04_container.yml
+# @desc Создание контейнера Zapret2 (без mount/envlist -- образ сам устанавливает)
+# @hosts mikrotik
 ---
 - name: "04: Zapret2 Container"
   hosts: mikrotik

@@ -1,9 +1,7 @@
-# install-zabbix-agent.yml
-# Установка Zabbix Agent 2 на Windows серверы из ZIP архива
-#
-# Зависимости: нет
-# Хосты: windows
-# Переменные: zabbix_server (из inventory)
+# @file install-zabbix-agent.yml
+# @desc Установка Zabbix Agent 2 на Windows серверы из ZIP архива
+# @hosts windows
+# @vars zabbix_server (из inventory)
 ---
 - name: Install Zabbix Agent 2 on Windows
   hosts: windows

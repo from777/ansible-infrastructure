@@ -1,4 +1,6 @@
-# elk.yml
+# @file elk.yml
+# @desc Установка ELK Stack (Elasticsearch + Kibana)
+# @hosts elk
 ---
 - name: Install ELK Stack
   hosts: elk

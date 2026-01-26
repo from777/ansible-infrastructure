@@ -1,13 +1,7 @@
-# test-alert.yml
-# Тестирует алерты отправляя фейковое значение через zabbix_sender
-# Триггер срабатывает → алерт уходит в Telegram → через 30 сек восстанавливается
-#
-# Использование в CLI Arguments:
-#   -e "test_host=192.168.0.243" -e "test_item=kaspersky.status" -e "bad_value=0" -e "good_value=266240"
-#
-# Примеры:
-#   Kaspersky status: -e "test_host=192.168.0.243" -e "test_item=kaspersky.status" -e "bad_value=0" -e "good_value=266240"
-#   Kaspersky db.age: -e "test_host=192.168.0.243" -e "test_item=kaspersky.db.age" -e "bad_value=10" -e "good_value=1"
+# @file test-alert.yml
+# @desc Тестирует алерты отправляя фейковое значение через zabbix_sender
+# @hosts zabbix
+# @vars test_host, test_item, bad_value, good_value (extra vars)
 ---
 - name: Test Alert via zabbix_sender
   hosts: zabbix

@@ -1,6 +1,6 @@
-# 00-preflight-check.yml
-# Проверяет что всё готово перед настройкой firewall
-# Если что-то не так — падает с понятной ошибкой
+# @file 00-preflight-check.yml
+# @desc Проверка готовности перед настройкой firewall (interface lists)
+# @hosts mikrotik
 ---
 - name: Preflight checks before firewall setup
   hosts: mikrotik

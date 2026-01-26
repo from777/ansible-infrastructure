@@ -1,7 +1,7 @@
-# setup-windows-hosts.yml
-# Добавляет Windows хосты в Zabbix (без templates)
-# Templates привязываются отдельными playbooks (monitoring-kaspersky.yml)
-# Запускать: при добавлении нового Windows сервера
+# @file setup-hosts.yml
+# @desc Добавляет Windows хосты в Zabbix (без templates)
+# @hosts zabbix
+# @notes Templates привязываются отдельно: monitoring-kaspersky.yml
 ---
 - name: Setup Windows hosts in Zabbix
   hosts: zabbix

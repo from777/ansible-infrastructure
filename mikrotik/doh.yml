@@ -1,4 +1,6 @@
-# doh.yml
+# @file doh.yml
+# @desc Настройка DNS over HTTPS на MikroTik
+# @hosts mikrotik
 ---
 - name: Configure DoH DNS
   hosts: mikrotik

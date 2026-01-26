@@ -1,5 +1,7 @@
-# usb_format.yml - Форматирование USB в ext4
-# ВНИМАНИЕ: Удаляет все данные на USB!
+# @file usb_format.yml
+# @desc Форматирование USB накопителя в ext4 (УДАЛЯЕТ ВСЕ ДАННЫЕ!)
+# @hosts mikrotik
+# @notes ВНИМАНИЕ: удаляет все данные на USB
 ---
 - name: "USB format ext4 (WIPES DATA!)"
   hosts: mikrotik

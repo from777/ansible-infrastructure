@@ -1,6 +1,6 @@
-# 14-vpn-input.yml
-# Правила для chain=VPN-Input
-# Трафик от VPN клиентов и контейнеров к роутеру
+# @file 14-vpn-input.yml
+# @desc Правила VPN-Input: трафик от VPN клиентов и контейнеров к роутеру
+# @hosts mikrotik
 ---
 - name: Configure VPN-Input chain
   hosts: mikrotik

@@ -1,7 +1,6 @@
-# auto_ip.yml - Автоопределение следующего свободного IP для контейнера
-# Использование: include_tasks: ../_shared/_tasks/auto_ip.yml
-# Требуемые переменные: container_network (например "192.168.254")
-# Результат: auto_container_ip (например "192.168.254.5")
+# @file auto_ip.yml
+# @desc Автоопределение следующего свободного IP для контейнера
+# @vars container_network
 ---
 - name: Получить все veth адреса (terse формат)
   community.routeros.command:

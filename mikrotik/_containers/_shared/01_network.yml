@@ -1,5 +1,7 @@
-# 01_network.yml - Bridge-Docker + NAT + DNS
-# Вызывается из мастер-плейбуков (mihomo_awg.yml, zapret2.yml, и т.д.)
+# @file 01_network.yml
+# @desc Bridge-Docker + NAT + DNS для контейнеров
+# @hosts mikrotik
+# @notes Вызывается из мастер-плейбуков (mihomo_awg.yml, zapret2.yml)
 ---
 - name: "01: Bridge-Docker + NAT + DNS"
   hosts: mikrotik

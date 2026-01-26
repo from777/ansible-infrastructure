@@ -1,8 +1,6 @@
-# create-windows-host.yml
-# Создаёт один Windows хост в Zabbix если не существует
-# Требуемые переменные:
-#   - windows_host.name: имя хоста (IP)
-#   - windows_host.ip: IP адрес
+# @file create-windows-host.yml
+# @desc Создаёт один Windows хост в Zabbix если не существует
+# @vars windows_host.name, windows_host.ip
 ---
 - name: "Check if host {{ windows_host.name }} exists"
   ansible.builtin.uri:

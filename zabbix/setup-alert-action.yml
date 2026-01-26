@@ -1,6 +1,7 @@
-# setup-alert-action.yml
-# Создаёт Action для отправки алертов в Telegram для ВСЕХ хостов
-# Запускать после setup-telegram.yml
+# @file setup-alert-action.yml
+# @desc Создаёт Action для отправки алертов в Telegram для ВСЕХ хостов
+# @hosts zabbix
+# @deps setup-telegram.yml
 ---
 - name: Setup Alert Action for Telegram
   hosts: zabbix

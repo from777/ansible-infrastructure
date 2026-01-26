@@ -1,6 +1,6 @@
-# cleanup.yml - Остановка и удаление старого контейнера
-# Использование: include_tasks: ../_shared/_tasks/cleanup.yml
-# Требуемые переменные: container_name, docker_bridge, smb_mount_point
+# @file cleanup.yml
+# @desc Остановка и удаление старого контейнера
+# @vars container_name, docker_bridge, smb_mount_point
 ---
 - name: Очистить unknown порты из bridge
   community.routeros.command:

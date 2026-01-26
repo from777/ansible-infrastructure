@@ -1,5 +1,7 @@
-# 02_smb_mount.yml - SMB share на роутере + монтирование на Semaphore
-# Вызывается из мастер-плейбуков
+# @file 02_smb_mount.yml
+# @desc SMB share на роутере + монтирование на Semaphore
+# @hosts mikrotik
+# @notes Вызывается из мастер-плейбуков
 ---
 - name: "02: SMB share on router + mount on Semaphore"
   hosts: mikrotik

@@ -1,10 +1,8 @@
-# Mik_mom_firewall_custom_rules.yml
-# Кастомные правила для роутера Mik_mom
-#
-# Этот плейбук запускается ПОСЛЕ firewall-full.yml
-# Добавляет специфичные правила которых нет на других роутерах
-#
-# Правила интегрируются в новую структуру chains
+# @file Mik_mom_firewall_custom_rules.yml
+# @desc Кастомные правила firewall для роутера Mik_mom
+# @hosts Mik_mom
+# @deps _firewall-filter/firewall-full.yml
+# @notes Запускается ПОСЛЕ firewall-full.yml
 ---
 - name: Add custom rules for Mik_mom
   hosts: Mik_mom

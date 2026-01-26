@@ -1,6 +1,6 @@
-# 12-isp-input.yml
-# Правила для chain=ISP-Input и ISP-Input-Allow
-# Трафик от WAN (интернета) к роутеру
+# @file 12-isp-input.yml
+# @desc Правила ISP-Input: трафик от WAN к роутеру
+# @hosts mikrotik
 ---
 - name: Configure ISP-Input chain
   hosts: mikrotik

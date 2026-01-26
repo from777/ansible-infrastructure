@@ -1,9 +1,6 @@
-# container_package.yml - Установка пакета container на MikroTik
-# Автоматически определяет версию RouterOS и архитектуру
-#
-# Использование:
-#   ansible-playbook container_package.yml -l Mik_Tim
-#
+# @file container_package.yml
+# @desc Установка пакета container на MikroTik (автоопределение версии и архитектуры)
+# @hosts mikrotik
 ---
 - name: "Install container package"
   hosts: mikrotik

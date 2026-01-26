@@ -1,6 +1,6 @@
-# setup-telegram.yml
-# Настройка Telegram в Zabbix + тестовое сообщение
-# Удаляет существующий media type и создаёт новый (идемпотентность)
+# @file setup-telegram.yml
+# @desc Настройка Telegram media type в Zabbix (удаляет старый, создаёт новый)
+# @hosts zabbix
 ---
 - name: Setup Telegram integration in Zabbix
   hosts: zabbix

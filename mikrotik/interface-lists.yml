@@ -1,4 +1,6 @@
-# interface-lists.yml
+# @file interface-lists.yml
+# @desc Настройка interface lists (WAN, LAN, VPN-OUT, GUEST)
+# @hosts mikrotik
 ---
 - name: Configure MikroTik interface lists
   hosts: mikrotik

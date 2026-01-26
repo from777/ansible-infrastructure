@@ -1,14 +1,7 @@
-# mihomo_awg.yml - Установка mihomo в режиме AWG (AmneziaWG)
-#
-# Использование:
-#   ansible-playbook mihomo_awg.yml -l Mik_Tim
-#
-# Что делает:
-# 1. Настраивает сеть (Bridge-Docker, NAT, DNS)
-# 2. Монтирует SMB для доступа к конфигам
-# 3. Копирует AWG конфиги и custom_config.yaml
-# 4. Создаёт и запускает контейнер
-#
+# @file mihomo_awg.yml
+# @desc Установка mihomo в режиме AWG (AmneziaWG): сеть, SMB, конфиги, контейнер
+# @hosts mikrotik
+# @deps _containers/_shared/01_network.yml, _containers/_shared/02_smb_mount.yml
 ---
 - name: "Set AWG config"
   hosts: mikrotik

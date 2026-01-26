@@ -1,13 +1,7 @@
-# 13-guest-input.yml
-# Правила для chain=GUEST-Input
-# Трафик от гостевой сети к роутеру
-#
-# Гостям разрешаем только:
-# - DNS (чтобы работал интернет)
-# - DHCP (чтобы получили IP)
-# Всё остальное блокируем (не должны иметь доступ к настройкам роутера)
-#
-# Автоматически пропускается если нет interface-list GUEST
+# @file 13-guest-input.yml
+# @desc Правила GUEST-Input: трафик от гостевой сети к роутеру (только DNS и DHCP)
+# @hosts mikrotik
+# @notes Пропускается если нет interface-list GUEST
 ---
 - name: Configure GUEST-Input chain
   hosts: mikrotik

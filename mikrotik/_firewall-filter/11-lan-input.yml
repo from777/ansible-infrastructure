@@ -1,6 +1,6 @@
-# 11-lan-input.yml
-# Правила для chain=LAN-Input
-# Трафик от LAN к роутеру - разрешаем всё
+# @file 11-lan-input.yml
+# @desc Правила LAN-Input: трафик от LAN к роутеру (разрешаем всё)
+# @hosts mikrotik
 ---
 - name: Configure LAN-Input chain
   hosts: mikrotik

@@ -1,4 +1,6 @@
-# ssh-key.yml - Установка SSH ключа и отключение парольной аутентификации
+# @file ssh-key.yml
+# @desc Установка SSH ключа и отключение парольной аутентификации
+# @hosts mikrotik
 ---
 - name: Configure SSH key authentication for MikroTik
   hosts: mikrotik

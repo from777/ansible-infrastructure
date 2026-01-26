@@ -1,4 +1,6 @@
-# 03_configs_awg.yml - Копирование конфигов для AWG режима
+# @file 03_configs_awg.yml
+# @desc Копирование AWG конфигов в контейнер mihomo
+# @hosts mikrotik
 ---
 - name: "03: Copy AWG configs to container"
   hosts: mikrotik
