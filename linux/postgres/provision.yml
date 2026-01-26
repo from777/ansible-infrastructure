@@ -1,0 +1,59 @@
+# @file provision.yml
+# @desc Установка PostgreSQL из официального репозитория на Debian
+# @hosts postgres
+# @vars postgresql_version (по умолчанию 17)
+---
+- name: Install PostgreSQL on Debian
+  hosts: postgres
+  become: yes
+  vars:
+    postgresql_version: "17"
+
+  tasks:
+    - name: Install prerequisites
+      ansible.builtin.apt:
+        name:
+          - gnupg2
+          - curl
+          - ca-certificates
+          - lsb-release
+        state: present
+        update_cache: yes
+
+    - name: Add PostgreSQL GPG key
+      ansible.builtin.get_url:
+        url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+        dest: /usr/share/keyrings/postgresql.asc
+        mode: '0644'
+
+    - name: Get Debian codename
+      ansible.builtin.command: lsb_release -cs
+      register: debian_codename
+      changed_when: false
+
+    - name: Add PostgreSQL official repository
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/postgresql.asc] https://apt.postgresql.org/pub/repos/apt {{ debian_codename.stdout }}-pgdg main"
+        filename: pgdg
+        state: present
+
+    - name: Install PostgreSQL
+      ansible.builtin.apt:
+        name: "postgresql-{{ postgresql_version }}"
+        state: present
+        update_cache: yes
+
+    - name: Ensure PostgreSQL is running and enabled
+      ansible.builtin.systemd:
+        name: postgresql
+        state: started
+        enabled: yes
+
+    - name: Show PostgreSQL version
+      ansible.builtin.command: psql --version
+      register: pg_version
+      changed_when: false
+
+    - name: Display installed version
+      ansible.builtin.debug:
+        msg: "{{ pg_version.stdout }}"
