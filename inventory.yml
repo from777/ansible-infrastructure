@@ -6,9 +6,9 @@ mikrotik:
       ansible_host: 192.168.0.1
       elk_server: 192.168.0.82
       router_ip: 192.168.0.1
-      zabbix_monitor: true   # при изменении запустить: setup-mikrotik-hosts.yml
-      monitor_socks: true    # при изменении запустить: monitoring-socks.yml
-      monitor_users: true    # при изменении запустить: monitoring-users.yml
+      zabbix_monitor: true   # при изменении запустить: linux/zabbix/mikrotik/setup-hosts.yml
+      monitor_socks: true    # при изменении запустить: linux/zabbix/mikrotik/monitoring-socks.yml
+      monitor_users: true    # при изменении запустить: linux/zabbix/mikrotik/monitoring-users.yml
       allowed_users:         # пользователи с group=full (для monitor_users)
         - admin
         - smbuser
@@ -16,9 +16,9 @@ mikrotik:
       ansible_host: 109.174.1.142
       elk_server: 10.200.200.82
       router_ip: 192.168.0.1
-      zabbix_monitor: false  # при изменении запустить: setup-mikrotik-hosts.yml
-      monitor_socks: false   # при изменении запустить: monitoring-socks.yml
-      monitor_users: false   # при изменении запустить: monitoring-users.yml
+      zabbix_monitor: false  # при изменении запустить: linux/zabbix/mikrotik/setup-hosts.yml
+      monitor_socks: false   # при изменении запустить: linux/zabbix/mikrotik/monitoring-socks.yml
+      monitor_users: false   # при изменении запустить: linux/zabbix/mikrotik/monitoring-users.yml
       allowed_users:         # пользователи с group=full (для monitor_users)
         - admin
         - user1
@@ -29,28 +29,28 @@ mikrotik:
         - 192.168.88.0/24
         - 192.168.0.0/24
         - 212.20.46.209
-      zabbix_monitor: true  # при изменении запустить: setup-mikrotik-hosts.yml
-      monitor_socks: true   # при изменении запустить: monitoring-socks.yml
-      monitor_users: false  # при изменении запустить: monitoring-users.yml
+      zabbix_monitor: true  # при изменении запустить: linux/zabbix/mikrotik/setup-hosts.yml
+      monitor_socks: true   # при изменении запустить: linux/zabbix/mikrotik/monitoring-socks.yml
+      monitor_users: false  # при изменении запустить: linux/zabbix/mikrotik/monitoring-users.yml
       allowed_users:        # пользователи с group=full (для monitor_users)
         - admin
         - ansible
 
-zabbix:
-  hosts:
-    zabbix-server:
-      ansible_host: 192.168.0.81
-      ansible_user: vagrant
-      ansible_password: vagrant
+linux:
+  children:
+    zabbix:
+      hosts:
+        zabbix-server:
+          ansible_host: 192.168.0.81
+          ansible_password: vagrant
+    elk:
+      hosts:
+        elk-server:
+          ansible_host: 192.168.0.82
+    postgres:
+      hosts: {}  # TODO: добавить postgres-server с ansible_host
   vars:
-    zabbix_user: "Admin"
-    zabbix_password: "zabbix"
-
-elk:
-  hosts:
-    elk-server:
-      ansible_host: 192.168.0.82
-      ansible_user: vagrant
+    ansible_user: vagrant
 
 windows:
   hosts:

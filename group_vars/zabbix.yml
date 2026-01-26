@@ -1,0 +1,13 @@
+# group_vars/zabbix.yml - переменные для группы zabbix
+---
+
+# Zabbix API credentials
+zabbix_user: "Admin"
+zabbix_password: "zabbix"
+
+# Zabbix Server configuration
+zabbix_version: "7.0"
+db_name: zabbix
+db_user: zabbix
+db_password: "zabbix_secure_pass_123"
+zabbix_timezone: "Europe/Moscow"

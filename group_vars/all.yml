@@ -1,0 +1,6 @@
+# group_vars/all.yml - общие переменные для всех хостов
+---
+
+# Telegram alerts
+tg_token: "5618230805:AAFAIcZme9nBm_TUPnmhgdG3_gTT3eLP1Bs"
+tg_chat_id: "1009377001"

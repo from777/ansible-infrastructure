@@ -1,7 +1,7 @@
 # @file monitoring-socks.yml
 # @desc Мониторинг SOCKS: template + привязка/отлинковка к хостам
 # @hosts zabbix
-# @deps zabbix/mikrotik/setup-hosts.yml
+# @deps linux/zabbix/mikrotik/setup-hosts.yml
 ---
 - name: Setup SOCKS monitoring in Zabbix
   hosts: zabbix
