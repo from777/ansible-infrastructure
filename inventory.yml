@@ -1,9 +1,29 @@
 # Ansible Inventory — auto-generated
-# Updated: 2026-01-30 15:31:47
+# Updated: 2026-01-30 15:33:19
 # Source: Notes host manager
 ---
 all:
   children:
+    linux:
+      children:
+        apache:
+          hosts:
+            192.168.0.71:
+              ansible_host: 192.168.0.71
+        php:
+          hosts:
+            192.168.0.71:
+              ansible_host: 192.168.0.71
+        postgresql:
+          hosts:
+            192.168.0.55:
+              ansible_host: 192.168.0.55
+    mikrotik:
+      hosts:
+        Mik_Tim:
+          ansible_host: 192.168.0.1
+          ansible_connection: network_cli
+          ansible_network_os: community.routeros.routeros
     windows:
       hosts:
         test:
