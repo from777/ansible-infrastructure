@@ -1,11 +1,6 @@
 # Ansible Inventory — auto-generated
-# Updated: 2026-01-30 15:33:44
+# Updated: 2026-01-30 15:33:45
 # Source: Notes host manager
 ---
 all:
   children:
-    windows:
-      hosts:
-        test:
-          ansible_host: 192.168.0.90
-          ansible_connection: winrm
