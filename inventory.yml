@@ -1,5 +1,5 @@
 # Ansible Inventory — auto-generated
-# Updated: 2026-01-30 15:33:27
+# Updated: 2026-01-30 15:33:41
 # Source: Notes host manager
 ---
 all:
@@ -14,10 +14,6 @@ all:
           hosts:
             192.168.0.71:
               ansible_host: 192.168.0.71
-        postgresql:
-          hosts:
-            192.168.0.55:
-              ansible_host: 192.168.0.55
     mikrotik:
       hosts:
         Mik_Tim:
