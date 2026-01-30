@@ -1,19 +1,9 @@
 # Ansible Inventory — auto-generated
-# Updated: 2026-01-30 15:33:41
+# Updated: 2026-01-30 15:33:42
 # Source: Notes host manager
 ---
 all:
   children:
-    linux:
-      children:
-        apache:
-          hosts:
-            192.168.0.71:
-              ansible_host: 192.168.0.71
-        php:
-          hosts:
-            192.168.0.71:
-              ansible_host: 192.168.0.71
     mikrotik:
       hosts:
         Mik_Tim:
