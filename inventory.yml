@@ -1,71 +1,35 @@
 ---
-mikrotik:
-  hosts:
-    Mik_Tim:
-      ansible_host: 192.168.0.1
-      elk_server: 192.168.0.82
-      router_ip: 192.168.0.1
-      zabbix_monitor: true   # при изменении запустить: linux/zabbix/mikrotik/setup-hosts.yml
-      monitor_socks: true    # при изменении запустить: linux/zabbix/mikrotik/monitoring-socks.yml
-      monitor_users: true    # при изменении запустить: linux/zabbix/mikrotik/monitoring-users.yml
-      allowed_users:         # пользователи с group=full (для monitor_users)
-        - admin
-        - smbuser
-    Mik_mom:
-      ansible_host: 109.174.1.142
-      elk_server: 10.200.200.82
-      router_ip: 192.168.0.1
-      zabbix_monitor: false  # при изменении запустить: linux/zabbix/mikrotik/setup-hosts.yml
-      monitor_socks: false   # при изменении запустить: linux/zabbix/mikrotik/monitoring-socks.yml
-      monitor_users: false   # при изменении запустить: linux/zabbix/mikrotik/monitoring-users.yml
-      allowed_users:         # пользователи с group=full (для monitor_users)
-        - admin
-        - user1
-    Mik_Mom_ax3:
-      ansible_host: 192.168.0.88
-      router_ip: 192.168.88.1
-      allowed_networks:
-        - 192.168.88.0/24
-        - 192.168.0.0/24
-        - 212.20.46.209
-      zabbix_monitor: true  # при изменении запустить: linux/zabbix/mikrotik/setup-hosts.yml
-      monitor_socks: true   # при изменении запустить: linux/zabbix/mikrotik/monitoring-socks.yml
-      monitor_users: false  # при изменении запустить: linux/zabbix/mikrotik/monitoring-users.yml
-      allowed_users:        # пользователи с group=full (для monitor_users)
-        - admin
-        - ansible
-
-linux:
+all:
   children:
-    zabbix:
-      hosts:
-        zabbix-server:
-          ansible_host: 192.168.0.81
-          ansible_password: vagrant
     elk:
       hosts:
         elk-server:
           ansible_host: 192.168.0.82
-    postgres:
-      hosts: {}  # TODO: добавить postgres-server с ansible_host
-  vars:
-    ansible_user: vagrant
-
-windows:
-  hosts:
-    176.9.141.234:   # VPS
-      monitor_kaspersky: false
-    192.168.0.248:   # DESKTOP-UOHL2UI
-      monitor_kaspersky: true
-    192.168.0.90:    # DESKTOP-JT6FBIH
-      monitor_kaspersky: true
-    192.168.0.243:   # DESKTOP-1N503TN
-      monitor_kaspersky: true
-  vars:
-    ansible_connection: winrm
-    ansible_winrm_transport: basic
-    ansible_winrm_port: 5985
-    ansible_winrm_scheme: http
-    ansible_winrm_read_timeout_sec: 120
-    ansible_winrm_operation_timeout_sec: 100
-    zabbix_server: 192.168.0.81  # IP Zabbix сервера для агентов
+    linux:
+      hosts:
+        elk-server:
+          ansible_host: 192.168.0.82
+        zabbix-server:
+          ansible_host: 192.168.0.81
+    mikrotik:
+      hosts:
+        Mik_Mom_ax3:
+          ansible_host: 192.168.0.88
+        Mik_Tim:
+          ansible_host: 192.168.0.1
+        Mik_mom:
+          ansible_host: 109.174.1.142
+    windows:
+      hosts:
+        176.9.141.234:
+          ansible_host: 176.9.141.234
+        192.168.0.243:
+          ansible_host: 192.168.0.243
+        192.168.0.248:
+          ansible_host: 192.168.0.248
+        192.168.0.90:
+          ansible_host: 192.168.0.90
+    zabbix_server:
+      hosts:
+        zabbix-server:
+          ansible_host: 192.168.0.81
