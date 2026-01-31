@@ -1,71 +1,14 @@
+# Ansible Inventory — auto-generated
+# Updated: 2026-01-31 13:35:03
+# Source: Notes host manager
 ---
-mikrotik:
-  hosts:
-    Mik_Tim:
-      ansible_host: 192.168.0.1
-      elk_server: 192.168.0.82
-      router_ip: 192.168.0.1
-      zabbix_monitor: true   # РїСЂРё РёР·РјРµРЅРµРЅРёРё Р·Р°РїСѓСЃС‚РёС‚СЊ: linux/zabbix/mikrotik/setup-hosts.yml
-      monitor_socks: true    # РїСЂРё РёР·РјРµРЅРµРЅРёРё Р·Р°РїСѓСЃС‚РёС‚СЊ: linux/zabbix/mikrotik/monitoring-socks.yml
-      monitor_users: true    # РїСЂРё РёР·РјРµРЅРµРЅРёРё Р·Р°РїСѓСЃС‚РёС‚СЊ: linux/zabbix/mikrotik/monitoring-users.yml
-      allowed_users:         # РїРѕР»СЊР·РѕРІР°С‚РµР»Рё СЃ group=full (РґР»СЏ monitor_users)
-        - admin
-        - smbuser
-    Mik_mom:
-      ansible_host: 109.174.1.142
-      elk_server: 10.200.200.82
-      router_ip: 192.168.0.1
-      zabbix_monitor: false  # РїСЂРё РёР·РјРµРЅРµРЅРёРё Р·Р°РїСѓСЃС‚РёС‚СЊ: linux/zabbix/mikrotik/setup-hosts.yml
-      monitor_socks: false   # РїСЂРё РёР·РјРµРЅРµРЅРёРё Р·Р°РїСѓСЃС‚РёС‚СЊ: linux/zabbix/mikrotik/monitoring-socks.yml
-      monitor_users: false   # РїСЂРё РёР·РјРµРЅРµРЅРёРё Р·Р°РїСѓСЃС‚РёС‚СЊ: linux/zabbix/mikrotik/monitoring-users.yml
-      allowed_users:         # РїРѕР»СЊР·РѕРІР°С‚РµР»Рё СЃ group=full (РґР»СЏ monitor_users)
-        - admin
-        - user1
-    Mik_Mom_ax3:
-      ansible_host: 192.168.0.88
-      router_ip: 192.168.88.1
-      allowed_networks:
-        - 192.168.88.0/24
-        - 192.168.0.0/24
-        - 212.20.46.209
-      zabbix_monitor: true  # РїСЂРё РёР·РјРµРЅРµРЅРёРё Р·Р°РїСѓСЃС‚РёС‚СЊ: linux/zabbix/mikrotik/setup-hosts.yml
-      monitor_socks: true   # РїСЂРё РёР·РјРµРЅРµРЅРёРё Р·Р°РїСѓСЃС‚РёС‚СЊ: linux/zabbix/mikrotik/monitoring-socks.yml
-      monitor_users: false  # РїСЂРё РёР·РјРµРЅРµРЅРёРё Р·Р°РїСѓСЃС‚РёС‚СЊ: linux/zabbix/mikrotik/monitoring-users.yml
-      allowed_users:        # РїРѕР»СЊР·РѕРІР°С‚РµР»Рё СЃ group=full (РґР»СЏ monitor_users)
-        - admin
-        - ansible
-
-linux:
+all:
   children:
-    zabbix:
-      hosts:
-        zabbix-server:
-          ansible_host: 192.168.0.81
-          ansible_password: vagrant
-    elk:
-      hosts:
-        elk-server:
-          ansible_host: 192.168.0.82
-    postgres:
-      hosts: {}  # TODO: РґРѕР±Р°РІРёС‚СЊ postgres-server СЃ ansible_host
-  vars:
-    ansible_user: vagrant
-
-windows:
-  hosts:
-    176.9.141.234:   # VPS
-      monitor_kaspersky: false
-    192.168.0.248:   # DESKTOP-UOHL2UI
-      monitor_kaspersky: true
-    192.168.0.90:    # DESKTOP-JT6FBIH
-      monitor_kaspersky: true
-    192.168.0.243:   # DESKTOP-1N503TN
-      monitor_kaspersky: true
-  vars:
-    ansible_connection: winrm
-    ansible_winrm_transport: basic
-    ansible_winrm_port: 5985
-    ansible_winrm_scheme: http
-    ansible_winrm_read_timeout_sec: 120
-    ansible_winrm_operation_timeout_sec: 100
-    zabbix_server: 192.168.0.81  # IP Zabbix СЃРµСЂРІРµСЂР° РґР»СЏ Р°РіРµРЅС‚РѕРІ
+    mikrotik:
+      children:
+        mikrotik:
+          hosts:
+            Mik_Tim:
+              ansible_host: 192.168.0.1
+              ansible_connection: network_cli
+              ansible_network_os: community.routeros.routeros
