@@ -1,3 +1,4 @@
+# php_system_id: 6
 # @file logging.yml
 # @desc Настройка отправки логов MikroTik на ELK сервер
 # @hosts mikrotik
