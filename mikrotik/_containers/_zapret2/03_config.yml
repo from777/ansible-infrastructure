@@ -42,17 +42,15 @@
       delegate_to: localhost
 
     # ===== ПОИСК ИСТОЧНИКА КОНФИГА =====
-    # Воркер подкладывает привязанные Notes-конфиги в {{ playbook_dir }}/configs/
-    # под именем из поля filename (для zapret2 это "configs/zapret2_config.j2").
-    - name: "03: Проверить Notes-шаблон (zapret2_config.j2)"
+    - name: "03: Проверить Notes-шаблон (config.j2)"
       ansible.builtin.stat:
-        path: "{{ configs_path }}/zapret2_config.j2"
+        path: "{{ configs_path }}/config.j2"
       register: notes_j2
       delegate_to: localhost
 
-    - name: "03: Проверить Notes-конфиг (готовый, zapret2_config)"
+    - name: "03: Проверить Notes-конфиг (готовый, без Jinja)"
       ansible.builtin.stat:
-        path: "{{ configs_path }}/zapret2_config"
+        path: "{{ configs_path }}/config"
       register: notes_plain
       delegate_to: localhost
 
@@ -79,17 +77,17 @@
       when: config_source == 'none'
 
     # ===== РЕНДЕР / КОПИРОВАНИЕ =====
-    - name: "03: Рендер zapret2_config.j2 из Notes (Jinja → подставит nfqws2_strategy и др.)"
+    - name: "03: Рендер config.j2 из Notes (Jinja → подставит nfqws2_strategy и др.)"
       ansible.builtin.template:
-        src: "{{ configs_path }}/zapret2_config.j2"
+        src: "{{ configs_path }}/config.j2"
         dest: "{{ prepared_config_path }}"
         mode: '0644'
       delegate_to: localhost
       when: config_source == 'notes_j2'
 
-    - name: "03: Копировать готовый zapret2_config из Notes (без Jinja)"
+    - name: "03: Копировать готовый config из Notes (без Jinja)"
       ansible.builtin.copy:
-        src: "{{ configs_path }}/zapret2_config"
+        src: "{{ configs_path }}/config"
         dest: "{{ prepared_config_path }}"
         mode: '0644'
       delegate_to: localhost
