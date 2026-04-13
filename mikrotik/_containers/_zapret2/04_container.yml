@@ -106,28 +106,19 @@
           Логи контейнера: /log print where topics~"container"
       when: not zapret2_installed.stat.exists
 
-    - name: Проверить что подготовленный config существует (готовит 03_config.yml)
-      ansible.builtin.stat:
-        path: "{{ smb_mount_point }}/docker_configs/{{ container_name }}/zapret2_config"
-      delegate_to: localhost
-      register: prepared_config
-
-    - name: FAIL если 03_config.yml не подготовил config
-      ansible.builtin.fail:
-        msg: |
-          Подготовленный config не найден!
-          Ожидаемый путь: {{ smb_mount_point }}/docker_configs/{{ container_name }}/zapret2_config
-          Запусти 03_config.yml ДО 04_container.yml (проверь цепочку в zapret2.yml).
-      when:
-        - zapret2_installed.stat.exists
-        - not prepared_config.stat.exists
-
-    - name: Применить подготовленный config (из Notes/шаблона — см. 03_config.yml)
+    - name: Записать config с рабочей стратегией DPI bypass
       ansible.builtin.copy:
-        src: "{{ smb_mount_point }}/docker_configs/{{ container_name }}/zapret2_config"
+        content: |
+          NFQWS2_ENABLE=1
+          MODE_FILTER=all
+          INIT_APPLY_FW=1
+          DISABLE_IPV6=1
+          NFQWS2_PORTS_TCP=443
+          NFQWS2_TCP_PKT_OUT=20
+          NFQWS2_TCP_PKT_IN=10
+          NFQWS2_OPT="{{ nfqws2_strategy }}"
         dest: "{{ smb_mount_point }}/docker/{{ container_name }}/opt/zapret2/config"
         mode: '0644'
-        remote_src: yes
       delegate_to: localhost
       when: zapret2_installed.stat.exists
 

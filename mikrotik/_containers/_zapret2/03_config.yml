@@ -1,22 +1,15 @@
 # @file 03_config.yml
-# @desc Подготовка config файла для Zapret2 из Notes-конфигов (приоритет) или fallback из ~configs/config.j2
+# @desc Подготовка папки для конфига Zapret2 (конфиг создаётся после первого запуска)
 # @hosts mikrotik
-# @vars nfqws2_strategy (vars.yml) — подставляется в шаблон config.j2 через Jinja
-# @notes Воркер кладёт привязанные в Notes конфиги в {{ playbook_dir }}/configs/.
-#        Источники (по приоритету): config.j2 (Notes) > config (Notes, plain) > ~configs/config.j2 (репо).
-#        Подготовленный файл сохраняется в {{ smb_mount_point }}/docker_configs/{{ container_name }}/zapret2_config
-#        и применяется в 04_container.yml ПОСЛЕ установки zapret2 внутри контейнера (первый запуск).
 ---
-- name: "03: Prepare Zapret2 config"
+- name: "03: Prepare for Zapret2 config"
   hosts: mikrotik
   gather_facts: no
   connection: ansible.netcommon.network_cli
   vars:
     ansible_network_os: community.routeros.routeros
-    smb_prep_dir: "{{ smb_mount_point }}/docker_configs/{{ container_name }}"
-    configs_path: "{{ playbook_dir }}/configs"
-    prepared_config_path: "{{ smb_prep_dir }}/zapret2_config"
-    fallback_template: "{{ playbook_dir }}/~configs/config.j2"
+    ansible_command_timeout: 120
+    smb_path: "{{ smb_mount_point }}/docker/{{ container_name }}"
   vars_files:
     - ../_shared/vars_common.yml
     - vars.yml
@@ -31,89 +24,16 @@
 
     - name: "03: Fail если SMB не смонтирован"
       ansible.builtin.fail:
-        msg: "SMB не смонтирован! Сначала запусти 02_smb_mount.yml"
+        msg: "SMB не смонтирован! SMB настроен в 02_smb_mount.yml"
       when: not smb_mounted.stat.exists
 
-    - name: "03: Создать prepared-папку на SMB"
-      ansible.builtin.file:
-        path: "{{ smb_prep_dir }}"
-        state: directory
-        mode: '0755'
-      delegate_to: localhost
-
-    # ===== ПОИСК ИСТОЧНИКА КОНФИГА =====
-    - name: "03: Проверить Notes-шаблон (config.j2)"
-      ansible.builtin.stat:
-        path: "{{ configs_path }}/config.j2"
-      register: notes_j2
-      delegate_to: localhost
-
-    - name: "03: Проверить Notes-конфиг (готовый, без Jinja)"
-      ansible.builtin.stat:
-        path: "{{ configs_path }}/config"
-      register: notes_plain
-      delegate_to: localhost
-
-    - name: "03: Проверить fallback-шаблон в репо"
-      ansible.builtin.stat:
-        path: "{{ fallback_template }}"
-      register: fallback_j2
-      delegate_to: localhost
-
-    - name: "03: Выбрать источник конфига"
-      ansible.builtin.set_fact:
-        config_source: >-
-          {% if notes_j2.stat.exists %}notes_j2
-          {%- elif notes_plain.stat.exists %}notes_plain
-          {%- elif fallback_j2.stat.exists %}fallback_j2
-          {%- else %}none{% endif %}
-
-    - name: "03: Fail если нет источника конфига"
-      ansible.builtin.fail:
-        msg: |
-          Нет конфига для Zapret2!
-          Привяжи config.j2 к плейбуку через UI Notes → "Конфиги",
-          либо проверь что шаблон есть в репо: {{ fallback_template }}
-      when: config_source == 'none'
-
-    # ===== РЕНДЕР / КОПИРОВАНИЕ =====
-    - name: "03: Рендер config.j2 из Notes (Jinja → подставит nfqws2_strategy и др.)"
-      ansible.builtin.template:
-        src: "{{ configs_path }}/config.j2"
-        dest: "{{ prepared_config_path }}"
-        mode: '0644'
-      delegate_to: localhost
-      when: config_source == 'notes_j2'
-
-    - name: "03: Копировать готовый config из Notes (без Jinja)"
-      ansible.builtin.copy:
-        src: "{{ configs_path }}/config"
-        dest: "{{ prepared_config_path }}"
-        mode: '0644'
-      delegate_to: localhost
-      when: config_source == 'notes_plain'
-
-    - name: "03: Рендер fallback ~configs/config.j2 из репо"
-      ansible.builtin.template:
-        src: "{{ fallback_template }}"
-        dest: "{{ prepared_config_path }}"
-        mode: '0644'
-      delegate_to: localhost
-      when: config_source == 'fallback_j2'
-
-    # ===== РЕЗУЛЬТАТ =====
-    - name: "03: Показать stat подготовленного конфига"
-      ansible.builtin.stat:
-        path: "{{ prepared_config_path }}"
-      register: prepared_stat
-      delegate_to: localhost
-
-    - name: "03: Результат"
+    - name: "03: Показать стратегию DPI bypass"
       ansible.builtin.debug:
         msg: |
-          Источник конфига: {{ config_source }}
-          Готовый файл: {{ prepared_config_path }} ({{ prepared_stat.stat.size | default('?') }} байт)
-          Стратегия (из vars.yml): {{ nfqws2_strategy }}
+          Стратегия для Zapret2:
+          {{ nfqws2_strategy }}
 
-          В 04_container.yml этот файл будет скопирован в:
-            {{ smb_mount_point }}/docker/{{ container_name }}/opt/zapret2/config
+          Если перестанет работать:
+          /container shell [find interface={{ container_name }}]
+          /opt/zapret2/init.d/sysv/zapret2 stop
+          ./blockcheck2.sh --hosts=www.youtube.com
